@@ -264,6 +264,12 @@ namespace PaRuX.Services
                 bytes /= 1024;
                 unit++;
             }
+            // Carry when the one-decimal display would round up to 1024.0 in the current unit
+            if (unit < units.Length - 1 && unit > 0 && Math.Round(bytes, 1) >= 1024.0)
+            {
+                bytes /= 1024;
+                unit++;
+            }
             return bytes.ToString(unit == 0 ? "0" : "0.0", CultureInfo.InvariantCulture) + " " + units[unit];
         }
 

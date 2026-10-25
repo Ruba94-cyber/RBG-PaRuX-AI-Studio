@@ -292,6 +292,9 @@ namespace PaRuX.Server.Tests
         [InlineData(1024, "1.0 KB")]
         [InlineData(1048576, "1.0 MB")]
         [InlineData(1073741824, "1.0 GB")]
+        [InlineData(1048575, "1.0 MB")]
+        [InlineData(1073741823, "1.0 GB")]
+        [InlineData(1099511627775, "1.0 TB")]
         public void FormatBytes_formats_correctly(long bytes, string expected)
         {
             string formatted = InstallProgressPresenter.FormatBytes(bytes);
