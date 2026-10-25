@@ -477,6 +477,37 @@ public static class MobileControlEndpoints
             catch (InvalidDataException exception) { return Results.BadRequest(new { error = exception.Message }); }
         });
 
+        // The desktop client reads (and, for legacy single-workspace callers, writes) the Core-stored
+        // workspace binding of a task. Without this route every coding task looked unbound to the
+        // agent ("task identity and workspace assignment could not be confirmed"), so no task ever
+        // received verifier handoff authority.
+        app.MapGet("/api/v1/orchestrator/tasks/{taskId}/workspace", (
+            string taskId,
+            HttpContext context,
+            TaskStore tasks) =>
+        {
+            if (!IsDesktopOwner(context)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+            if (tasks.Get(taskId) == null) return Results.NotFound(new { error = "Task not found." });
+            AgentWorkspaceAssignmentDto? assignment = AgentWorkspaceAssignmentStore.Current.Get(taskId);
+            return assignment == null
+                ? Results.NotFound(new { error = "Task has no workspace assignment." })
+                : Results.Ok(assignment);
+        });
+
+        app.MapPut("/api/v1/orchestrator/tasks/{taskId}/workspace", (
+            string taskId,
+            SetAgentWorkspaceAssignmentRequest request,
+            HttpContext context,
+            TaskStore tasks) =>
+        {
+            if (!IsDesktopOwner(context)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+            AgentTaskDto? task = tasks.Get(taskId);
+            if (task == null) return Results.NotFound(new { error = "Task not found." });
+            try { return Results.Ok(AgentWorkspaceAssignmentStore.Current.Set(taskId, request.WorkspaceRoot, task)); }
+            catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
+            { return Results.BadRequest(new { error = exception.Message }); }
+        });
+
         app.MapGet("/api/v1/orchestrator/tasks/{taskId}/desktop-worktree", (
             string taskId,
             HttpContext context,

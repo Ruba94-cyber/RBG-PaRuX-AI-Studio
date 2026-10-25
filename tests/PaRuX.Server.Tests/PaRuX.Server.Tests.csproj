@@ -122,6 +122,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\BubblePlacementPolicy.cs" Link="Bubble\BubblePlacementPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\LocalAgentCancellationRegistry.cs" Link="Control\LocalAgentCancellationRegistry.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\LocalAiState.cs" Link="Runtime\LocalAiState.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ChatHeaderStatusPresenter.cs" Link="Runtime\ChatHeaderStatusPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\UniversalDiffFormatter.cs" Link="Diff\UniversalDiffFormatter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\EvalTrainingDatasetExporter.cs" Link="Training\EvalTrainingDatasetExporter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ModelDownloadResumeCatalog.cs" Link="ModelHub\ModelDownloadResumeCatalog.cs" />

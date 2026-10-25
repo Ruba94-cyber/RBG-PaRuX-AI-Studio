@@ -118,7 +118,8 @@ public sealed class CodingAgentReadBatchTests
     public void Validation_rejects_wrong_sizes_duplicates_and_missing_fields()
     {
         Assert.False(CodingAgentReadBatch.TryValidate(null, out _));
-        Assert.False(CodingAgentReadBatch.TryValidate(new[] { Read("a") }, out _));
+        Assert.True(CodingAgentReadBatch.TryValidate(new[] { Read("a") }, out _)); // a one-item batch is just a read; rejecting it wasted a model step
+        Assert.False(CodingAgentReadBatch.TryValidate(Array.Empty<CodingBatchReadItem>(), out _));
         Assert.False(CodingAgentReadBatch.TryValidate(Enumerable.Range(0, 7).Select(i => Read("f" + i)).ToList(), out _));
         Assert.False(CodingAgentReadBatch.TryValidate(new[] { Read("a"), Read("a") }, out string dup));
         Assert.Contains("duplicate", dup);

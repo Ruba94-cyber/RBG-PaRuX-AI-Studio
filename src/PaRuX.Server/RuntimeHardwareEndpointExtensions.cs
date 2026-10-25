@@ -91,18 +91,25 @@ public static class RuntimeHardwareEndpointExtensions
             GpuInventoryStatus gpu = gpuInventory.GetStatus();
             RuntimeHardwareProfile accelerator = RuntimeHardwareProfileResolver.Resolve(status, gpu);
 
+            RuntimeManagerHardwareStatus shaped = FromStatus(status);
             return Results.Ok(new RuntimeManagerHardwareStatus
             {
-                Backends = status.Backends,
-                GpuDetected = status.GpuDetected,
-                VramTotalMib = status.VramTotalMib,
-                RamTotalBytes = status.RamTotalBytes,
-                GamingActive = status.GamingActive,
-                ActiveRole = status.ActiveRole,
-                ActiveProfile = status.ActiveProfile,
-                ActiveModelPath = status.ActiveModelPath,
-                LaunchPlanExplanation = status.LaunchPlanExplanation,
-                TextLaunchTrace = status.TextLaunchTrace,
+                Backends = shaped.Backends,
+                CurrentManagedProviderEndpoint = shaped.CurrentManagedProviderEndpoint,
+                GpuDetected = shaped.GpuDetected,
+                VramTotalMib = shaped.VramTotalMib,
+                VramFreeMib = shaped.VramFreeMib,
+                RamTotalBytes = shaped.RamTotalBytes,
+                GamingActive = shaped.GamingActive,
+                GamingShutdownPending = shaped.GamingShutdownPending,
+                LastGamingShutdownFailure = shaped.LastGamingShutdownFailure,
+                ActiveRole = shaped.ActiveRole,
+                ActiveProfile = shaped.ActiveProfile,
+                ActiveModelPath = shaped.ActiveModelPath,
+                ActiveVisionProjectorPath = shaped.ActiveVisionProjectorPath,
+                ActiveHasVisionSupport = shaped.ActiveHasVisionSupport,
+                LaunchPlanExplanation = shaped.LaunchPlanExplanation,
+                TextLaunchTrace = shaped.TextLaunchTrace,
                 GpuAdapters = gpu.Adapters,
                 GpuDedicatedVideoMemoryTotalBytes = gpu.TotalDedicatedVideoMemoryBytes,
                 GpuDedicatedSystemMemoryTotalBytes = gpu.TotalDedicatedSystemMemoryBytes,
@@ -128,6 +135,30 @@ public static class RuntimeHardwareEndpointExtensions
             });
         });
     }
+
+    /// <summary>Copies every original <see cref="RuntimeManagerStatus"/> field to the root of the hardware
+    /// shape. The endpoint promises that all original fields stay at the root; the managed provider endpoint,
+    /// free VRAM, gaming-shutdown state and vision projector were once left out, so clients that need the
+    /// endpoint (the coding agent's context-window probe) always saw it as unknown.</summary>
+    public static RuntimeManagerHardwareStatus FromStatus(RuntimeManagerStatus status) => new()
+    {
+        Backends = status.Backends,
+        CurrentManagedProviderEndpoint = status.CurrentManagedProviderEndpoint,
+        GpuDetected = status.GpuDetected,
+        VramTotalMib = status.VramTotalMib,
+        VramFreeMib = status.VramFreeMib,
+        RamTotalBytes = status.RamTotalBytes,
+        GamingActive = status.GamingActive,
+        GamingShutdownPending = status.GamingShutdownPending,
+        LastGamingShutdownFailure = status.LastGamingShutdownFailure,
+        ActiveRole = status.ActiveRole,
+        ActiveProfile = status.ActiveProfile,
+        ActiveModelPath = status.ActiveModelPath,
+        ActiveVisionProjectorPath = status.ActiveVisionProjectorPath,
+        ActiveHasVisionSupport = status.ActiveHasVisionSupport,
+        LaunchPlanExplanation = status.LaunchPlanExplanation,
+        TextLaunchTrace = status.TextLaunchTrace
+    };
 
     private static void MapPerformanceEndpoints(
         WebApplication app,

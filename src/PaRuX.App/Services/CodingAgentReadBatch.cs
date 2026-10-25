@@ -47,8 +47,8 @@ namespace PaRuX.Services
         public static bool TryValidate(IReadOnlyList<CodingBatchReadItem>? items, out string error)
         {
             error = string.Empty;
-            if (items == null || items.Count < 2 || items.Count > MaxItems)
-            { error = "requests must contain between 2 and " + MaxItems + " read-only items"; return false; }
+            if (items == null || items.Count < 1 || items.Count > MaxItems)
+            { error = "requests must contain between 1 and " + MaxItems + " read-only items"; return false; }
             var identities = new HashSet<string>(StringComparer.Ordinal);
             foreach (CodingBatchReadItem item in items)
             {

@@ -79,13 +79,19 @@ public sealed class RuntimeAcceleratorProfile
 public sealed class RuntimeManagerHardwareStatus
 {
     public List<RuntimeBackendStatus> Backends { get; set; } = new();
+    public string? CurrentManagedProviderEndpoint { get; set; }
     public bool GpuDetected { get; set; }
     public int VramTotalMib { get; set; }
+    public int? VramFreeMib { get; set; }
     public long RamTotalBytes { get; set; }
     public bool GamingActive { get; set; }
+    public bool GamingShutdownPending { get; set; }
+    public string? LastGamingShutdownFailure { get; set; }
     public string? ActiveRole { get; set; }
     public string? ActiveProfile { get; set; }
     public string? ActiveModelPath { get; set; }
+    public string? ActiveVisionProjectorPath { get; set; }
+    public bool ActiveHasVisionSupport { get; set; }
     public string LaunchPlanExplanation { get; set; } = string.Empty;
     public List<string> TextLaunchTrace { get; set; } = new();
 
