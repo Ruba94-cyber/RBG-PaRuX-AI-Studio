@@ -1,0 +1,100 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Version>1.9.6</Version>
+    <FileVersion>1.9.6.0</FileVersion>
+    <AssemblyVersion>1.9.6.0</AssemblyVersion>
+    <InformationalVersion>1.9.6</InformationalVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Public binary/process branding is PaRuX Server; keep the internal project/namespace
+         stable to avoid a high-risk no-value mass namespace rewrite during release hardening. -->
+    <AssemblyName>PaRuX.Server</AssemblyName>
+    <AssemblyTitle>PaRuX Server</AssemblyTitle>
+    <Product>PaRuX</Product>
+    <Description>PaRuX Server - local AI backend and workstation control plane</Description>
+    <RootNamespace>PaRuX.Server</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Embedded rather than copied next to the binary: the web client is served from memory, so a
+         self-contained publish cannot ship a Core whose UI file was left behind. -->
+    <EmbeddedResource Include="WebClient\index.html" LogicalName="PaRuX.Server.WebClient.index.html" />
+    <EmbeddedResource Include="WebClient\login.html" LogicalName="PaRuX.Server.WebClient.login.html" />
+    <EmbeddedResource Include="WebClient\mobile-conversation-patch.css" LogicalName="PaRuX.Server.WebClient.mobile-conversation-patch.css" />
+    <EmbeddedResource Include="WebClient\mobile-conversation-patch.js" LogicalName="PaRuX.Server.WebClient.mobile-conversation-patch.js" />
+    <!-- The llama.cpp UI config and the ComfyUI workflow graphs. Embedded for the same reason as
+         the web client, plus one of its own: these used to be hand-placed files in the user's
+         LocalAI root, so deleting that folder - or installing PaRuX for the first time - left
+         text inference and every media pipeline with nothing to run. ConfigAssets writes any
+         missing one out at startup and never overwrites a file the user has edited. -->
+    <EmbeddedResource Include="Assets\config\*.json" LogicalName="PaRuX.Server.Assets.config.%(Filename)%(Extension)" />
+    <!-- Vision projector families and their projector quantisation preference. Data, not code: the
+         pairing rules change with this file and never with a projector file name in C#. -->
+    <EmbeddedResource Include="Assets\models\vision-projector-families.json" LogicalName="PaRuX.Server.Assets.models.vision-projector-families.json" />
+    <!-- Media companion registry: text encoders/VAEs each supported media family needs. Data, not code. -->
+    <EmbeddedResource Include="Assets\media\media-companion-registry.json" LogicalName="PaRuX.Server.Assets.media.media-companion-registry.json" />
+    <EmbeddedResource Include="Assets\media\media-catalogue.json" LogicalName="PaRuX.Server.Assets.media.media-catalogue.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PaRuX.Contracts\PaRuX.Contracts.csproj" />
+    <ProjectReference Include="..\PaRuX.Intelligence\PaRuX.Intelligence.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.30" />
+    <!-- Windows DPAPI for the opt-in remote-provider API key. That credential can bill the user's
+         account, so it is encrypted for the current user rather than written beside the config in
+         clear text; this project targets net8.0 (not net8.0-windows), where ProtectedData is not
+         in the base library. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />
+    <PackageReference Include="ExcelDataReader" Version="3.9.0" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
+    <!-- MCP client (not just server): lets PaRuX connect OUT to third-party MCP servers the
+         user configures, closing the gap with tools that only expose their own MCP server. -->
+    <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
+    <!-- Local sentence-embedding inference for Memory/RAG semantic search (CPU, no Python) -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.29.0" />
+    <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
+    <PackageReference Include="Parquet.Net" Version="6.1.0" />
+    <!-- Official ComfyUI Windows portable releases are .7z archives. Extraction is performed
+         entry-by-entry by SafeArchiveExtractor so path validation remains under PaRuX control. -->
+    <PackageReference Include="SharpCompress" Version="0.50.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Built-in skill manifests live at the repo root (skills/built-in/) so the public
+         repository layout matches docs/skills.md; linked here so they ship with PaRuX Server. -->
+    <!-- Hash-locked Training Lab dependency closure (see TrainingRuntimeLock). Shipped next to the
+         app because the install is refused without it; regenerate with tools/training-lock. -->
+    <Content Include="training-runtime.lock.txt;training-torch-cu128.lock.txt;training-torch-cpu.lock.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\skills\built-in\*.json" Link="skills\built-in\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- PaRuX-owned direct ExLlamaV3 benchmark host. This runs only inside the PaRuX-managed
+         ExLlamaV3 venv and avoids a TabbyAPI/system-Python dependency for Engine Race evidence. -->
+    <Content Include="exllamav3-benchmark\parux_exllamav3_benchmark.py">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- PaRuX-owned persistent ExLlamaV3 serving worker. JSONL over redirected stdio keeps the
+         engine local/private and avoids a third-party HTTP server dependency such as TabbyAPI. -->
+    <Content Include="exllamav3-host\parux_exllamav3_worker.py">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- llama.cpp's real convert_lora_to_gguf.py/conversion package (MIT, vendored verbatim -
+         see llama-cpp-conversion/LICENSE-llama.cpp and THIRD_PARTY_NOTICES.md), shipped next to
+         PaRuX.Server so LoraGgufConversionService needs no network access to the script itself. -->
+    <Content Include="..\..\llama-cpp-conversion\**\*.py" Link="llama-cpp-conversion\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\llama-cpp-conversion\LICENSE-llama.cpp" Link="llama-cpp-conversion\LICENSE-llama.cpp">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>PaRuX.Server.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,2087 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="PaRuX.Views.SettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    mc:Ignorable="d"
+    AutomationProperties.AutomationId="Settings_Page"
+    AutomationProperties.Name="Settings"
+    AutomationProperties.AccessibilityView="Raw"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <UserControl.Resources>
+        <!-- Diagnostics health dot, coloured from the code-behind by key. -->
+        <SolidColorBrush x:Key="PaRuXDotOkBrush" Color="{ThemeResource PaRuXSuccessColor}" />
+        <SolidColorBrush x:Key="PaRuXDotWarnBrush" Color="{ThemeResource PaRuXWarnColor}" />
+        <SolidColorBrush x:Key="PaRuXDotOffBrush" Color="{ThemeResource PaRuXOffColor}" />
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="192" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ==================== Category rail ==================== -->
+        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Padding="12,20,4,20">
+            <StackPanel x:Name="SettingsCategoryRail" Spacing="2" />
+        </ScrollViewer>
+
+        <ScrollViewer x:Name="SettingsContentScroll" Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="24,20,24,32">
+        <StackPanel x:Name="SettingsContentPanel" Spacing="{StaticResource PaRuXSpaceXL}" MaxWidth="760" HorizontalAlignment="Left">
+
+            <!-- ==================== Page header ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceXS}">
+                <TextBlock Text="Settings" Style="{StaticResource PaRuXDisplayTextStyle}" />
+                <TextBlock
+                    Text="How PaRuX looks, when it appears, and what it runs on."
+                    Style="{StaticResource PaRuXCaptionTextStyle}" />
+            </StackPanel>
+
+            <!-- ==================== General ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="General">
+                <TextBlock Text="GENERAL" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Theme" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock
+                                    Text="Follow Windows, or pin PaRuX to light or dark."
+                                    Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <ComboBox x:Name="ThemeCombo" AutomationProperties.AutomationId="Settings_Theme_ComboBox" AutomationProperties.Name="Theme" AutomationProperties.AccessibilityView="Control" Grid.Column="1" MinWidth="160"
+                                      VerticalAlignment="Center"
+                                      CornerRadius="{StaticResource PaRuXRadiusSmall}"
+                                      SelectionChanged="ThemeCombo_SelectionChanged">
+                                <ComboBoxItem Content="System" Tag="System" />
+                                <ComboBoxItem Content="Light" Tag="Light" />
+                                <ComboBoxItem Content="Dark" Tag="Dark" />
+                            </ComboBox>
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Start with Windows" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock x:Name="StartupHint"
+                                           Text="Adds PaRuX to the Windows startup list."
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="StartupSwitch" AutomationProperties.AutomationId="Settings_Startup_Toggle" AutomationProperties.Name="Start with Windows" AutomationProperties.AccessibilityView="Control" Grid.Column="1"
+                                          VerticalAlignment="Center"
+                                          MinWidth="0"
+                                          OnContent="" OffContent=""
+                                          Toggled="StartupSwitch_Toggled" />
+                        </Grid>
+
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Notifications ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="General">
+                <TextBlock Text="NOTIFICATIONS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Media generation" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="Notify when long image or video generation finishes in the background." Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="NotificationsGenerationSwitch"
+                                          AutomationProperties.AutomationId="Settings_NotificationsGeneration_Toggle"
+                                          AutomationProperties.Name="Media generation notifications"
+                                          AutomationProperties.AccessibilityView="Control"
+                                          Grid.Column="1" VerticalAlignment="Center" MinWidth="0" OnContent="" OffContent=""
+                                          Toggled="NotificationsGenerationSwitch_Toggled" />
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Model downloads" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="Notify when a model or checkpoint download completes or fails." Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="NotificationsDownloadsSwitch"
+                                          AutomationProperties.AutomationId="Settings_NotificationsDownloads_Toggle"
+                                          AutomationProperties.Name="Model download notifications"
+                                          AutomationProperties.AccessibilityView="Control"
+                                          Grid.Column="1" VerticalAlignment="Center" MinWidth="0" OnContent="" OffContent=""
+                                          Toggled="NotificationsDownloadsSwitch_Toggled" />
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Runtime installs" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="Notify when a runtime engine install completes or fails." Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="NotificationsInstallsSwitch"
+                                          AutomationProperties.AutomationId="Settings_NotificationsInstalls_Toggle"
+                                          AutomationProperties.Name="Runtime install notifications"
+                                          AutomationProperties.AccessibilityView="Control"
+                                          Grid.Column="1" VerticalAlignment="Center" MinWidth="0" OnContent="" OffContent=""
+                                          Toggled="NotificationsInstallsSwitch_Toggled" />
+                        </Grid>
+
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Quick Chat bubble ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="General">
+                <TextBlock Text="QUICK CHAT BUBBLE" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Visibility" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock
+                                    Text="When the floating bubble appears on screen."
+                                    Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <ComboBox x:Name="BubbleCombo" AutomationProperties.Name="Bubble mode" Grid.Column="1" MinWidth="200"
+                                      VerticalAlignment="Center"
+                                      CornerRadius="{StaticResource PaRuXRadiusSmall}"
+                                      SelectionChanged="BubbleCombo_SelectionChanged">
+                                <ComboBoxItem Content="Always visible" Tag="AlwaysVisible" />
+                                <ComboBoxItem Content="Auto-hide (fade when idle)" Tag="AutoHide" />
+                                <ComboBoxItem Content="Hotkey only" Tag="HotkeyOnly" />
+                                <ComboBoxItem Content="Disabled" Tag="Disabled" />
+                            </ComboBox>
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Global hotkey" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock x:Name="HotkeyHint"
+                                           Text="Opens Quick Chat from anywhere, e.g. Ctrl+Alt+Space."
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <TextBox x:Name="HotkeyBox" AutomationProperties.Name="Global hotkey" Grid.Column="1" MinWidth="160"
+                                     VerticalAlignment="Center"
+                                     Margin="0,0,8,0"
+                                     CornerRadius="{StaticResource PaRuXRadiusSmall}" />
+                            <Button x:Name="ApplyHotkeyButton" Grid.Column="2" Content="Apply"
+                                    VerticalAlignment="Center"
+                                    Height="32"
+                                    Padding="16,0,16,0"
+                                    CornerRadius="{StaticResource PaRuXRadiusSmall}"
+                                    Click="ApplyHotkey_Click" />
+                        </Grid>
+
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Models ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Models">
+                <TextBlock Text="MODELS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Default text profile" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock
+                                    Text="Auto leaves whichever profile is already loaded untouched."
+                                    Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <ComboBox x:Name="ProfileCombo" AutomationProperties.Name="Profile" Grid.Column="1" MinWidth="160"
+                                      VerticalAlignment="Center"
+                                      CornerRadius="{StaticResource PaRuXRadiusSmall}"
+                                      SelectionChanged="ProfileCombo_SelectionChanged">
+                                <ComboBoxItem Content="Auto" Tag="AUTO" />
+                                <ComboBoxItem Content="Standard" Tag="STANDARD" />
+                                <ComboBoxItem Content="Uncensored" Tag="UNCENSORED" />
+                            </ComboBox>
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Auto-escalate to Uncensored" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock
+                                    Text="When Standard declines or falls short, silently retry the same message on Uncensored."
+                                    Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                <TextBlock x:Name="AutoFallbackStatusText" Visibility="Collapsed" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="AutoFallbackSwitch" Grid.Column="1"
+                                          OffContent="Off" OnContent="On" VerticalAlignment="Center"
+                                          Toggled="AutoFallbackSwitch_Toggled" />
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Detected local models (.gguf)" Style="{StaticResource PaRuXBodyStrongTextStyle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Rescan" Click="RescanModels_Click" />
+                        </Grid>
+                        <TextBlock
+                            Text="Which downloaded file backs Standard and Uncensored - pick a different one below, or leave the built-in defaults."
+                            TextWrapping="Wrap"
+                            Style="{StaticResource PaRuXSubtleCaptionStyle}"
+                            Margin="0,4,0,0" />
+                        <TextBlock x:Name="ModelRoleStatusText" Visibility="Collapsed" TextWrapping="Wrap" Margin="0,4,0,0" />
+                        <StackPanel x:Name="DetectedModelsList" Spacing="6" Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== External text backend ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Models">
+                <TextBlock Text="EXTERNAL TEXT BACKEND" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+                        <TextBlock
+                            Text="Point chat at a local OpenAI-compatible server you're already running (Ollama, LM Studio, koboldcpp, text-generation-webui, ...) instead of PaRuX's own bundled model. PaRuX neither starts nor manages it - just checks it's reachable before sending a request."
+                            TextWrapping="Wrap"
+                            Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <TextBlock x:Name="ExternalBackendStatusText" TextWrapping="Wrap" Margin="0,10,0,0" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <Button x:Name="ClearExternalBackendButton" Content="Use PaRuX's own local model" Margin="0,6,0,0" Click="ClearExternalBackend_Click" Visibility="Collapsed" />
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Detect running backends" Style="{StaticResource PaRuXBodyStrongTextStyle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" x:Name="DetectBackendsButton" Content="Detect" Click="DetectBackends_Click" />
+                        </Grid>
+                        <StackPanel x:Name="DetectedBackendsList" Spacing="6" Margin="0,8,0,0" />
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <TextBlock Text="Or enter one manually" Style="{StaticResource PaRuXBodyStrongTextStyle}" Margin="0,0,0,6" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="ManualBackendNameBox" Grid.Column="0" PlaceholderText="Name (e.g. Ollama)" />
+                            <TextBox x:Name="ManualBackendEndpointBox" Grid.Column="1" PlaceholderText="http://127.0.0.1:11434" />
+                            <Button Grid.Column="2" Content="Use" Click="SetManualBackend_Click" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Guided tour ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="General">
+                <TextBlock Text="FINDING YOUR WAY AROUND" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+                        <TextBlock
+                            Text="PaRuX shows a short walkthrough of the sidebar the first time you finish setup. Run it again whenever you want - it points at each section and says what it is for."
+                            TextWrapping="Wrap"
+                            Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <Button x:Name="ShowGuidedTourButton" Content="Show me around" Margin="0,10,0,0" Click="ShowGuidedTour_Click" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Your PC apps ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Your PC apps">
+                <TextBlock Text="APPS ON THIS PC" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+                        <TextBlock
+                            Text="PaRuX can answer from the apps you already use - your notes, your mail, your calendar, your bookmarks - by reading their files on this PC. Nothing is connected until you connect it, every source is read-only, each one is limited to the single folder or file you choose, and every answer cites the file it came from. Connecting a source sends nothing anywhere: the reading happens here."
+                            TextWrapping="Wrap"
+                            Style="{StaticResource PaRuXCaptionTextStyle}" />
+
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}" Margin="0,10,0,0">
+                            <Button x:Name="RefreshDesktopIntegrationsButton" Content="Scan this PC" Click="RefreshDesktopIntegrations_Click" />
+                            <TextBlock x:Name="DesktopIntegrationsStatusText" VerticalAlignment="Center" TextWrapping="Wrap" Style="{StaticResource PaRuXSubtleCaptionStyle}" />
+                        </StackPanel>
+
+                        <StackPanel x:Name="DesktopIntegrationsList" Spacing="{StaticResource PaRuXSpaceS}" Margin="0,12,0,0" />
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <TextBlock Text="Documents PaRuX writes" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <TextBlock
+                            Text="PaRuX can also create Word and Excel files for you. It writes only new files, only into this one folder - never into the folders it reads from, and never over a file that already exists: a name that is taken gets &quot;(2)&quot; added, the way a download would."
+                            TextWrapping="Wrap"
+                            Margin="0,4,0,0"
+                            Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}" Margin="0,8,0,0">
+                            <Button x:Name="ChooseDocumentOutputButton" Content="Choose folder" Click="ChooseDocumentOutput_Click" />
+                            <Button x:Name="ResetDocumentOutputButton" Content="Use PaRuX's folder" Click="ResetDocumentOutput_Click" />
+                            <TextBlock x:Name="DocumentOutputText" VerticalAlignment="Center" TextWrapping="Wrap" Style="{StaticResource PaRuXSubtleCaptionStyle}" />
+                        </StackPanel>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <TextBlock
+                            Text="Using an app that isn't listed? Export from it to a folder of .eml (mail), .ics (calendar) or Markdown/text (notes) and connect that folder - Outlook, Apple Mail, Notion, Evernote and Joplin all export to one of those."
+                            TextWrapping="Wrap"
+                            Style="{StaticResource PaRuXSubtleCaptionStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Cloud fallback ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Models">
+                <TextBlock Text="CLOUD FALLBACK (OPTIONAL)" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+                        <TextBlock
+                            Text="PaRuX runs entirely on this device. This is the one exception, and it is off unless you turn it on: if local inference cannot serve a turn at all - no model installed, the runtime will not start, not enough VRAM - PaRuX may answer that single turn through an OpenAI-compatible API instead of failing. It is never used while local inference is working, never during Gaming Mode, and every turn it serves is announced in the chat before the answer starts."
+                            TextWrapping="Wrap"
+                            Style="{StaticResource PaRuXCaptionTextStyle}" />
+
+                        <ToggleSwitch
+                            x:Name="CloudFallbackToggle"
+                            Header="Allow a cloud fallback when local inference fails"
+                            OnContent="On"
+                            OffContent="Off"
+                            Margin="0,10,0,0"
+                            Toggled="CloudFallbackToggle_Toggled" />
+
+                        <StackPanel x:Name="CloudFallbackDetailPanel" Visibility="Collapsed" Spacing="{StaticResource PaRuXSpaceS}" Margin="0,6,0,0">
+                            <ComboBox
+                                x:Name="CloudFallbackProviderCombo"
+                                Header="Provider"
+                                HorizontalAlignment="Stretch"
+                                SelectionChanged="CloudFallbackProvider_SelectionChanged" />
+                            <TextBox
+                                x:Name="CloudFallbackBaseUrlBox"
+                                Header="API base URL"
+                                PlaceholderText="https://your-gateway.example.com/v1" />
+                            <TextBox
+                                x:Name="CloudFallbackModelBox"
+                                Header="Model id"
+                                PlaceholderText="openai/gpt-oss-120b" />
+                            <PasswordBox
+                                x:Name="CloudFallbackApiKeyBox"
+                                Header="API key"
+                                PlaceholderText="Leave blank to keep the saved key" />
+                            <TextBlock
+                                Text="The key is encrypted with Windows DPAPI for your account and never leaves PaRuX Core. It is sent to the provider you chose and to nobody else."
+                                TextWrapping="Wrap"
+                                Style="{StaticResource PaRuXSubtleCaptionStyle}" />
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}">
+                                <Button x:Name="SaveCloudFallbackButton" Content="Save" Click="SaveCloudFallback_Click" Style="{StaticResource AccentButtonStyle}" />
+                                <Button x:Name="TestCloudFallbackButton" Content="Test connection" Click="TestCloudFallback_Click" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <TextBlock x:Name="CloudFallbackStatusText" TextWrapping="Wrap" Margin="0,10,0,0" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <TextBlock x:Name="CloudFallbackLastUsedText" TextWrapping="Wrap" Margin="0,4,0,0" Style="{StaticResource PaRuXSubtleCaptionStyle}" Visibility="Collapsed" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Media checkpoints ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Models">
+                <TextBlock Text="GENERATION CHECKPOINTS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+                        <TextBlock
+                            Text="Which real checkpoint file image/video/edit generation actually uses. Everything found in ComfyUI's diffusion_models folder shows up here - download an alternative into that folder and it becomes pickable, per generation type, without touching a workflow file by hand."
+                            TextWrapping="Wrap"
+                            Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <StackPanel x:Name="MediaCheckpointsList" Spacing="10" Margin="0,10,0,0" />
+                        <TextBlock
+                            Text="Recommended alternatives to download"
+                            Style="{StaticResource PaRuXBodyStrongTextStyle}"
+                            Margin="0,16,0,4" />
+                        <TextBlock
+                            Text="Only checkpoints from the same model family already wired into each type's workflow - a drop-in swap, not a general model catalog."
+                            TextWrapping="Wrap"
+                            Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <StackPanel x:Name="RecommendedCheckpointsList" Spacing="10" Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Custom workflows ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Media Generation">
+                <TextBlock Text="CUSTOM WORKFLOWS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+                        <TextBlock
+                            Text="Bring your own ComfyUI workflow instead of PaRuX's built-in ones. Export a workflow from ComfyUI's own web UI as &quot;API format&quot; (Workflow menu -&gt; Export (API)) and import the JSON file here. PaRuX auto-detects a prompt node, a seed node, a source-image node, and the save node by their ComfyUI class - any it can't find just keeps that workflow's own baked-in value. Still-image workflows (a SaveImage node) only, for now."
+                            TextWrapping="Wrap"
+                            Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <StackPanel x:Name="CustomWorkflowsList" Spacing="10" Margin="0,10,0,0" />
+                        <Button x:Name="ImportWorkflowButton" Content="Import workflow…" Margin="0,12,0,0" Click="ImportWorkflow_Click" />
+                        <TextBlock x:Name="ImportWorkflowStatus" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Images ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Media Generation">
+                <TextBlock Text="IMAGES" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Resolution preset" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                                    Text="Resolution only — the local image workflow does not expose a steps/quality control the way video does." />
+                            </StackPanel>
+                            <ComboBox x:Name="ImagePresetCombo" AutomationProperties.Name="Image preset" Grid.Column="1" MinWidth="170" SelectionChanged="ImagePresetCombo_SelectionChanged">
+                                <ComboBoxItem Content="512 × 512" Tag="512x512" />
+                                <ComboBoxItem Content="768 × 768" Tag="768x768" />
+                                <ComboBoxItem Content="1024 × 1024" Tag="1024x1024" />
+                                <ComboBoxItem Content="1440 × 1440" Tag="1440x1440" />
+                                <ComboBoxItem Content="2K · 2048 × 2048" Tag="2048x2048" />
+                                <ComboBoxItem Content="Custom" Tag="custom" />
+                            </ComboBox>
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Generated resolution" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="512–2048 pixels; values are normalized to multiples of 64."
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <NumberBox x:Name="ImageWidthBox" Grid.Column="1" Width="104" Header="Width"
+                                       Minimum="512" Maximum="2048" SmallChange="64"
+                                       SpinButtonPlacementMode="Compact"
+                                       ValueChanged="ImageNumberBox_ValueChanged" />
+                            <NumberBox x:Name="ImageHeightBox" Grid.Column="2" Width="104" Header="Height"
+                                       Minimum="512" Maximum="2048" SmallChange="64"
+                                       SpinButtonPlacementMode="Compact"
+                                       ValueChanged="ImageNumberBox_ValueChanged" />
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Image input limits" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="Adjust these limits for the memory available on this device."
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <NumberBox x:Name="MaxImagesBox" Grid.Column="1" Width="104" Header="Files"
+                                       Minimum="1" Maximum="8" SpinButtonPlacementMode="Compact"
+                                       ValueChanged="ImageNumberBox_ValueChanged" />
+                            <NumberBox x:Name="MaxImageMegabytesBox" Grid.Column="2" Width="104" Header="MB each"
+                                       Minimum="1" Maximum="100" SpinButtonPlacementMode="Compact"
+                                       ValueChanged="ImageNumberBox_ValueChanged" />
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Generated images folder" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock x:Name="ImageFolderPath" TextTrimming="CharacterEllipsis"
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Choose…" Click="ChooseImageFolder_Click"
+                                    Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Content="Reset" Click="ResetImageFolder_Click"
+                                    VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Videos ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Media Generation">
+                <TextBlock Text="VIDEOS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Output quality preset" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="Sets resolution and render steps together. Standard (720p) is the default; higher tiers take substantially longer." Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox x:Name="VideoPresetCombo" AutomationProperties.Name="Video preset" Grid.Column="1" MinWidth="200" SelectionChanged="VideoPresetCombo_SelectionChanged">
+                                <ComboBoxItem Content="Fast preview · 640×360 · 12 steps" Tag="640x360x12" />
+                                <ComboBoxItem Content="Draft · 832×448 · 16 steps" Tag="832x448x16" />
+                                <ComboBoxItem Content="Standard · 1280×720 · 30 steps" Tag="1280x720x30" />
+                                <ComboBoxItem Content="High · 1920×1080 · 40 steps" Tag="1920x1080x40" />
+                                <ComboBoxItem Content="Ultra · 2560×1440 · 50 steps" Tag="2560x1440x50" />
+                                <ComboBoxItem Content="4K · 3840×2160 · 60 steps" Tag="3840x2160x60" />
+                                <ComboBoxItem Content="Custom" Tag="custom" />
+                            </ComboBox>
+                        </Grid>
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Generated resolution" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="Custom output, normalized to multiples of 8 for the local workflow." Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <NumberBox x:Name="VideoWidthBox" Grid.Column="1" Width="112" Header="Width" Minimum="256" Maximum="3840" SmallChange="8" SpinButtonPlacementMode="Compact" ValueChanged="VideoNumberBox_ValueChanged" />
+                            <NumberBox x:Name="VideoHeightBox" Grid.Column="2" Width="112" Header="Height" Minimum="256" Maximum="2160" SmallChange="8" SpinButtonPlacementMode="Compact" ValueChanged="VideoNumberBox_ValueChanged" />
+                        </Grid>
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Render quality" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="More inference steps improve detail and stability at the cost of waiting time." Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <NumberBox x:Name="VideoStepsBox" Grid.Column="1" Width="112" Header="Steps" Minimum="8" Maximum="60" SmallChange="2" SpinButtonPlacementMode="Compact" ValueChanged="VideoNumberBox_ValueChanged" />
+                            <NumberBox x:Name="VideoFpsBox" Grid.Column="2" Width="112" Header="FPS" Minimum="8" Maximum="60" SpinButtonPlacementMode="Compact" ValueChanged="VideoNumberBox_ValueChanged" />
+                        </Grid>
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Timeline" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="Long requests are split into coherent clips and finalized to this duration." Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <NumberBox x:Name="VideoDurationBox" Grid.Column="1" Width="112" Header="Seconds" Minimum="1" Maximum="60" SmallChange="1" SpinButtonPlacementMode="Compact" ValueChanged="VideoNumberBox_ValueChanged" />
+                        </Grid>
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Video input limit" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="Maximum size for a video attached to one chat message." Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <NumberBox x:Name="MaxVideoMegabytesBox" Grid.Column="1" Width="112" Header="MB" Minimum="10" Maximum="4096" SmallChange="50" SpinButtonPlacementMode="Compact" ValueChanged="VideoNumberBox_ValueChanged" />
+                        </Grid>
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Generated videos folder" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock x:Name="VideoFolderPath" TextTrimming="CharacterEllipsis" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Choose…" Click="ChooseVideoFolder_Click" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Content="Reset" Click="ResetVideoFolder_Click" VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Gaming ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Privacy &amp; Network">
+                <TextBlock Text="GAMING" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Hard-off protection" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                            <TextBlock x:Name="GamingStatusText" Text="Checking gaming state…" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        </StackPanel>
+                        <Button x:Name="EnterGamingButton" Grid.Column="1" Content="Enter Gaming Mode" Click="EnterGamingMode_Click" VerticalAlignment="Center" />
+                        <Button x:Name="ExitGamingButton" Grid.Column="2" Content="Exit Gaming Mode" Click="ExitGamingMode_Click" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== LAN access ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Privacy &amp; Network">
+                <TextBlock Text="LOCAL NETWORK" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="2">
+                                <TextBlock Text="Remote access" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="Off by default. When enabled, PaRuX binds only to the selected private IPv4 address over HTTPS. No cloud, UPnP, router changes, or Internet exposure." TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="LanEnabledSwitch" Grid.Column="1" OffContent="Off" OnContent="On" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <ComboBox x:Name="LanAddressCombo" Grid.Column="0" Header="Private network interface" PlaceholderText="No private IPv4 interface found" />
+                            <NumberBox x:Name="LanPortBox" Grid.Column="1" Header="Port" Minimum="1024" Maximum="65535" Value="51124" SpinButtonPlacementMode="Compact" />
+                            <Button x:Name="ApplyLanButton" Grid.Column="2" Content="Apply &amp; restart Core" Click="ApplyRemoteAccess_Click" VerticalAlignment="Bottom" Margin="0,0,0,1" />
+                        </Grid>
+                        <TextBlock x:Name="LanStatusText" Text="Checking local-network status…" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <Border Style="{StaticResource PaRuXDividerStyle}" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="2">
+                                <TextBlock Text="Pair a device" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="Creates a one-time six-digit code valid for five minutes. Each device receives its own revocable token." TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <Button x:Name="PairDeviceButton" Grid.Column="1" Content="Create pairing code" Click="PairDevice_Click" VerticalAlignment="Center" />
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceL}">
+                            <Border Width="176" Height="176" Padding="8" Visibility="Collapsed"
+                                    x:Name="PairingQrBorder"
+                                    Background="White"
+                                    CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                                    BorderBrush="{ThemeResource PaRuXStrokeBrush}" BorderThickness="1">
+                                <Image x:Name="PairingQrImage" Stretch="Uniform" />
+                            </Border>
+                            <TextBlock x:Name="PairingCodeText" Visibility="Collapsed" TextWrapping="Wrap"
+                                       VerticalAlignment="Center"
+                                       Style="{StaticResource PaRuXBodyTextStyle}" IsTextSelectionEnabled="True" />
+                        </StackPanel>
+                        <StackPanel x:Name="PairedDevicesList" Spacing="{StaticResource PaRuXSpaceS}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Browser access ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Privacy &amp; Network">
+                <TextBlock Text="BROWSER ACCESS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="2">
+                                <TextBlock Text="Open PaRuX in a browser" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                                    Text="Off by default. When on, PaRuX serves its full web interface on this PC's loopback address, so you can put Nginx Proxy Manager, Caddy or Traefik in front of it and reach PaRuX from another computer. A passphrase is required — once a proxy is in front, it is the only thing between the Internet and this PC. Inference still runs here and nothing is sent to a cloud provider." />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="WebAccessSwitch" Grid.Column="1" OffContent="Off" OnContent="On" VerticalAlignment="Center" Toggled="WebAccessSwitch_Toggled" />
+                        </Grid>
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <PasswordBox x:Name="WebAccessPassphraseBox" Grid.Column="0" Header="Passphrase (at least 12 characters)" PlaceholderText="Set or replace the passphrase" />
+                            <Button x:Name="SetWebPassphraseButton" Grid.Column="1" Content="Set passphrase" Click="SetWebPassphrase_Click" VerticalAlignment="Bottom" Margin="0,0,0,1" />
+                        </Grid>
+                        <TextBlock x:Name="WebAccessStatusText" Text="Checking browser-access status…" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                                Text="Point your reverse proxy at http://127.0.0.1:51123 and let it terminate HTTPS. PaRuX never opens a firewall port or changes a network setting for you." />
+                            <Button x:Name="OpenWebClientButton" Grid.Column="1" Content="Open in browser" Click="OpenWebClient_Click" VerticalAlignment="Center" />
+                            <Button x:Name="SignOutWebSessionsButton" Grid.Column="2" Content="Sign out all browsers" Click="SignOutWebSessions_Click" VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== API keys ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Privacy &amp; Network">
+                <TextBlock Text="API KEYS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Use PaRuX from other apps" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                            <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                                Text="Apps and coding agents should use the Local AI Gateway (Settings › Integrations): http://127.0.0.1:11435 with the Anthropic Messages, OpenAI Responses or OpenAI Chat Completions API. Tools built for Ollama can also point at http://127.0.0.1:51123 (/api/chat, /api/generate, /api/tags) — no Ollama install is needed. Paste a key below as the API key or bearer token. A key buys inference only — it can never read your conversations, change settings, or reach anything else on this PC." />
+                        </StackPanel>
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBox x:Name="ApiKeyNameBox" Grid.Column="0" Header="Name this key" PlaceholderText="e.g. Open WebUI on the laptop" />
+                            <Button x:Name="CreateApiKeyButton" Grid.Column="1" Content="Create key" Click="CreateApiKey_Click" VerticalAlignment="Bottom" Margin="0,0,0,1" />
+                        </Grid>
+                        <Border x:Name="NewApiKeyPanel" Visibility="Collapsed" Padding="10" CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                                BorderBrush="{ThemeResource PaRuXStrokeBrush}" BorderThickness="1">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Copy this key now — PaRuX keeps only a hash and cannot show it again."
+                                           TextWrapping="Wrap" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBox x:Name="NewApiKeyText" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" />
+                                <Button x:Name="CopyApiKeyButton" Content="Copy to clipboard" Click="CopyApiKey_Click" HorizontalAlignment="Left" />
+                            </StackPanel>
+                        </Border>
+                        <TextBlock x:Name="ApiKeyStatusText" Text="Checking API keys…" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <StackPanel x:Name="ApiKeyList" Spacing="{StaticResource PaRuXSpaceS}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Computer Use ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Automation">
+                <TextBlock Text="COMPUTER USE" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Full Computer Use (mouse, keyboard, screen)" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                                    Text="Off by default. When on, a request that isn't just &quot;open an app&quot; may drive the real mouse, keyboard, and screen directly — every step is shown live in the reply, capped at 15 steps, and the Stop button cancels it immediately. Also gates whether Multi-Agent/Autopilot &quot;ui-verification&quot; tasks may capture the screen to check their work. Paired Android devices can start Computer Use tasks on this PC, and while this is on those tasks run without a per-task prompt." />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="ComputerUseAutomationSwitch" Grid.Column="1"
+                                          OffContent="Off" OnContent="On" VerticalAlignment="Center"
+                                          Toggled="ComputerUseAutomationSwitch_Toggled" />
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" />
+
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="2">
+                                <TextBlock Text="Allowed apps and emulators" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="Only apps added here can be launched from chat. PaRuX never executes arbitrary chat text as a command." TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Add app…" Click="ChooseComputerApp_Click" VerticalAlignment="Center" />
+                        </Grid>
+                        <StackPanel x:Name="ComputerAppsList" Spacing="{StaticResource PaRuXSpaceS}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== MCP servers ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Automation">
+                <TextBlock Text="MCP SERVERS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Connect PaRuX OUT to third-party MCP servers so the chat model can call their tools directly (real OpenAI-style function calling, not text parsing). Each server is a command PaRuX launches locally, same shape as Claude Desktop's own MCP config - e.g. command 'npx', args '-y @modelcontextprotocol/server-filesystem C:\Users\me\Documents'. A server can do anything its own process is allowed to do, so only add ones you trust." />
+                        <StackPanel x:Name="McpServersList" Spacing="6" />
+
+                        <TextBlock Text="Add a server" Style="{StaticResource PaRuXBodyStrongTextStyle}" Margin="0,4,0,0" />
+                        <ComboBox x:Name="McpPresetCombo" AutomationProperties.Name="MCP server preset" PlaceholderText="Pick a known server (optional) - fills in the fields below"
+                            HorizontalAlignment="Stretch" SelectionChanged="McpPresetCombo_SelectionChanged" />
+                        <TextBox x:Name="NewMcpNameBox" PlaceholderText="Name, e.g. Filesystem" />
+                        <TextBox x:Name="NewMcpCommandBox" PlaceholderText="Command, e.g. npx" />
+                        <TextBox x:Name="NewMcpArgsBox" PlaceholderText="Args, e.g. -y @modelcontextprotocol/server-filesystem C:\Users\me\Documents" />
+                        <Button Content="Add server" HorizontalAlignment="Left" Click="AddMcpServer_Click" />
+                        <TextBlock x:Name="McpStatus" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Coding handoff ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Automation">
+                <TextBlock Text="CODING HANDOFF" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="180" /><ColumnDefinition Width="180" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="VS Code and OpenCode commands" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                            <TextBlock Text="Defaults resolve from PATH; use full executable paths when needed." TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        </StackPanel>
+                        <TextBox x:Name="VsCodeCommandBox" Grid.Column="1" Header="VS Code" />
+                        <TextBox x:Name="OpenCodeCommandBox" Grid.Column="2" Header="OpenCode" />
+                        <Button Grid.Column="3" Content="Apply" Click="ApplyCodingCommands_Click" VerticalAlignment="Bottom" Margin="0,0,0,1" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Agent Command Center ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Agents">
+                <TextBlock Text="AGENT COMMAND CENTER" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock Text="Coding agent workspace" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Git repository the desktop Coding Agent operates on for 'coding'-role tasks. Every task gets its own isolated git worktree under .parux-agents\ inside this folder - your own working copy is never touched. Leave empty to keep coding tasks dispatched-only (never executed)." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBox x:Name="AgentWorkspaceRootBox" Grid.Column="0" PlaceholderText="e.g. C:\Users\me\Projects\my-repo" LostFocus="AgentWorkspaceRootBox_LostFocus" />
+                            <Button Grid.Column="1" Content="Browse…" Click="BrowseAgentWorkspaceRoot_Click" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Give the local Multi-Agent Orchestrator a goal. A background scheduler dispatches it, a role-appropriate local-model worker attempts it, and an independent verifier reviews the result before it's marked complete - entirely on this machine, no cloud involved." />
+                        <TextBox x:Name="AgentTaskGoalBox" PlaceholderText="Goal, e.g. 'Research the tradeoffs between X and Y'" TextWrapping="Wrap" AcceptsReturn="True" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <ComboBox x:Name="AgentTaskRoleBox" Grid.Column="0" Header="Role (optional - AUTO infers one)" HorizontalAlignment="Stretch" SelectedIndex="0">
+                                <ComboBoxItem Content="AUTO" Tag="" />
+                                <ComboBoxItem Content="Planner" Tag="planner" />
+                                <ComboBoxItem Content="Research" Tag="research" />
+                                <ComboBoxItem Content="Review" Tag="review" />
+                                <ComboBoxItem Content="Documentation" Tag="documentation" />
+                                <ComboBoxItem Content="Testing" Tag="testing" />
+                                <ComboBoxItem Content="Security" Tag="security" />
+                                <ComboBoxItem Content="Coding" Tag="coding" />
+                                <ComboBoxItem Content="UI Verification (requires Full Computer Use below)" Tag="ui-verification" />
+                            </ComboBox>
+                            <Button Grid.Column="1" Content="Create task" Click="CreateAgentTask_Click" VerticalAlignment="Bottom" />
+                        </Grid>
+                        <TextBlock x:Name="AgentTasksStatus" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="AgentTasksCountLabel" Grid.Column="0" Text="0 task(s)" Style="{StaticResource PaRuXBodyStrongTextStyle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Refresh" Click="RefreshAgentTasks_Click" />
+                        </Grid>
+                        <StackPanel x:Name="AgentTasksList" Spacing="8" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Project Manager + Autopilot ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Agents">
+                <TextBlock Text="PROJECTS &amp; AUTOPILOT" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock Text="Autonomous Project Manager" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Give a large goal and the local model breaks it into a real, dependency-wired task graph through the Multi-Agent Orchestrator above - recorded in the Context Graph, not a separate store." />
+                        <TextBox x:Name="ProjectGoalBox" PlaceholderText="Goal, e.g. 'Prepare this project for its first public release'" TextWrapping="Wrap" AcceptsReturn="True" />
+                        <Button Content="Create project" Click="CreateProject_Click" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="ProjectStatus" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="ProjectsCountLabel" Grid.Column="0" Text="0 project(s)" Style="{StaticResource PaRuXBodyStrongTextStyle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Refresh" Click="RefreshProjects_Click" />
+                        </Grid>
+                        <StackPanel x:Name="ProjectsList" Spacing="8" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock Text="Autopilot" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Plan -&gt; gate -&gt; execute -&gt; verify -&gt; report, end to end. SUPERVISED holds every created task until you approve it; BALANCED/AUTONOMOUS start immediately (currently behave the same operationally - no auto-repair loop yet)." />
+                        <TextBox x:Name="AutopilotGoalBox" PlaceholderText="Goal for Autopilot to plan and run" TextWrapping="Wrap" AcceptsReturn="True" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <ComboBox x:Name="AutopilotModeBox" Grid.Column="0" Header="Permission mode" HorizontalAlignment="Stretch" SelectedIndex="0">
+                                <ComboBoxItem Content="Supervised (hold for approval)" Tag="supervised" />
+                                <ComboBoxItem Content="Balanced" Tag="balanced" />
+                                <ComboBoxItem Content="Autonomous" Tag="autonomous" />
+                            </ComboBox>
+                            <Button Grid.Column="1" Content="Start run" Click="StartAutopilotRun_Click" VerticalAlignment="Bottom" />
+                        </Grid>
+                        <TextBlock x:Name="AutopilotStatus" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBox x:Name="AutopilotRunIdBox" Grid.Column="0" PlaceholderText="Run id (auto-filled after Start run)" />
+                            <Button Grid.Column="1" Content="Check status" Click="CheckAutopilotRun_Click" />
+                            <Button Grid.Column="2" Content="Approve" Click="ApproveAutopilotRun_Click" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PaRuXCardStyle}" BorderBrush="{StaticResource PaRuXDotWarnBrush}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock Text="STOP ALL AGENTS" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Cancels every in-flight Multi-Agent task, cancels every active Autopilot run, pauses Automations from creating new tasks, and stops the local coding agent / Computer Use if either was invoked directly from chat - without deleting or rewriting any stored data. Does not yet reach Android's on-device Computer Use." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="STOP ALL AGENTS" Click="StopAllAgents_Click" BorderBrush="{StaticResource PaRuXDotWarnBrush}" BorderThickness="2" />
+                            <Button Grid.Column="1" Content="Resume automations" Click="ResumeAutomations_Click" />
+                            <TextBlock x:Name="StopAllStatusText" Grid.Column="2" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Integrations: Developer / AI clients ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Integrations">
+                <TextBlock Text="LOCAL AI GATEWAY" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Coding agents and AI apps can use PaRuX's local models instead of a cloud account. PaRuX speaks the Anthropic Messages, OpenAI Responses and OpenAI Chat Completions APIs on a separate loopback-only port that serves models and nothing else. One model instance is shared by every client; PaRuX picks the model for each request." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="GatewayStateText" Text="Checking the gateway…" Style="{StaticResource PaRuXBodyStrongTextStyle}" TextWrapping="Wrap"
+                                           AutomationProperties.AutomationId="Settings_Gateway_State_Text" />
+                                <TextBlock x:Name="GatewayDetailText" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Refresh" Click="RefreshIntegrations_Click" VerticalAlignment="Top"
+                                    AutomationProperties.AutomationId="Settings_Integrations_Refresh_Button" />
+                        </Grid>
+                        <Expander Header="Advanced gateway settings" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                            <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                                <ToggleSwitch x:Name="GatewayEnabledToggle" Header="Gateway port" OnContent="On (loopback only)" OffContent="Off" />
+                                <NumberBox x:Name="GatewayPortBox" Header="Port" Minimum="1024" Maximum="65535" SpinButtonPlacementMode="Compact" Width="180" HorizontalAlignment="Left" />
+                                <ComboBox x:Name="GatewayVendorModelCombo" Header="When a client asks for a Claude or GPT model name, use" Width="320">
+                                    <ComboBoxItem Content="parux-auto (PaRuX chooses)" Tag="parux-auto" />
+                                    <ComboBoxItem Content="parux-code" Tag="parux-code" />
+                                    <ComboBoxItem Content="parux-reasoning" Tag="parux-reasoning" />
+                                    <ComboBoxItem Content="parux-fast" Tag="parux-fast" />
+                                </ComboBox>
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXSubtleCaptionStyle}"
+                                    Text="Request and response bodies are never written to PaRuX's logs. The gateway never listens on your network; use Privacy &amp; Network for LAN access. Port and on/off changes apply the next time PaRuX starts." />
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}">
+                                    <Button Content="Save gateway settings" Click="SaveGatewaySettings_Click" />
+                                    <TextBlock x:Name="GatewaySettingsStatusText" VerticalAlignment="Center" TextWrapping="Wrap" Style="{StaticResource PaRuXSubtleCaptionStyle}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Expander>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Integrations">
+                <TextBlock Text="DEVELOPER / AI CLIENTS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Connect backs up anything it changes, writes only PaRuX's own entry, and runs a real test in which the client creates a file through PaRuX. Disconnect removes only what PaRuX added; Restore puts the file back exactly as it was before the first Connect." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Launch in" VerticalAlignment="Center" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            <TextBox x:Name="IntegrationWorkingFolderBox" Grid.Column="1" IsReadOnly="True"
+                                     AutomationProperties.AutomationId="Settings_Integrations_Folder_Text" AutomationProperties.Name="Integrations folder path" />
+                            <Button Grid.Column="2" Content="Choose folder" Click="ChooseIntegrationFolder_Click" />
+                        </Grid>
+                        <StackPanel x:Name="ClientIntegrationsList" Spacing="{StaticResource PaRuXSpaceS}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Integrations">
+                <TextBlock Text="OTHER APPS (GENERIC)" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Any app that lets you set a custom OpenAI-compatible or Anthropic-compatible endpoint can use PaRuX. Use one of these base URLs, the model parux-auto (or parux-code, parux-reasoning, parux-fast, parux-vision) and a key." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}" RowSpacing="{StaticResource PaRuXSpaceXS}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                            <TextBlock Text="OpenAI-compatible" VerticalAlignment="Center" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            <TextBox x:Name="GenericOpenAiUrlText" Grid.Column="1" IsReadOnly="True" FontFamily="Consolas" />
+                            <Button Grid.Column="2" Content="Copy" Click="CopyGenericOpenAiUrl_Click" />
+                            <TextBlock Grid.Row="1" Text="Anthropic-compatible" VerticalAlignment="Center" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            <TextBox x:Name="GenericAnthropicUrlText" Grid.Row="1" Grid.Column="1" IsReadOnly="True" FontFamily="Consolas" />
+                            <Button Grid.Row="1" Grid.Column="2" Content="Copy" Click="CopyGenericAnthropicUrl_Click" />
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}">
+                            <Button Content="Create a key for another app" Click="CreateGenericGatewayKey_Click" />
+                            <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Style="{StaticResource PaRuXSubtleCaptionStyle}"
+                                       Text="Keys are listed and revoked under Privacy &amp; Network › API keys." />
+                        </StackPanel>
+                        <StackPanel x:Name="GenericKeyPanel" Visibility="Collapsed" Spacing="6">
+                            <TextBlock Text="Copy this key now — PaRuX keeps only a hash and cannot show it again." TextWrapping="Wrap" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                            <TextBox x:Name="GenericKeyText" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" />
+                            <Button Content="Copy key" Click="CopyGenericKey_Click" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Gaming & AI Sharing ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Gaming &amp; AI Sharing">
+                <TextBlock Text="GAMING &amp; AI RESOURCE SHARING" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Workload Orchestrator State" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                            <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                                Text="Turns your PC into an always-available local AI server that automatically yields GPU/VRAM to local or remote gaming, then recovers resources when gaming finishes." />
+                        </StackPanel>
+
+                        <Border Background="{ThemeResource PaRuXSurfaceSubtleBrush}" CornerRadius="{StaticResource PaRuXRadiusMedium}" Padding="16">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="GamingStatusBadge" Grid.Column="0" Text="CHECKING" FontWeight="Bold" FontSize="14" Foreground="{StaticResource PaRuXDotOkBrush}" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="GamingStatusMessage" Grid.Column="1" Text="Reading the workload orchestrator state…" Style="{StaticResource PaRuXCaptionTextStyle}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            <Button x:Name="GamingRefreshBtn" AutomationProperties.AutomationId="Settings_Gaming_Refresh_Button" AutomationProperties.Name="Refresh gaming status" Grid.Column="2" Content="Refresh Status" Click="GamingRefreshBtn_Click" />
+                                </Grid>
+
+                                <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,4,0,4" />
+
+                                <Grid ColumnSpacing="16" RowSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock x:Name="GamingActiveLauncherLabel" Grid.Row="0" Grid.Column="0" Text="Active Launcher: …" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                    <TextBlock x:Name="GamingActiveInputLabel" Grid.Row="0" Grid.Column="1" Text="Active Input: …" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                    <TextBlock x:Name="GamingVramLabel" Grid.Row="1" Grid.Column="0" Text="VRAM Allocation: …" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                    <TextBlock x:Name="GamingSuspendedGameLabel" Grid.Row="1" Grid.Column="1" Text="Suspended Game: …" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                    <TextBlock x:Name="GamingWorkloadsLabel" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Text="AI Workloads: …" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button x:Name="GamingEnterBtn" AutomationProperties.AutomationId="Settings_Gaming_Enter_Button" Content="Enter Gaming" Click="GamingEnterBtn_Click" />
+                            <Button x:Name="GamingExitBtn" AutomationProperties.AutomationId="Settings_Gaming_Exit_Button" Content="Return to AI" Click="GamingExitBtn_Click" />
+                            <Button x:Name="GamingSuspendBtn" Content="Suspend Game" Click="GamingSuspendBtn_Click" />
+                            <Button x:Name="GamingResumeBtn" Content="Resume Game" Click="GamingResumeBtn_Click" />
+                        </StackPanel>
+                        <!-- Shows why a Gaming action was refused or failed; hidden when the last action succeeded. -->
+                        <TextBlock x:Name="GamingActionText" Visibility="Collapsed" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock Text="Detected Subsystem Providers" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="PaRuX automatically detects installed gaming utilities, streaming servers, and suspend tools without requiring third-party cloud services or proprietary home automation dependencies." />
+
+                        <StackPanel x:Name="GamingProvidersList" Spacing="6" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock Text="Gaming Profiles &amp; Quick Resume" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Configure session triggers, launchers, input providers, and Quick Resume (game suspension) policies." />
+
+                        <ComboBox x:Name="GamingProfileSelector" Header="Active Profile" HorizontalAlignment="Stretch" SelectionChanged="GamingProfileSelector_SelectionChanged" />
+                        <ComboBox x:Name="GamingQuickResumeCombo" Header="Quick Resume Policy" HorizontalAlignment="Stretch" SelectionChanged="GamingQuickResumeCombo_SelectionChanged">
+                            <ComboBoxItem Content="Auto (Suspend game if compatible, check VRAM)" Tag="auto" />
+                            <ComboBoxItem Content="Always (Suspend game process in RAM)" Tag="always" />
+                            <ComboBoxItem Content="Off (Leave game lifecycle unmanaged)" Tag="off" />
+                        </ComboBox>
+
+                        <NumberBox x:Name="GamingGracePeriodBox" Header="Remote Reconnect Grace Period (seconds)" Minimum="5" Maximum="120" Value="30" SpinButtonPlacementMode="Compact" />
+                        <Button x:Name="GamingSaveProfileBtn" Content="Save Profile Settings" Click="GamingSaveProfileBtn_Click" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="GamingProfileNoticeText" Visibility="Collapsed" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Automations ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Agents">
+                <TextBlock Text="AUTOMATIONS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="TRIGGER -&gt; CONDITIONS -&gt; ACTION. When the trigger fires, a real Multi-Agent task is created and goes through the same dispatch/execution/verification pipeline as every other task above." />
+                        <TextBox x:Name="AutomationNameBox" PlaceholderText="Name, e.g. 'Daily changelog summary'" />
+                        <ComboBox x:Name="AutomationTriggerTypeBox" Header="Trigger" HorizontalAlignment="Stretch" SelectedIndex="0">
+                            <ComboBoxItem Content="Schedule (fixed interval)" Tag="schedule" />
+                            <ComboBoxItem Content="File created in a folder" Tag="file_created" />
+                            <ComboBoxItem Content="Git commit in a repository" Tag="git_commit" />
+                        </ComboBox>
+                        <NumberBox x:Name="AutomationIntervalSecondsBox" Header="Interval seconds (Schedule trigger)" Minimum="60" Value="3600" SpinButtonPlacementMode="Compact" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBox x:Name="AutomationFolderPathBox" Grid.Column="0" Header="Folder to watch (File Created) / repository (Git Commit)" PlaceholderText="e.g. C:\Users\me\Inbox or C:\Users\me\my-project" />
+                            <Button Grid.Column="1" Content="Browse…" Click="BrowseAutomationFolder_Click" VerticalAlignment="Bottom" />
+                        </Grid>
+                        <TextBox x:Name="AutomationFilterBox" Header="File filter (File Created trigger)" PlaceholderText="* (default)" />
+                        <TextBox x:Name="AutomationGitBranchBox" Header="Branch (Git Commit trigger, optional)" PlaceholderText="Empty = whatever is currently checked out" />
+                        <TextBox x:Name="AutomationGoalTemplateBox" PlaceholderText="Task goal, e.g. 'Summarize {fileName}'" TextWrapping="Wrap" AcceptsReturn="True" />
+                        <ComboBox x:Name="AutomationRoleBox" Header="Role (optional - AUTO infers one)" HorizontalAlignment="Stretch" SelectedIndex="0">
+                            <ComboBoxItem Content="AUTO" Tag="" />
+                            <ComboBoxItem Content="Planner" Tag="planner" />
+                            <ComboBoxItem Content="Research" Tag="research" />
+                            <ComboBoxItem Content="Review" Tag="review" />
+                            <ComboBoxItem Content="Documentation" Tag="documentation" />
+                            <ComboBoxItem Content="Testing" Tag="testing" />
+                            <ComboBoxItem Content="Security" Tag="security" />
+                        </ComboBox>
+                        <Button Content="Create automation" Click="CreateAutomation_Click" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="AutomationStatus" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="AutomationsCountLabel" Grid.Column="0" Text="0 automation(s)" Style="{StaticResource PaRuXBodyStrongTextStyle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Refresh" Click="RefreshAutomations_Click" />
+                        </Grid>
+                        <TextBlock x:Name="AutomationsStatusText" Visibility="Collapsed" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <StackPanel x:Name="AutomationsList" Spacing="8" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Context Graph Inspector ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Agents">
+                <TextBlock Text="CONTEXT GRAPH INSPECTOR" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Entities and relations other vNext features have recorded (projects, tasks, ...) - a small, explainable slice, not a prompt-stuffing dump. Free-form entity/relation types, nothing enforced here." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBox x:Name="ContextTypeFilterBox" Grid.Column="0" PlaceholderText="Filter by entity type (optional), e.g. 'project'" />
+                            <Button Grid.Column="1" Content="Refresh" Click="RefreshContextEntities_Click" />
+                        </Grid>
+                        <TextBlock x:Name="ContextEntitiesCountLabel" Text="0 entities" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <StackPanel x:Name="ContextEntitiesList" Spacing="8" />
+                        <TextBlock Text="Neighborhood" Style="{StaticResource PaRuXBodyStrongTextStyle}" Margin="0,8,0,0" />
+                        <TextBlock x:Name="ContextNeighborhoodText" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock Text="Add an entity or relation manually" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBox x:Name="ContextEntityTypeBox" Grid.Column="0" PlaceholderText="Type, e.g. 'note'" />
+                            <TextBox x:Name="ContextEntityNameBox" Grid.Column="1" PlaceholderText="Name" />
+                        </Grid>
+                        <Button Content="Add entity" Click="CreateContextEntity_Click" HorizontalAlignment="Left" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBox x:Name="ContextRelationFromBox" Grid.Column="0" PlaceholderText="From entity id" />
+                            <TextBox x:Name="ContextRelationTypeBox" Grid.Column="1" PlaceholderText="Relation type, e.g. 'RELATES_TO'" />
+                            <TextBox x:Name="ContextRelationToBox" Grid.Column="2" PlaceholderText="To entity id" />
+                        </Grid>
+                        <Button Content="Add relation" Click="CreateContextRelation_Click" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="ContextGraphStatus" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== PaRuX Platform / Universal Diff ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="PaRuX Platform">
+                <TextBlock Text="LICENSE &amp; TRUST" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Inspect license metadata declared by a Hugging Face model or dataset repository. PaRuX reports the source metadata as-is; absence is not permission, and this is not legal advice." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="160" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <ComboBox x:Name="LicenseTrustKindBox" Grid.Column="0" Header="Repository kind" SelectedIndex="0">
+                                <ComboBoxItem Content="Model" Tag="model" />
+                                <ComboBoxItem Content="Dataset" Tag="dataset" />
+                            </ComboBox>
+                            <TextBox x:Name="LicenseTrustRepoIdBox" Grid.Column="1" Header="Hugging Face repository" PlaceholderText="owner/repository" />
+                            <Button x:Name="LicenseTrustInspectButton" Grid.Column="2" Content="Inspect metadata" Click="InspectLicenseTrust_Click" VerticalAlignment="Bottom" />
+                        </Grid>
+                        <TextBlock x:Name="LicenseTrustStatusText" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <TextBlock x:Name="LicenseTrustResultText" TextWrapping="Wrap" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="OBSERVABILITY" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="A read-only chronological view over real records already owned by agent tasks, model and dataset downloads, training jobs, adapters, and AutoLab experiments. Refreshing does not create or modify data." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="ObservabilityCountText" Grid.Column="0" Text="Timeline not loaded" Style="{StaticResource PaRuXBodyStrongTextStyle}" VerticalAlignment="Center" />
+                            <Button x:Name="ObservabilityRefreshButton" Grid.Column="1" Content="Refresh latest 50" Click="RefreshObservability_Click" />
+                        </Grid>
+                        <ScrollViewer MaxHeight="420" VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel x:Name="ObservabilityTimelineList" Spacing="8" />
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="CAPABILITY PROFILER" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Runs a fixed battery of five real probes (JSON reliability, exact instruction-following, math reasoning, moderate long-context recall, tool-call formatting) against whichever model is currently loaded and healthy in the text runtime. Deterministically scored - no second model judges the answers." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="CapabilityProfilerStatusText" Grid.Column="0" Text="No profile run yet." Style="{StaticResource PaRuXBodyStrongTextStyle}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            <Button x:Name="CapabilityProfilerRunButton" Grid.Column="1" Content="Run profile" Click="RunCapabilityProfile_Click" />
+                        </Grid>
+                        <StackPanel x:Name="CapabilityProfilerResultsList" Spacing="6" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="UNIVERSAL DIFF" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Compare any two text-shaped values locally: code, configuration, prompts, skill manifests, or exported document text. PaRuX Core performs a line-level comparison; no model or internet connection is used." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="UniversalDiffOldTextBox" Grid.Column="0" Header="Original text"
+                                     PlaceholderText="Paste the original text" AcceptsReturn="True" TextWrapping="NoWrap"
+                                     MinHeight="220" FontFamily="Consolas"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                            <TextBox x:Name="UniversalDiffNewTextBox" Grid.Column="1" Header="Updated text"
+                                     PlaceholderText="Paste the updated text" AcceptsReturn="True" TextWrapping="NoWrap"
+                                     MinHeight="220" FontFamily="Consolas"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}">
+                            <Button x:Name="UniversalDiffCompareButton" Content="Compare" Click="CompareUniversalDiff_Click" />
+                            <Button Content="Clear" Click="ClearUniversalDiff_Click" />
+                        </StackPanel>
+                        <TextBlock x:Name="UniversalDiffStatusText" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <TextBox x:Name="UniversalDiffOutputBox" Header="Diff result" IsReadOnly="True"
+                                 AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="180" MaxHeight="420"
+                                 FontFamily="Consolas" PlaceholderText="Lines prefixed with + were added; lines prefixed with - were removed."
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Storage ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Data">
+                <TextBlock Text="STORAGE" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel>
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Managed-data quota" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock x:Name="StorageUsageText" Text="Calculating local usage…" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <NumberBox x:Name="StorageQuotaBox" Grid.Column="1" Header="GB" Minimum="10" Maximum="400" SmallChange="10" SpinButtonPlacementMode="Compact" ValueChanged="StorageQuotaNumber_ValueChanged" />
+                            <Button Grid.Column="2" Content="Refresh" Click="RefreshStorage_Click" VerticalAlignment="Bottom" Margin="0,0,0,1" />
+                        </Grid>
+                        <StackPanel x:Name="StorageBreakdownList" Spacing="4" Margin="0,10,0,0" />
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,10,0,10" />
+                        <TextBlock x:Name="AiStorageBudgetText" Style="{StaticResource PaRuXBodyStrongTextStyle}" TextWrapping="Wrap" />
+                        <TextBlock Text="Whole-ecosystem total (PaRuX's own data plus the external LLM model stack above), advisory only — nothing is deleted automatically."
+                                   Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Document attachments" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="PDF, DOCX, PPTX, XLS/XLSX/XLSB, CSV/TSV, text, source code, JSON and XML. PDFs are analyzed as page images." TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <NumberBox x:Name="MaxDocumentsBox" Grid.Column="1" Header="Files" Minimum="1" Maximum="8" SpinButtonPlacementMode="Compact" ValueChanged="DocumentNumberBox_ValueChanged" />
+                            <NumberBox x:Name="MaxDocumentMegabytesBox" Grid.Column="2" Header="MB each" Minimum="1" Maximum="1024" SmallChange="10" SpinButtonPlacementMode="Compact" ValueChanged="DocumentNumberBox_ValueChanged" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Internet ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Privacy &amp; Network">
+                <TextBlock Text="INTERNET" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Text="Web search" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                            <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                                Text="Off by default. When on, an explicit request like 'search the web for…' runs one keyless search and reads the top results — never automatically, and never as a fallback for the AI itself. AI inference always stays local; nothing here sends a prompt to a cloud AI provider. Page content is always treated as untrusted data, never as instructions." />
+                            <TextBlock x:Name="InternetStatusText" Visibility="Collapsed" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="InternetSwitch" Grid.Column="1"
+                                      OffContent="Off" OnContent="On" VerticalAlignment="Center"
+                                      Toggled="InternetSwitch_Toggled" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== RAG ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Chat Behavior">
+                <TextBlock Text="RAG (LOCAL DOCUMENTS)" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Index a folder and PaRuX retrieves relevant excerpts into chat automatically, with the source file named in the reply. Text, Markdown, CSV/JSON/XML/YAML, source files, and .docx/.xlsx/.pptx are indexed; PDFs are not yet." />
+
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Semantic search engine" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock x:Name="EmbeddingEngineStatusText" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <Button x:Name="InstallEmbeddingEngineButton" Grid.Column="1" Content="Install (~90 MB)" Click="InstallEmbeddingEngine_Click" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Indexed folders" Style="{StaticResource PaRuXBodyStrongTextStyle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Add folder…" Click="AddRagSource_Click" />
+                        </Grid>
+                        <StackPanel x:Name="RagSourcesList" Spacing="6" />
+                        <TextBlock x:Name="RagIndexStatus" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Personas ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Chat Behavior">
+                <TextBlock Text="PERSONAS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="A system-prompt preset that shapes tone and personality - layered on top of whatever the current route/skill already needs, so it never replaces PaRuX's actual capabilities. Applies to every device, same as Memory and RAG." />
+                        <StackPanel x:Name="PersonasList" Spacing="6" />
+
+                        <TextBlock Text="Create a custom persona" Style="{StaticResource PaRuXBodyStrongTextStyle}" Margin="0,4,0,0" />
+                        <TextBox x:Name="NewPersonaNameBox" PlaceholderText="Name, e.g. Sarcastic Reviewer" />
+                        <TextBox x:Name="NewPersonaPromptBox" PlaceholderText="System-prompt instruction, e.g. Respond with dry, sarcastic wit while still being accurate."
+                            TextWrapping="Wrap" AcceptsReturn="True" Height="72" />
+                        <Button Content="Create persona" HorizontalAlignment="Left" Click="CreatePersona_Click" />
+                        <TextBlock x:Name="PersonaStatus" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Memory ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Chat Behavior">
+                <TextBlock Text="MEMORY" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Persistent local facts PaRuX can selectively recall in chat — never the whole list, just what's relevant to what you just asked. Stays on this PC; nothing here is sent anywhere except as short snippets inside your own prompts to your own local model." />
+
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="MemoryScopeCombo" AutomationProperties.Name="Memory scope" Grid.Column="0" SelectedIndex="0">
+                                <ComboBoxItem Content="User" Tag="User" />
+                                <ComboBoxItem Content="Project" Tag="Project" />
+                                <ComboBoxItem Content="Conversation" Tag="Conversation" />
+                                <ComboBoxItem Content="Agent" Tag="Agent" />
+                            </ComboBox>
+                            <TextBox x:Name="MemoryNewContentBox" Grid.Column="1" PlaceholderText="Add a memory, e.g. I prefer terse commit messages" />
+                            <Button Grid.Column="2" Content="Add" Click="AddMemory_Click" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="MemorySearchBox" Grid.Column="0" PlaceholderText="Search memory…" TextChanged="MemorySearchBox_TextChanged" />
+                            <Button Grid.Column="1" Content="Export" Click="ExportMemory_Click" />
+                            <Button Grid.Column="2" Content="Import" Click="ImportMemory_Click" />
+                            <Button Grid.Column="3" Content="Clear all" Click="ClearMemory_Click" />
+                        </Grid>
+
+                        <TextBlock x:Name="MemoryStatusText" Visibility="Collapsed" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <StackPanel x:Name="MemoryList" Spacing="6" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Backup & Restore ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Data">
+                <TextBlock Text="BACKUP &amp; RESTORE" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Save everything PaRuX considers your own data - conversation history, Memory, indexed-folder configuration, and app settings - into one .zip file, and restore it later on this PC or a new one. Downloaded AI models and the contents of indexed folders are never included; re-indexing after a restore is fine." />
+
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="Export backup…" Click="ExportBackup_Click" HorizontalAlignment="Left" />
+                            <Button Grid.Column="1" Content="Clear safety snapshots" Click="ClearSafetySnapshots_Click"
+                                    ToolTipService.ToolTip="Deletes the automatic pre-restore copies PaRuX keeps under its data folder (backups). They contain your full data." />
+                            <Button Grid.Column="2" Content="Import backup…" Click="ImportBackup_Click" />
+                        </Grid>
+
+                        <TextBlock x:Name="BackupStatus" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Import chat history ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Data">
+                <TextBlock Text="IMPORT CHAT HISTORY" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Bring conversations in from a ChatGPT or Claude data export (.zip or conversations.json) or a Google Takeout Gemini MyActivity.json. Imported as ordinary local conversations tagged with their source; importing the same file again skips what is already there." />
+                        <Button Content="Import chats…" AutomationProperties.AutomationId="Import_Chats_Button" Click="ImportChatHistory_Click" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="ChatImportStatus" AutomationProperties.AutomationId="Import_Chats_Status" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <Button Content="Find models from other apps…" AutomationProperties.AutomationId="ExternalModels_Find_Button" Click="FindModelsFromOtherApps_Click" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="ExternalModelsStatus" AutomationProperties.AutomationId="ExternalModels_Status" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Skills ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Chat Behavior">
+                <TextBlock Text="SKILLS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Every capability PaRuX can run - what model role it prefers, which tools and policies it uses, and its permissions - fully inspectable, nothing hidden. AUTO picks one by trigger phrase; force one from the composer's skill selector or a slash command." />
+
+                        <Button Content="What are Skills? (guide)" HorizontalAlignment="Left" Click="SkillsGuide_Click" />
+
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" x:Name="SkillsCountLabel" Text="Loading skills…" Style="{StaticResource PaRuXBodyStrongTextStyle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="New skill…" Click="CreateSkill_Click" />
+                            <Button Grid.Column="2" Content="Refresh" Click="RefreshSkills_Click" />
+                        </Grid>
+                        <TextBlock x:Name="SkillsStatusText" Visibility="Collapsed" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <StackPanel x:Name="SkillsList" Spacing="6" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Research ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Automation">
+                <TextBlock Text="RESEARCH" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Plans queries, searches the web, fetches sources, and synthesizes a cited local-model answer. Requires Internet enabled above. Fast = one pass; Deep is the most thorough." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="ResearchModeCombo" AutomationProperties.Name="Research mode" Grid.Column="0" SelectedIndex="1">
+                                <ComboBoxItem Content="Fast" Tag="fast" />
+                                <ComboBoxItem Content="Balanced" Tag="balanced" />
+                                <ComboBoxItem Content="Deep" Tag="deep" />
+                            </ComboBox>
+                            <TextBox x:Name="ResearchQuestionBox" Grid.Column="1" PlaceholderText="Ask a research question…" AcceptsReturn="False" />
+                            <Button x:Name="ResearchAskButton" Grid.Column="2" Content="Ask" Click="ResearchAsk_Click" />
+                        </Grid>
+                        <ProgressRing x:Name="ResearchProgress" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" Width="20" Height="20" />
+                        <TextBlock x:Name="ResearchAnswer" TextWrapping="Wrap" Style="{StaticResource PaRuXBodyTextStyle}" Visibility="Collapsed" />
+                        <StackPanel x:Name="ResearchSourcesList" Spacing="4" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Presentations ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Media Generation">
+                <TextBlock Text="PRESENTATIONS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Local-LLM outline plus native OpenXml slide construction - a real, editable .pptx file, no external service." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="90" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="PresentationTopicBox" Grid.Column="0" PlaceholderText="Presentation topic…" />
+                            <NumberBox x:Name="PresentationSlideCount" Grid.Column="1" Value="6" Minimum="2" Maximum="30" SpinButtonPlacementMode="Compact" />
+                            <Button x:Name="PresentationGenerateButton" Grid.Column="2" Content="Generate" Click="PresentationGenerate_Click" />
+                        </Grid>
+                        <ProgressRing x:Name="PresentationProgress" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" Width="20" Height="20" />
+                        <StackPanel x:Name="PresentationSlidesList" Spacing="4" />
+                        <Button x:Name="PresentationSaveButton" Content="Save .pptx…" Visibility="Collapsed" Click="PresentationSave_Click" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Speech ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Media Generation">
+                <TextBlock Text="SPEECH" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock x:Name="SpeechEngineStatusText" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" Text="Checking speech engines…" />
+
+                        <TextBlock Text="Text to speech" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBox x:Name="TtsTextBox" Grid.Column="0" PlaceholderText="Text to speak…" AcceptsReturn="True" MaxHeight="80" TextWrapping="Wrap" />
+                            <Button x:Name="TtsSpeakButton" Grid.Column="1" Content="Speak" Click="TtsSpeak_Click" VerticalAlignment="Bottom" />
+                        </Grid>
+                        <MediaPlayerElement x:Name="TtsPlayer" Height="0" Visibility="Collapsed" AreTransportControlsEnabled="False" />
+                        <TextBlock x:Name="TtsStatus" Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" />
+
+                        <TextBlock Text="Speech to text" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Transcribe an audio file (wav/mp3)" Style="{StaticResource PaRuXBodyTextStyle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" x:Name="SttPickButton" Content="Pick audio…" Click="SttPick_Click" />
+                        </Grid>
+                        <TextBlock x:Name="SttResult" TextWrapping="Wrap" Style="{StaticResource PaRuXBodyTextStyle}" Visibility="Collapsed" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Local AI runtime location ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Models">
+                <TextBlock Text="LOCAL AI RUNTIME LOCATION" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Where the local AI runtime lives on disk (llama.cpp builds, ComfyUI, models, config, logs). PaRuX auto-detects an existing installation; only change this if you moved it or are setting up a fresh machine." />
+                        <TextBlock x:Name="LocalAiRootText" Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="LocalAiRootBox" Grid.Column="0" PlaceholderText="Local AI root folder" IsReadOnly="True" />
+                            <Button Grid.Column="1" Content="Browse…" Click="LocalAiRootBrowse_Click" />
+                            <Button Grid.Column="2" Content="Save" Click="LocalAiRootSave_Click" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Local AI runtime components & lifecycle ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Models">
+                <Grid Margin="4,0,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="RUNTIME COMPONENTS &amp; LIFECYCLE" Style="{StaticResource PaRuXSectionHeaderTextStyle}" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" x:Name="RefreshComponentsSettingsButton" AutomationProperties.AutomationId="Settings_RefreshComponents_Button" Content="Refresh components" Click="RefreshComponentsSettings_Click" FontSize="12" />
+                </Grid>
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Local-first component lifecycle. You can detect, locate existing, install with PaRuX, or skip components at any time. PaRuX never alters user-managed software without explicit direction." />
+                        <ProgressBar x:Name="ComponentsSettingsProgress" AutomationProperties.AutomationId="Settings_Components_Progress" IsIndeterminate="True" Visibility="Collapsed" HorizontalAlignment="Stretch" />
+                        <TextBlock x:Name="ComponentsSettingsStatusText" AutomationProperties.AutomationId="Settings_Components_StatusText" Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" />
+                        <StackPanel x:Name="ComponentsSettingsList" AutomationProperties.AutomationId="Settings_Components_List" Spacing="{StaticResource PaRuXSpaceS}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Model Downloads ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Models">
+                <TextBlock Text="MODEL DOWNLOADS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Search Hugging Face for GGUF models and download straight into PaRuX's managed folder, checked against the AI storage budget before every download. This never touches the external LocalAI model stack - point a runtime at a downloaded file yourself when you want to use it." />
+                        <TextBlock x:Name="ModelBudgetText" Style="{StaticResource PaRuXCaptionTextStyle}" />
+
+                        <TextBlock Text="Recommended models" Style="{StaticResource PaRuXBodyStrongTextStyle}" Margin="0,8,0,0" />
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Not sure what to download? These are current, well-regarded models for common use cases, rated against your own hardware." />
+                        <StackPanel x:Name="RecommendedModelsList" Spacing="8" />
+
+                        <TextBlock Text="Search Hugging Face" Style="{StaticResource PaRuXBodyStrongTextStyle}" Margin="0,8,0,0" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBox x:Name="ModelSearchBox" Grid.Column="0" PlaceholderText="Search Hugging Face for GGUF models…" />
+                            <Button Grid.Column="1" Content="Search" Click="ModelSearch_Click" />
+                        </Grid>
+                        <ProgressRing x:Name="ModelSearchProgress" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" Width="20" Height="20" />
+                        <StackPanel x:Name="ModelSearchResults" Spacing="8" />
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="PaRuX managed model library" Style="{StaticResource PaRuXBodyStrongTextStyle}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                <Button Content="Refresh" Click="RefreshManagedModels_Click" />
+                                <Button Content="Unload" Click="UnloadManagedModel_Click" ToolTipService.ToolTip="Stops whichever role is currently loaded into the text runtime." />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Only files downloaded or explicitly copied into PaRuX's managed folder appear here. Delete is restricted to this folder and never touches the external LocalAI stack. Pick a role and Load to actually start this file in the text runtime - only one role can be loaded at a time on this machine." />
+                        <TextBlock x:Name="RuntimeManagerStatusText" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <StackPanel x:Name="ManagedModelsList" Spacing="6" />
+                        <TextBlock Text="Active downloads" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                        <StackPanel x:Name="ModelDownloadsList" Spacing="6" />
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Installed model benchmarks" Style="{StaticResource PaRuXBodyStrongTextStyle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Refresh" Click="RefreshModelBenchmarks_Click" />
+                        </Grid>
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Every completed GGUF download is benchmarked automatically. Run it again at any time here. Averages only combine measurements from the same backend and hardware." />
+                        <StackPanel x:Name="ModelBenchmarksList" Spacing="8" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Model Compare ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Models">
+                <TextBlock Text="MODEL COMPARE" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Blind side-by-side test: send one prompt to two local models, one after another (this GPU can't hold two large models loaded at once), then compare the replies before finding out which model said what." />
+                        <TextBox x:Name="ComparePromptBox" PlaceholderText="Prompt to send to both models…" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="120" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <ComboBox x:Name="CompareModelACombo" AutomationProperties.Name="Compare model A" Grid.Column="0" PlaceholderText="Model A" HorizontalAlignment="Stretch" />
+                            <ComboBox x:Name="CompareModelBCombo" AutomationProperties.Name="Compare model B" Grid.Column="1" PlaceholderText="Model B" HorizontalAlignment="Stretch" />
+                        </Grid>
+                        <Button x:Name="CompareRunButton" Content="Run comparison" Click="CompareRun_Click" HorizontalAlignment="Left" />
+                        <Button x:Name="CompareCancelButton" Content="Cancel run" Visibility="Collapsed" Click="CompareCancel_Click" HorizontalAlignment="Left" />
+                        <ProgressRing x:Name="CompareProgress" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" Width="20" Height="20" />
+                        <TextBlock x:Name="CompareStageText" Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" />
+
+                        <Grid x:Name="CompareResultsGrid" ColumnSpacing="{StaticResource PaRuXSpaceM}" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock x:Name="CompareALabel" Text="Response A" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock x:Name="CompareAText" TextWrapping="Wrap" Style="{StaticResource PaRuXBodyTextStyle}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock x:Name="CompareBLabel" Text="Response B" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock x:Name="CompareBText" TextWrapping="Wrap" Style="{StaticResource PaRuXBodyTextStyle}" />
+                            </StackPanel>
+                        </Grid>
+                        <Button x:Name="CompareRevealButton" Content="Reveal" Click="CompareReveal_Click" HorizontalAlignment="Left" Visibility="Collapsed" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Group Chat ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Models">
+                <TextBlock Text="GROUP CHAT" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="2-4 local models take turns replying to one prompt, each seeing what the others already said - one model loaded at a time, in order (this GPU can't hold more than one large model at once)." />
+                        <TextBox x:Name="GroupChatPromptBox" PlaceholderText="Prompt for the group…" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="120" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}" RowSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                            <ComboBox x:Name="GroupChatModel1Combo" AutomationProperties.Name="Group chat participant 1" Grid.Row="0" Grid.Column="0" PlaceholderText="Participant 1" HorizontalAlignment="Stretch" />
+                            <ComboBox x:Name="GroupChatModel2Combo" AutomationProperties.Name="Group chat participant 2" Grid.Row="0" Grid.Column="1" PlaceholderText="Participant 2" HorizontalAlignment="Stretch" />
+                            <ComboBox x:Name="GroupChatModel3Combo" AutomationProperties.Name="Group chat participant 3" Grid.Row="1" Grid.Column="0" PlaceholderText="Participant 3 (optional)" HorizontalAlignment="Stretch" />
+                            <ComboBox x:Name="GroupChatModel4Combo" AutomationProperties.Name="Group chat participant 4" Grid.Row="1" Grid.Column="1" PlaceholderText="Participant 4 (optional)" HorizontalAlignment="Stretch" />
+                        </Grid>
+                        <Button x:Name="GroupChatRunButton" Content="Start group chat" Click="GroupChatRun_Click" HorizontalAlignment="Left" />
+                        <Button x:Name="GroupChatCancelButton" Content="Cancel group chat" Visibility="Collapsed" Click="GroupChatCancel_Click" HorizontalAlignment="Left" />
+                        <ProgressRing x:Name="GroupChatProgress" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" Width="20" Height="20" />
+                        <TextBlock x:Name="GroupChatStageText" Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" />
+                        <StackPanel x:Name="GroupChatResultsList" Spacing="{StaticResource PaRuXSpaceM}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Candidate Discovery Policy ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Models">
+                <TextBlock Text="CANDIDATE DISCOVERY POLICY" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock Text="Choose how PaRuX treats newly discovered model candidates. The notice list in Model Hub already offers Evaluate, Later and Ignore per candidate."
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource PaRuXCaptionTextStyle}" />
+
+                        <!-- Row 1: Automatic evaluation -->
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock x:Name="DiscoveryPolicyAutoEvaluateLabel"
+                                           Text="Evaluate suitable models automatically"
+                                           TextWrapping="Wrap"
+                                           Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock x:Name="DiscoveryPolicyAutoEvaluateExplanation"
+                                           TextWrapping="Wrap"
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="Settings_DiscoveryPolicy_AutoEvaluate_Toggle"
+                                          Grid.Column="1"
+                                          AutomationProperties.AutomationId="Settings_DiscoveryPolicy_AutoEvaluate_Toggle"
+                                          AutomationProperties.Name="Evaluate suitable models automatically"
+                                          AutomationProperties.AccessibilityView="Control"
+                                          Toggled="DiscoveryPolicyAutoEvaluateToggle_Toggled" />
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,4,0,4" />
+
+                        <!-- Row 2: Promotion policy -->
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock x:Name="DiscoveryPolicyPromotionLabel"
+                                           Text="Promotion policy"
+                                           TextWrapping="Wrap"
+                                           Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock x:Name="DiscoveryPolicyPromotionExplanation"
+                                           TextWrapping="Wrap"
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <ComboBox x:Name="Settings_DiscoveryPolicy_Promotion_ComboBox"
+                                      Grid.Column="1"
+                                      MinWidth="200"
+                                      MaxWidth="260"
+                                      AutomationProperties.AutomationId="Settings_DiscoveryPolicy_Promotion_ComboBox"
+                                      AutomationProperties.Name="Promotion policy"
+                                      AutomationProperties.AccessibilityView="Control"
+                                      SelectionChanged="DiscoveryPolicyPromotionComboBox_SelectionChanged">
+                                <ComboBoxItem Content="Ask before replacing" Tag="ask" />
+                                <ComboBoxItem Content="Auto-promote only when clearly better" Tag="clearly_better" />
+                                <ComboBoxItem Content="Never replace pinned or manual choices" Tag="never" />
+                            </ComboBox>
+                        </Grid>
+
+                        <TextBlock x:Name="Settings_DiscoveryPolicy_Status_Text"
+                                   AutomationProperties.AutomationId="Settings_DiscoveryPolicy_Status_Text"
+                                   AutomationProperties.Name="Candidate discovery policy status"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Automatic checks ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Models">
+                <TextBlock Text="AUTOMATIC CHECKS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock Text="PaRuX periodically looks for new model candidates and suggests runtimes for this PC. Models are never downloaded without your approval. PaRuX-managed runtimes can update themselves safely (tested first, previous build kept for rollback). Checks pause while Gaming Mode is on."
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Check automatically"
+                                       Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                            <ToggleSwitch x:Name="Settings_AutoCheck_Enabled_Toggle"
+                                          Grid.Column="1"
+                                          AutomationProperties.AutomationId="Settings_AutoCheck_Enabled_Toggle"
+                                          AutomationProperties.Name="Check automatically"
+                                          Toggled="AutoCheckEnabledToggle_Toggled" />
+                        </Grid>
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Check every (hours, 1 to 720)"
+                                       Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                            <NumberBox x:Name="Settings_AutoCheck_Interval_Box"
+                                       Grid.Column="1" Width="120" Minimum="1" Maximum="720" SmallChange="1" LargeChange="12"
+                                       SpinButtonPlacementMode="Compact" Value="24"
+                                       AutomationProperties.AutomationId="Settings_AutoCheck_Interval_Box"
+                                       AutomationProperties.Name="Check interval in hours"
+                                       ValueChanged="AutoCheckIntervalBox_ValueChanged" />
+                        </Grid>
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" TextWrapping="Wrap"
+                                       Text="Keep PaRuX-managed runtimes up to date automatically"
+                                       Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                            <ToggleSwitch x:Name="Settings_AutoCheck_RuntimeUpdate_Toggle"
+                                          Grid.Column="1" IsOn="True"
+                                          AutomationProperties.AutomationId="Settings_AutoCheck_RuntimeUpdate_Toggle"
+                                          AutomationProperties.Name="Keep PaRuX-managed runtimes up to date automatically"
+                                          Toggled="AutoCheckRuntimeUpdateToggle_Toggled" />
+                        </Grid>
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" TextWrapping="Wrap"
+                                       Text="Optimize the media engine for this PC automatically when idle"
+                                       Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                            <ToggleSwitch x:Name="Settings_AutoCheck_MediaOptimize_Toggle"
+                                          Grid.Column="1" IsOn="False"
+                                          AutomationProperties.AutomationId="Settings_AutoCheck_MediaOptimize_Toggle"
+                                          AutomationProperties.Name="Optimize the media engine for this PC automatically when idle"
+                                          Toggled="AutoCheckMediaOptimizeToggle_Toggled" />
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}">
+                            <Button x:Name="Settings_AutoCheck_MediaOptimize_Button" Content="Optimize media engine for this PC"
+                                    AutomationProperties.AutomationId="Settings_AutoCheck_MediaOptimize_Button"
+                                    Click="AutoCheckMediaOptimize_Click" />
+                            <Button x:Name="Settings_AutoCheck_MediaOptimizeCancel_Button" Content="Cancel" Visibility="Collapsed"
+                                    AutomationProperties.AutomationId="Settings_AutoCheck_MediaOptimizeCancel_Button"
+                                    Click="AutoCheckMediaOptimizeCancel_Click" />
+                        </StackPanel>
+                        <TextBlock x:Name="Settings_AutoCheck_MediaOptimize_Text"
+                                   AutomationProperties.AutomationId="Settings_AutoCheck_MediaOptimize_Text"
+                                   AutomationProperties.Name="Media engine optimisation status"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}">
+                            <Button x:Name="Settings_AutoCheck_CheckNow_Button" Content="Check now"
+                                    AutomationProperties.AutomationId="Settings_AutoCheck_CheckNow_Button"
+                                    Click="AutoCheckNow_Click" />
+                            <Button x:Name="Settings_AutoCheck_RuntimeUpdate_Button" Content="Update runtimes now"
+                                    AutomationProperties.AutomationId="Settings_AutoCheck_RuntimeUpdate_Button"
+                                    Click="AutoCheckRuntimeUpdateNow_Click" />
+                        </StackPanel>
+                        <TextBlock x:Name="Settings_AutoCheck_RuntimeUpdate_Text"
+                                   AutomationProperties.AutomationId="Settings_AutoCheck_RuntimeUpdate_Text"
+                                   AutomationProperties.Name="Last runtime update result"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <TextBlock x:Name="Settings_AutoCheck_LastRun_Text"
+                                   AutomationProperties.AutomationId="Settings_AutoCheck_LastRun_Text"
+                                   AutomationProperties.Name="Last automatic check"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <TextBlock x:Name="Settings_AutoCheck_Status_Text"
+                                   AutomationProperties.AutomationId="Settings_AutoCheck_Status_Text"
+                                   AutomationProperties.Name="Automatic checks status"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Avatar Studio ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Media Generation">
+                <TextBlock Text="AVATAR STUDIO" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Real local lip-synced talking-avatar video from a reference photo plus text - powered by LatentSync (Apache-2.0, chosen over Wav2Lip specifically because Wav2Lip's checkpoint is non-commercial-only). Install downloads the engine and its ~5 GB checkpoint once; still works with an external provider (e.g. Duix) configured instead, which takes priority if both are set up." />
+                        <TextBlock x:Name="AvatarEngineStatusText" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" Text="Checking local avatar engine…" />
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}">
+                            <Button x:Name="AvatarInstallButton" Content="Install engine (~5 GB)" Click="AvatarInstall_Click" />
+                            <Button x:Name="AvatarPhotoButton" Content="Set reference photo…" Click="AvatarPhoto_Click" />
+                        </StackPanel>
+                        <ProgressRing x:Name="AvatarInstallProgress" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" Width="20" Height="20" />
+
+                        <TextBlock x:Name="AvatarStatusText" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" Text="Checking avatar provider…" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBox x:Name="AvatarTextBox" Grid.Column="0" PlaceholderText="Text for the avatar to say…" IsEnabled="False" />
+                            <Button x:Name="AvatarGenerateButton" Grid.Column="1" Content="Generate" Click="AvatarGenerate_Click" IsEnabled="False" />
+                        </Grid>
+                        <ProgressRing x:Name="AvatarProgress" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" Width="20" Height="20" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== 3D Studio ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Media Generation">
+                <TextBlock Text="3D STUDIO" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Turns an image into a real, textured 3D relief model (.glb) - draft quality (one viewing angle's worth of real geometry via depth estimation, not a full 360° reconstruction), but works on any modern GPU. Install downloads a depth-estimation model on first use." />
+                        <TextBlock x:Name="ThreedEngineStatusText" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" Text="Checking 3D engine…" />
+                        <Button x:Name="ThreedInstallButton" Content="Install engine" Click="ThreedInstall_Click" HorizontalAlignment="Left" />
+                        <ProgressRing x:Name="ThreedInstallProgress" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" Width="20" Height="20" />
+
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" x:Name="ThreedSourceImageText" Text="Pick a source image…" Style="{StaticResource PaRuXBodyTextStyle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Pick image…" Click="ThreedPickImage_Click" />
+                        </Grid>
+                        <Button x:Name="ThreedGenerateButton" Content="Generate 3D model" Click="ThreedGenerate_Click" HorizontalAlignment="Left" IsEnabled="False" />
+                        <ProgressRing x:Name="ThreedGenerateProgress" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" Width="20" Height="20" />
+                        <TextBlock x:Name="ThreedResultText" Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" />
+
+                        <WebView2 x:Name="ThreedViewer" Height="0" Visibility="Collapsed" />
+                        <StackPanel x:Name="ThreedActionsPanel" Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}" Visibility="Collapsed">
+                            <Button Content="Save .glb…" Click="ThreedSave_Click" />
+                            <Button x:Name="ThreedOpenBlenderButton" Content="Open in Blender" Click="ThreedOpenBlender_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Training ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Automation">
+                <TextBlock Text="TRAINING DATASET" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                            Text="Only replies you rated 👍 or explicitly saved as a training candidate (the flag icon under a reply) are ever included — nothing is added automatically. Exports as JSONL, deduplicated, with a 90/10 train/validation split. This prepares data; it does not run any training." />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Export training dataset (JSONL)" Style="{StaticResource PaRuXBodyStrongTextStyle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Export…" Click="ExportTrainingDataset_Click" />
+                        </Grid>
+                        <TextBlock x:Name="TrainingExportStatus" Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Training Lab ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Automation">
+                <TextBlock Text="TRAINING LAB" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                        <TextBlock x:Name="TrainingEngineStatusText" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" Text="Checking training engine…" />
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Train JSONL" Style="{StaticResource PaRuXCaptionTextStyle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Pick file…" Click="TrainingPickJsonl_Click" />
+                        </Grid>
+                        <TextBlock x:Name="TrainingJsonlPathText" Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" Text="(export a training dataset above, or pick an existing .jsonl)" />
+                        <TextBox x:Name="TrainingBaseModelBox" PlaceholderText="Base model (Unsloth 4-bit HF id)" Text="unsloth/Qwen2.5-0.5B-Instruct-bnb-4bit" />
+                        <Button x:Name="TrainingStartButton" Content="Start training" Click="TrainingStart_Click" HorizontalAlignment="Left" IsEnabled="False" />
+                        <ProgressBar x:Name="TrainingJobProgress" Visibility="Collapsed" Minimum="0" Maximum="100" />
+                        <TextBlock x:Name="TrainingJobStatusText" Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== Advanced / diagnostics ==================== -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Tag="Advanced">
+                <TextBlock Text="ADVANCED" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceL}">
+
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Local AI diagnostics" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock
+                                    Text="Live state of llama-server, refreshed every three seconds."
+                                    Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Refresh"
+                                    VerticalAlignment="Center"
+                                    Height="32"
+                                    Padding="16,0,16,0"
+                                    CornerRadius="{StaticResource PaRuXRadiusSmall}"
+                                    Click="RefreshDiagnostics_Click" />
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXInsetCardStyle}">
+                            <Grid ColumnSpacing="{StaticResource PaRuXSpaceL}" RowSpacing="{StaticResource PaRuXSpaceM}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="llama-server health"
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}" VerticalAlignment="Center">
+                                    <!-- Never a bare "checking…": the ring spins until the first
+                                         answer lands, then a coloured dot states the verdict. -->
+                                    <ProgressRing x:Name="DiagRing" Width="14" Height="14" IsActive="True"
+                                                  Foreground="{ThemeResource PaRuXBrandBrush}"
+                                                  VerticalAlignment="Center" />
+                                    <Border x:Name="DiagHealthDot" Width="8" Height="8"
+                                            Visibility="Collapsed"
+                                            CornerRadius="{StaticResource PaRuXRadiusPill}"
+                                            Background="{ThemeResource PaRuXTextTertiaryBrush}"
+                                            VerticalAlignment="Center" />
+                                    <TextBlock x:Name="DiagHealth" Text="checking…"
+                                               Style="{StaticResource PaRuXBodyTextStyle}" VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Active profile"
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="DiagProfile" Text="—"
+                                           Style="{StaticResource PaRuXBodyTextStyle}" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Mode"
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="DiagMode" Text="—"
+                                           Style="{StaticResource PaRuXBodyTextStyle}" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Text profile setting"
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" x:Name="DiagTextProfile" Text="—"
+                                           Style="{StaticResource PaRuXBodyTextStyle}" />
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Gaming Mode"
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" x:Name="DiagGame" Text="—"
+                                           Style="{StaticResource PaRuXBodyTextStyle}" />
+
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="GPU / VRAM"
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                <TextBlock Grid.Row="5" Grid.Column="1" x:Name="DiagVram" Text="—"
+                                           Style="{StaticResource PaRuXBodyTextStyle}" />
+
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="System RAM"
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                <TextBlock Grid.Row="6" Grid.Column="1" x:Name="DiagRam" Text="—"
+                                           Style="{StaticResource PaRuXBodyTextStyle}" />
+                            </Grid>
+                        </Border>
+
+                        <TextBlock x:Name="DiagEndpoint" Style="{StaticResource PaRuXMicroTextStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ==================== About ==================== -->
+            <Border Style="{StaticResource PaRuXCardStyle}" Tag="General">
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceL}">
+                    <ContentControl
+                        Width="40"
+                        Height="40"
+                        VerticalAlignment="Top"
+                        ContentTemplate="{StaticResource PrxOrbitMarkTemplate}"
+                        IsHitTestVisible="False" />
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceXS}" VerticalAlignment="Center">
+                        <TextBlock Text="RBG PaRuX AI Studio" Style="{StaticResource PaRuXSubtitleTextStyle}" />
+                        <TextBlock x:Name="AboutVersion" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <TextBlock Text="A local-first assistant for your own machine. Phase 1."
+                                   Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

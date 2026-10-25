@@ -1,0 +1,12 @@
+numpy
+unsloth==2026.9.4
+transformers
+datasets
+trl
+peft
+accelerate
+pillow
+soundfile
+librosa
+sentencepiece
+torch==2.10.0

@@ -1,0 +1,257 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- CrashHarnessProgram.Main is the entry point used by the real-process crash tests. -->
+    <GenerateProgramFile>false</GenerateProgramFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.30" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Parquet.Net" Version="6.1.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />
+    <PackageReference Include="ExcelDataReader" Version="3.9.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Fixtures\performance-stream\*.sse" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PaRuX.Server\PaRuX.Server.csproj" />
+    <ProjectReference Include="..\..\src\PaRuX.Intelligence\PaRuX.Intelligence.csproj" />
+    <ProjectReference Include="..\PaRuX.RuntimeStub\PaRuX.RuntimeStub.csproj" ReferenceOutputAssembly="false" />
+    <Compile Include="..\..\src\PaRuX.WinMlWorker\ChatTemplateThinking.cs" Link="Linked\ChatTemplateThinking.cs" />
+    <ProjectReference Include="..\PaRuX.WinMlWorkerStub\PaRuX.WinMlWorkerStub.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\PaRuX.App\Models\RouteKind.cs" Link="Routing\RouteKind.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelArenaPresenter.cs" Link="Linked\ModelArenaPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CreateWorkflowLoraPresenter.cs" Link="Linked\CreateWorkflowLoraPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Models\Conversation.cs" Link="Models\Conversation.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Models\ChatMessage.cs" Link="Models\ChatMessage.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Models\ChatAttachment.cs" Link="Models\ChatAttachment.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Models\ConversationBranch.cs" Link="Models\ConversationBranch.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ConversationBranching.cs" Link="Branching\ConversationBranching.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaPromptEnhancer.cs" Link="Branching\MediaPromptEnhancer.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingWorkspacePath.cs" Link="CodingAgent\CodingWorkspacePath.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ManagedRuntimeEndpoint.cs" Link="Runtime\ManagedRuntimeEndpoint.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\RouterService.cs" Link="Routing\RouterService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ChatMediaJobReconciler.cs" Link="Chat\ChatMediaJobReconciler.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ChatRenderWindowPolicy.cs" Link="Chat\ChatRenderWindowPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ChatModelRouteInfo.cs" Link="Chat\ChatModelRouteInfo.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModalityIntent.cs" Link="Chat\ModalityIntent.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModalityChatPresenter.cs" Link="Chat\ModalityChatPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ChatProvenance.cs" Link="Chat\ChatProvenance.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ChatModelRouteExplanationBuilder.cs" Link="Chat\ChatModelRouteExplanationBuilder.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CandidateEvaluationStatusText.cs" Link="ModelHub\CandidateEvaluationStatusText.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\DiscoveryRefreshStatusPresenter.cs" Link="ModelHub\DiscoveryRefreshStatusPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MaintenancePresenter.cs" Link="Maintenance\MaintenancePresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ProjectWorkspaceSession.cs" Link="Projects\ProjectWorkspaceSession.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\DocumentTextExtractor.cs" Link="Documents\DocumentTextExtractor.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\AppPaths.cs" Link="CodingAgent\AppPaths.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\Log.cs" Link="Diagnostics\Log.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\SpeechPcmWavStreamWriter.cs" Link="Speech\SpeechPcmWavStreamWriter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\SpeechTimingPresenter.cs" Link="Speech\SpeechTimingPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentCheckpointStore.cs" Link="CodingAgent\CodingAgentCheckpointStore.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentArtifactStore.cs" Link="CodingAgent\CodingAgentArtifactStore.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodeWorktreeApplyService.cs" Link="CodingAgent\CodeWorktreeApplyService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\AgentRepositoryApplyAuthority.cs" Link="CodingAgent\AgentRepositoryApplyAuthority.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ShadowWorkspaceService.cs" Link="CodingAgent\ShadowWorkspaceService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ShadowApplyTransaction.cs" Link="CodingAgent\ShadowApplyTransaction.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ShadowApplyRecoveryInspector.cs" Link="CodingAgent\ShadowApplyRecoveryInspector.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ShadowApplyRecoveryService.cs" Link="CodingAgent\ShadowApplyRecoveryService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ShadowRecoveryDialogModel.cs" Link="CodingAgent\ShadowRecoveryDialogModel.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MultiRepositoryApplyService.cs" Link="CodingAgent\MultiRepositoryApplyService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MultiRepositoryWorktreeService.cs" Link="CodingAgent\MultiRepositoryWorktreeService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\WindowsCodingSandbox.cs" Link="CodingAgent\WindowsCodingSandbox.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingNpmScriptRunner.cs" Link="CodingAgent\CodingNpmScriptRunner.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingCommandPreflight.cs" Link="CodingAgent\CodingCommandPreflight.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentTools.cs" Link="CodingAgent\CodingAgentTools.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingPackageRestoreDiscovery.cs" Link="CodingAgent\CodingPackageRestoreDiscovery.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingWarmEnvironmentSharedCache.cs" Link="CodingAgent\CodingWarmEnvironmentSharedCache.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingPermissionProfile.cs" Link="CodingAgent\CodingPermissionProfile.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentPermissionMode.cs" Link="CodingAgent\CodingAgentPermissionMode.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentNarrationStallPolicy.cs" Link="CodingAgent\CodingAgentNarrationStallPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingTaskIntent.cs" Link="CodingAgent\CodingTaskIntent.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BinaryAnalysisTools.cs" Link="BinaryAnalysis\BinaryAnalysisTools.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BinaryDecompilerTools.cs" Link="BinaryAnalysis\BinaryDecompilerTools.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingVerificationDiscovery.cs" Link="CodingAgent\CodingVerificationDiscovery.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingStepStageReporter.cs" Link="CodingAgent\CodingStepStageReporter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingVerificationCommandPolicy.cs" Link="CodingAgent\CodingVerificationCommandPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingVerificationManifestPolicy.cs" Link="CodingAgent\CodingVerificationManifestPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingWorkspaceVerificationFingerprint.cs" Link="CodingAgent\CodingWorkspaceVerificationFingerprint.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingWorkspaceGitLayoutPolicy.cs" Link="CodingAgent\CodingWorkspaceGitLayoutPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingRepositoryAliasPolicy.cs" Link="CodingAgent\CodingRepositoryAliasPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ShadowApplyPathPolicy.cs" Link="CodingAgent\ShadowApplyPathPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingBrowserPostconditionPolicy.cs" Link="CodingAgent\CodingBrowserPostconditionPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingTaskApplyAdmissionPolicy.cs" Link="CodingAgent\CodingTaskApplyAdmissionPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\PolyglotCodeIntelligence.cs" Link="CodingAgent\PolyglotCodeIntelligence.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingContextCompiler.cs" Link="CodingAgent\CodingContextCompiler.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingContextBudgetPolicy.cs" Link="CodingAgent\CodingContextBudgetPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentPromptBudgetPolicy.cs" Link="CodingAgent\CodingAgentPromptBudgetPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentPromptBuilder.cs" Link="CodingAgent\CodingAgentPromptBuilder.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentMcpToolPolicy.cs" Link="CodingAgent\CodingAgentMcpToolPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentActionJsonRepair.cs" Link="CodingAgent\CodingAgentActionJsonRepair.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentActionJson.cs" Link="CodingAgent\CodingAgentActionJson.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentProtocolRetryPolicy.cs" Link="CodingAgent\CodingAgentProtocolRetryPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentProactiveContextPolicy.cs" Link="CodingAgent\CodingAgentProactiveContextPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingProjectInstructionResolver.cs" Link="CodingAgent\CodingProjectInstructionResolver.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingExactPromptAdmissionPolicy.cs" Link="CodingAgent\CodingExactPromptAdmissionPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentBackendSelectionPolicy.cs" Link="CodingAgent\CodingAgentBackendSelectionPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingCompletionClaimPolicy.cs" Link="CodingAgent\CodingCompletionClaimPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingWebSearchEvidenceFormatter.cs" Link="CodingAgent\CodingWebSearchEvidenceFormatter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentRepeatGuard.cs" Link="CodingAgent\CodingAgentRepeatGuard.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentPhaseTimer.cs" Link="CodingAgent\CodingAgentPhaseTimer.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentReadBatch.cs" Link="CodingAgent\CodingAgentReadBatch.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentCompletionAuthority.cs" Link="CodingAgent\CodingAgentCompletionAuthority.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentContinuation.cs" Link="CodingAgent\CodingAgentContinuation.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentFeatureFlags.cs" Link="CodingAgent\CodingAgentFeatureFlags.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingVerificationPresentation.cs" Link="CodingAgent\CodingVerificationPresentation.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentObservationPolicy.cs" Link="CodingAgent\CodingAgentObservationPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\StructuredChatRoleRoute.cs" Link="CodingAgent\StructuredChatRoleRoute.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\StructuredChatStreamPolicy.cs" Link="CodingAgent\StructuredChatStreamPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\WorktreeService.cs" Link="CodingAgent\WorktreeService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BubblePlacementPolicy.cs" Link="Bubble\BubblePlacementPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\LocalAgentCancellationRegistry.cs" Link="Control\LocalAgentCancellationRegistry.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\LocalAiState.cs" Link="Runtime\LocalAiState.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\UniversalDiffFormatter.cs" Link="Diff\UniversalDiffFormatter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\EvalTrainingDatasetExporter.cs" Link="Training\EvalTrainingDatasetExporter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelDownloadResumeCatalog.cs" Link="ModelHub\ModelDownloadResumeCatalog.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelHardwareFitEstimator.cs" Link="ModelHub\ModelHardwareFitEstimator.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelHubRowPresentation.cs" Link="ModelHub\ModelHubRowPresentation.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ManagedSplitSetNotes.cs" Link="ModelHub\ManagedSplitSetNotes.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelHubSplitSetPresentation.cs" Link="ModelHub\ModelHubSplitSetPresentation.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelLicenseConsentPolicy.cs" Link="ModelHub\ModelLicenseConsentPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelHubSimpleModePresenter.cs" Link="ModelHub\ModelHubSimpleModePresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaHubPresenter.cs" Link="ModelHub\MediaHubPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelSuggestionPresenter.cs" Link="ModelHub\ModelSuggestionPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelSuggestionLanePresenter.cs" Link="ModelHub\ModelSuggestionLanePresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\SuggestionFeedContracts.cs" Link="ModelHub\SuggestionFeedContracts.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\SignedAppUpdateChannel.cs" Link="Updates\SignedAppUpdateChannel.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ReleaseTrustAnchor.cs" Link="Updates\ReleaseTrustAnchor.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\AppUpdateClient.cs" Link="Updates\AppUpdateClient.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\AppUpdateInstallBoundary.cs" Link="Updates\AppUpdateInstallBoundary.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseActionParser.cs" Link="ComputerUse\ComputerUseActionParser.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseCompletionGate.cs" Link="ComputerUse\ComputerUseCompletionGate.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseTypingSequencer.cs" Link="ComputerUse\ComputerUseTypingSequencer.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseInputPin.cs" Link="ComputerUse\ComputerUseInputPin.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseInputDriver.cs" Link="ComputerUse\ComputerUseInputDriver.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseInferenceTimeout.cs" Link="ComputerUse\ComputerUseInferenceTimeout.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseRunGate.cs" Link="ComputerUse\ComputerUseRunGate.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseAuthorizationPolicy.cs" Link="ComputerUse\ComputerUseAuthorizationPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseApprovalState.cs" Link="ComputerUse\ComputerUseApprovalState.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseSensitiveActionPolicy.cs" Link="ComputerUse\ComputerUseSensitiveActionPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\WindowsUiTreeObservationService.cs" Link="ComputerUse\WindowsUiTreeObservationService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\WindowsUiActionService.cs" Link="ComputerUse\WindowsUiActionService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\WindowsUiActionResultPolicy.cs" Link="ComputerUse\WindowsUiActionResultPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\UiCaptureProvenancePolicy.cs" Link="ComputerUse\UiCaptureProvenancePolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserNavigationPlanner.cs" Link="ComputerUse\BrowserNavigationPlanner.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserDevToolsEvaluationPolicy.cs" Link="ComputerUse\BrowserDevToolsEvaluationPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserRedirectObservationPolicy.cs" Link="ComputerUse\BrowserRedirectObservationPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserRequestAdmissionPolicy.cs" Link="ComputerUse\BrowserRequestAdmissionPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserLiteralAddressPolicy.cs" Link="ComputerUse\BrowserLiteralAddressPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserAttachedTargetPolicy.cs" Link="ComputerUse\BrowserAttachedTargetPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserDevToolsNavigationResultPolicy.cs" Link="ComputerUse\BrowserDevToolsNavigationResultPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserNetworkEvidencePolicy.cs" Link="ComputerUse\BrowserNetworkEvidencePolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserDomActionScriptBuilder.cs" Link="ComputerUse\BrowserDomActionScriptBuilder.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserDomActionResultPolicy.cs" Link="ComputerUse\BrowserDomActionResultPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserDomAssertionPolicy.cs" Link="ComputerUse\BrowserDomAssertionPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserUiMutationPolicy.cs" Link="ComputerUse\BrowserUiMutationPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserTaskOwnerLease.cs" Link="ComputerUse\BrowserTaskOwnerLease.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserOfflineEgressPolicy.cs" Link="ComputerUse\BrowserOfflineEgressPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserOfflineEgressSink.cs" Link="ComputerUse\BrowserOfflineEgressSink.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserInternetSwitchWatch.cs" Link="ComputerUse\BrowserInternetSwitchWatch.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserScreenshotStore.cs" Link="ComputerUse\BrowserScreenshotStore.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserOrphanPolicy.cs" Link="ComputerUse\BrowserOrphanPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserResolvedAddressPolicy.cs" Link="ComputerUse\BrowserResolvedAddressPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserInitiatorPolicy.cs" Link="ComputerUse\BrowserInitiatorPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserFrameLineage.cs" Link="ComputerUse\BrowserFrameLineage.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserEvidenceLabelPolicy.cs" Link="ComputerUse\BrowserEvidenceLabelPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserDownloadGuardPolicy.cs" Link="ComputerUse\BrowserDownloadGuardPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BrowserProcessTreePolicy.cs" Link="ComputerUse\BrowserProcessTreePolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingTaskRunLease.cs" Link="CodingAgent\CodingTaskRunLease.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ResourceSnapshot.cs" Link="ModelHub\ResourceSnapshot.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelFitClassifier.cs" Link="ModelHub\ModelFitClassifier.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ExternalModelImportPolicy.cs" Link="ModelHub\ExternalModelImportPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\Integrations\ClientIntegrationModels.cs" Link="Integrations\ClientIntegrationModels.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\Integrations\ClientConfigEditors.cs" Link="Integrations\ClientConfigEditors.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\Integrations\IntegrationStore.cs" Link="Integrations\IntegrationStore.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\Integrations\ClientLocator.cs" Link="Integrations\ClientLocator.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\Integrations\ClientIntegrations.cs" Link="Integrations\ClientIntegrations.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\Integrations\ClientIntegrationService.cs" Link="Integrations\ClientIntegrationService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\GamingCallResult.cs" Link="Gaming\GamingCallResult.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\GamingProfileEdit.cs" Link="Gaming\GamingProfileEdit.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ToggleFailureRecovery.cs" Link="Settings\ToggleFailureRecovery.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\DraftSubmission.cs" Link="Settings\DraftSubmission.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ConfirmedAction.cs" Link="Settings\ConfirmedAction.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BackupRestoreDecisionPresenter.cs" Link="Settings\BackupRestoreDecisionPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CreateOperationGate.cs" Link="CreateWorkspace\CreateOperationGate.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaCompanionRemediation.cs" Link="CreateWorkspace\MediaCompanionRemediation.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BoundedStatusPoller.cs" Link="Polling\BoundedStatusPoller.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelDownloadStatusPolicy.cs" Link="Polling\ModelDownloadStatusPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelDownloadPresentationPolicy.cs" Link="ModelHub\ModelDownloadPresentationPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelDownloadSettingsPolicy.cs" Link="ModelHub\ModelDownloadSettingsPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\DiscoveryPolicyPresenter.cs" Link="ModelHub\DiscoveryPolicyPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CapabilityAcquisitionPresenter.cs" Link="ModelHub\CapabilityAcquisitionPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CapabilityOverridePresenter.cs" Link="Routing\CapabilityOverridePresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CapabilityModePresenter.cs" Link="Routing\CapabilityModePresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\OnboardingStateMachine.cs" Link="Onboarding\OnboardingStateMachine.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\OnboardingReturnPolicy.cs" Link="Onboarding\OnboardingReturnPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\InstallProgressPresenter.cs" Link="Onboarding\InstallProgressPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelDownloadRowPresentation.cs" Link="ModelHub\ModelDownloadRowPresentation.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\OnboardingChatVerificationPolicy.cs" Link="Onboarding\OnboardingChatVerificationPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\OnboardingAutoSetup.cs" Link="Onboarding\OnboardingAutoSetup.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\OnboardingAutoSetupPresenter.cs" Link="Onboarding\OnboardingAutoSetupPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BundledRuntimeOverviewPresenter.cs" Link="Onboarding\BundledRuntimeOverviewPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComponentLifecyclePresenter.cs" Link="Lifecycle\ComponentLifecyclePresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\UserFailureRecoveryMapper.cs" Link="Diagnostics\UserFailureRecoveryMapper.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\AnsweringModelLabelFormatter.cs" Link="Chat\AnsweringModelLabelFormatter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BackgroundWorkNotificationPolicy.cs" Link="Notifications\BackgroundWorkNotificationPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\BackgroundWorkTracker.cs" Link="Notifications\BackgroundWorkTracker.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\WcagContrastCalculator.cs" Link="Accessibility\WcagContrastCalculator.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\OverlayEscapePolicy.cs" Link="Accessibility\OverlayEscapePolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\AccessibleKeyboardMap.cs" Link="Accessibility\AccessibleKeyboardMap.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\AccessibilityAuditService.cs" Link="Accessibility\AccessibilityAuditService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\GuidedTourTriggerPolicy.cs" Link="Help\GuidedTourTriggerPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\InAppHelpCatalog.cs" Link="Help\InAppHelpCatalog.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ChatHomeNavigationPolicy.cs" Link="Navigation\ChatHomeNavigationPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\WorkspaceNavigationOrder.cs" Link="Navigation\WorkspaceNavigationOrder.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ChatDraftCoordinator.cs" Link="Chat\ChatDraftCoordinator.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingTaskSandboxWorkspacePolicy.cs" Link="CodingAgent\CodingTaskSandboxWorkspacePolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingTaskReviewModel.cs" Link="CodingAgent\CodingTaskReviewModel.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingReviewFindingLedger.cs" Link="CodingAgent\CodingReviewFindingLedger.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingOwnChangeReverter.cs" Link="CodingAgent\CodingOwnChangeReverter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingTaskChangeTracker.cs" Link="CodingAgent\CodingTaskChangeTracker.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryItem.cs" Link="MediaGallery\MediaGalleryItem.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryItemMapper.cs" Link="MediaGallery\MediaGalleryItemMapper.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaProvenanceFormatter.cs" Link="MediaGallery\MediaProvenanceFormatter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryBrowser.cs" Link="MediaGallery\MediaGalleryBrowser.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryDeleteCoordinator.cs" Link="MediaGallery\MediaGalleryDeleteCoordinator.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaEditSourceBridge.cs" Link="MediaGallery\MediaEditSourceBridge.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\WindowResponsivenessPolicy.cs" Link="Responsive\WindowResponsivenessPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\WorkspaceResponsivenessAuditor.cs" Link="Responsive\WorkspaceResponsivenessAuditor.cs" />
+  </ItemGroup>
+
+  <Target Name="StageOverheadRuntimeStub" AfterTargets="Build">
+    <ItemGroup>
+      <_OverheadRuntimeStub Include="$(MSBuildProjectDirectory)\..\PaRuX.RuntimeStub\bin\$(Configuration)\net8.0\llama-server*" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)runtime-stub" />
+    <Copy SourceFiles="@(_OverheadRuntimeStub)" DestinationFolder="$(OutDir)runtime-stub" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="StageWinMlWorkerStub" AfterTargets="Build">
+    <ItemGroup>
+      <_WinMlWorkerStub Include="$(MSBuildProjectDirectory)\..\PaRuX.WinMlWorkerStub\bin\$(Configuration)\net8.0\PaRuX.WinMlWorkerStub*" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)winml-worker-stub" />
+    <Copy SourceFiles="@(_WinMlWorkerStub)" DestinationFolder="$(OutDir)winml-worker-stub" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

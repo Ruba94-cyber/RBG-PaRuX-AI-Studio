@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "name": "PaRuX verified dependency handoff",
+  "description": "End-to-end DAG benchmark. A research predecessor learns an opaque token, a coding task must use only predecessor evidence to write it, and a review task must recover it from the verified coding result. The coding goal never contains the token.",
+  "token": "PARUX-DAG-HANDOFF-94721",
+  "artifact": "benchmark-fixtures/agent/dependency-handoff.txt"
+}

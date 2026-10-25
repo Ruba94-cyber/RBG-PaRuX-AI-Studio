@@ -1,0 +1,46 @@
+<Project Sdk="WixToolset.Sdk/7.0.0">
+  <PropertyGroup>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.9.6</ProductVersion>
+    <PublishDir Condition="'$(PublishDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\publish\win-x64</PublishDir>
+    <LicenseRtf>$(MSBuildThisFileDirectory)License.rtf</LicenseRtf>
+    <OutputName>PaRuX-$(ProductVersion)-win-x64</OutputName>
+    <DefineConstants>ProductVersion=$(ProductVersion);PublishDir=$(PublishDir);LicenseRtf=$(LicenseRtf)</DefineConstants>
+    <!-- ICE03 flags "Invalid Language Id"/"String overflow" on the .mui satellite resource files
+         WindowsAppSDK/WinUI ships one per locale (e.g. Microsoft.ui.xaml.dll.mui under af-ZA,
+         gd-gb, ...). Their embedded PE VERSIONINFO language metadata doesn't cleanly encode into
+         the MSI File table's Language column, but that column has no effect on where Windows
+         Installer actually places these files (Directory harvesting already puts each .mui under
+         its own correct locale subfolder) - a documented false positive for self-contained
+         WindowsAppSDK publishes, not a real install-correctness issue. -->
+    <SuppressIces>ICE03</SuppressIces>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0" />
+  </ItemGroup>
+
+  <!-- The WiX harvest consumes PublishDir recursively. Release payload preparation is fail-closed:
+       first publish the Windows-only Windows ML/TensorRT-RTX helper into PaRuX.Server\winml,
+       then generate a WINDOWS-scoped CycloneDX SBOM from every .NET project actually shipped in
+       the MSI, then stage the hash-locked baseline runtime artifacts. Tests and Android remain
+       excluded. If any operation fails, the MSI is not produced with a stale/mis-scoped SBOM,
+       a missing optional performance-pack worker, or an unverifiable baseline runtime.
+
+       Must run BeforeTargets="CoreCompile", not "Build": WiX v7's actual harvest+compile+link
+       (invoking wix.exe against Package.wxs, including its <Files Include="$(PublishDir)\**">
+       harvest) happens inside the SDK's own "CoreCompile" target, which "Build" depends on and
+       therefore completes before a "BeforeTargets=Build" hook would ever run. -->
+  <Target Name="PreparePaRuXReleasePayload" BeforeTargets="CoreCompile" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\..\src\PaRuX.WinMlWorker\PaRuX.WinMlWorker.csproj&quot; -c Release -r win-x64 --self-contained true -o &quot;$(PublishDir)\PaRuX.Server\winml&quot; -p:Version=&quot;$(ProductVersion)&quot; -p:FileVersion=&quot;$(ProductVersion).0&quot; -p:AssemblyVersion=&quot;$(ProductVersion).0&quot; -p:InformationalVersion=&quot;$(ProductVersion)&quot; -p:DebugSymbols=false -p:DebugType=None" />
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -Command &quot;if (-not (Test-Path -LiteralPath '$(PublishDir)\PaRuX.Server\winml\PaRuX.WinMlWorker.exe' -PathType Leaf)) { throw 'Windows ML worker publish did not produce PaRuX.WinMlWorker.exe.' }&quot;" />
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\..\scripts\generate-sbom.ps1&quot; -Scope windows -OutputPath &quot;$(PublishDir)\PaRuX.Server\SBOM.cyclonedx.json&quot; -ProductVersion &quot;$(ProductVersion)&quot;" />
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\..\scripts\stage-msi-runtime.ps1&quot; -PublishDir &quot;$(PublishDir)&quot;" />
+  </Target>
+
+  <!--
+    WiX v7 requires an explicit OSMF EULA acceptance gesture. Do NOT hard-code AcceptEula here:
+    local/release builds must pass -p:AcceptEula=wix7. scripts/build-msi.ps1 does so only after
+    PARUX_ACCEPT_WIX7_EULA=1 is explicitly set by the person performing the build.
+  -->
+</Project>

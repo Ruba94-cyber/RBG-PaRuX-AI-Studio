@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "platform": "win-x64",
+  "artifacts": [
+    {
+      "id": "llama.cpp-vulkan",
+      "version": "b10549",
+      "license": "MIT",
+      "archiveName": "llama-b10549-bin-win-vulkan-x64.zip",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10549/llama-b10549-bin-win-vulkan-x64.zip",
+      "sizeBytes": 34936498,
+      "sha256": "8e7b0e6382a5bcbf57c79cf54b61483e9f7b26561d4413f28095cdaee256207b",
+      "destination": "PaRuX.Server/runtime-baseline/llama.cpp-b10549-vulkan",
+      "requiredFiles": ["llama-server.exe"]
+    },
+    {
+      "id": "uv",
+      "version": "0.12.1",
+      "license": "MIT OR Apache-2.0",
+      "archiveName": "uv-x86_64-pc-windows-msvc.zip",
+      "url": "https://github.com/astral-sh/uv/releases/download/0.12.1/uv-x86_64-pc-windows-msvc.zip",
+      "sizeBytes": 19073343,
+      "sha256": "8fcb0cb46e1229065e344758980924e569bef5882ef45f46fada8fb24e06b74a",
+      "destination": "PaRuX.Server/runtime-tools/uv",
+      "requiredFiles": ["uv.exe"]
+    }
+  ]
+}

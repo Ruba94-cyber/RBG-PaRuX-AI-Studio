@@ -1,0 +1,1 @@
+# False positives are allowlisted with path- and line-specific rules in .gitleaks.toml.

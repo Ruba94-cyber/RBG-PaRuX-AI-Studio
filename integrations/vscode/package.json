@@ -1,0 +1,117 @@
+{
+  "name": "parux-agent",
+  "displayName": "PaRuX Agent",
+  "description": "Native PaRuX task, multi-repository coding-worktree, editor-context and verifier control for VS Code.",
+  "version": "0.4.0",
+  "publisher": "rbg-parux",
+  "license": "FSL-1.1-MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./main.js",
+  "activationEvents": [
+    "onView:paruxAgents",
+    "onView:paruxReviewFindings",
+    "onCommand:parux.runCodingTask",
+    "onCommand:parux.refreshAgents",
+    "onCommand:parux.showTaskLogs",
+    "onCommand:parux.openTaskWorktree",
+    "onCommand:parux.configureTaskRepositories",
+    "onCommand:parux.stopTask",
+    "onCommand:parux.resumeTask",
+    "onCommand:parux.fixSelection",
+    "onCommand:parux.explainSelection",
+    "onCommand:parux.testSelection",
+    "onCommand:parux.reviewSelection",
+    "onCommand:parux.hunkFeedback",
+    "onCommand:parux.acceptHunk",
+    "onCommand:parux.rejectHunk",
+    "onCommand:parux.openReviewFinding",
+    "onCommand:parux.resolveReviewFinding",
+    "onCommand:parux.dismissReviewFinding",
+    "onCommand:parux.reopenReviewFinding"
+  ],
+  "contributes": {
+    "commands": [
+      { "command": "parux.runCodingTask", "title": "PaRuX: Run Coding Task" },
+      { "command": "parux.refreshAgents", "title": "PaRuX: Refresh Agent Tasks" },
+      { "command": "parux.showTaskLogs", "title": "PaRuX: Show Task Logs" },
+      { "command": "parux.openTaskWorktree", "title": "PaRuX: Open Task Worktree" },
+      { "command": "parux.configureTaskRepositories", "title": "PaRuX: Configure Task Repositories" },
+      { "command": "parux.stopTask", "title": "PaRuX: Stop Task" },
+      { "command": "parux.resumeTask", "title": "PaRuX: Resume Task" },
+      { "command": "parux.fixSelection", "title": "PaRuX: Fix Selection / Diagnostics", "icon": "$(wrench)" },
+      { "command": "parux.explainSelection", "title": "PaRuX: Explain Selection", "icon": "$(comment-discussion)" },
+      { "command": "parux.testSelection", "title": "PaRuX: Generate / Repair Tests", "icon": "$(beaker)" },
+      { "command": "parux.reviewSelection", "title": "PaRuX: Review Selected Hunk", "icon": "$(code-review)" },
+      { "command": "parux.hunkFeedback", "title": "PaRuX: Apply Hunk Feedback", "icon": "$(request-changes)" },
+      { "command": "parux.acceptHunk", "title": "PaRuX: Accept Selected Hunk", "icon": "$(check)" },
+      { "command": "parux.rejectHunk", "title": "PaRuX: Reject Selected Hunk", "icon": "$(discard)" },
+      { "command": "parux.openReviewFinding", "title": "PaRuX: Open Review Finding", "icon": "$(go-to-file)" },
+      { "command": "parux.resolveReviewFinding", "title": "PaRuX: Resolve Review Finding", "icon": "$(pass-filled)" },
+      { "command": "parux.dismissReviewFinding", "title": "PaRuX: Dismiss Review Finding", "icon": "$(circle-slash)" },
+      { "command": "parux.reopenReviewFinding", "title": "PaRuX: Reopen Review Finding", "icon": "$(issues)" }
+    ],
+    "views": {
+      "explorer": [
+        { "id": "paruxAgents", "name": "PaRuX Agents" },
+        { "id": "paruxReviewFindings", "name": "PaRuX Review Findings" }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        { "command": "parux.runCodingTask", "when": "view == paruxAgents", "group": "navigation@1" },
+        { "command": "parux.refreshAgents", "when": "view == paruxAgents", "group": "navigation@2" }
+      ],
+      "view/item/context": [
+        { "command": "parux.showTaskLogs", "when": "view == paruxAgents && viewItem == paruxTask", "group": "inline@1" },
+        { "command": "parux.openTaskWorktree", "when": "view == paruxAgents && viewItem == paruxTask", "group": "inline@2" },
+        { "command": "parux.configureTaskRepositories", "when": "view == paruxAgents && viewItem == paruxTask", "group": "parux@1" },
+        { "command": "parux.stopTask", "when": "view == paruxAgents && viewItem == paruxTask", "group": "parux@2" },
+        { "command": "parux.resumeTask", "when": "view == paruxAgents && viewItem == paruxTask", "group": "parux@3" },
+        { "command": "parux.openReviewFinding", "when": "view == paruxReviewFindings", "group": "inline@1" },
+        { "command": "parux.resolveReviewFinding", "when": "view == paruxReviewFindings && viewItem == paruxReviewFinding.open", "group": "inline@2" },
+        { "command": "parux.dismissReviewFinding", "when": "view == paruxReviewFindings && viewItem == paruxReviewFinding.open", "group": "parux@1" },
+        { "command": "parux.reopenReviewFinding", "when": "view == paruxReviewFindings && (viewItem == paruxReviewFinding.resolved || viewItem == paruxReviewFinding.dismissed)", "group": "inline@2" }
+      ],
+      "editor/context": [
+        { "command": "parux.fixSelection", "when": "resourceScheme == file && editorTextFocus", "group": "parux@1" },
+        { "command": "parux.explainSelection", "when": "resourceScheme == file && editorTextFocus", "group": "parux@2" },
+        { "command": "parux.testSelection", "when": "resourceScheme == file && editorTextFocus", "group": "parux@3" },
+        { "command": "parux.reviewSelection", "when": "resourceScheme == file && editorHasSelection", "group": "parux@4" },
+        { "command": "parux.hunkFeedback", "when": "resourceScheme == file && editorHasSelection", "group": "parux@5" },
+        { "command": "parux.acceptHunk", "when": "resourceScheme == file && editorHasSelection", "group": "parux-review@1" },
+        { "command": "parux.rejectHunk", "when": "resourceScheme == file && editorHasSelection", "group": "parux-review@2" }
+      ]
+    },
+    "configuration": {
+      "title": "PaRuX Agent",
+      "properties": {
+        "parux.dataRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Optional PaRuX data-root override. Leave empty to use the platform default."
+        },
+        "parux.refreshSeconds": {
+          "type": "number",
+          "default": 5,
+          "minimum": 2,
+          "maximum": 60,
+          "description": "Agent-tree/status refresh interval in seconds."
+        },
+        "parux.editorPermissionProfile": {
+          "type": "string",
+          "enum": ["offline", "package-fetch", "trusted-restore"],
+          "default": "offline",
+          "description": "Coding permission profile used by Fix/Test/Hunk Feedback editor actions. Read-only Explain/Review never receives coding capabilities."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

@@ -1,0 +1,726 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="PaRuX.Views.ChatView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <!--
+        Styles used by elements the code-behind builds per message live here, in
+        this control's OWN resource dictionary, so ChatView can fetch them with a
+        plain Resources["key"] indexer - no merged-dictionary traversal involved.
+    -->
+    <UserControl.Resources>
+
+        <!-- The small PaRuX mark that sits to the left of every reply. -->
+        <Style x:Key="PaRuXAvatarStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource PaRuXBrandBrush}" />
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="CornerRadius" Value="13" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Margin" Value="0,2,12,0" />
+        </Style>
+
+        <Style x:Key="PaRuXAvatarGlyphStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource PaRuXDisplayFontFamily}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{ThemeResource PaRuXOnBrandBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Route badge under a user turn: quiet, not a shouty label. -->
+        <Style x:Key="PaRuXMessageRoutePillStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource PaRuXSurfaceSubtleBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource PaRuXStrokeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{StaticResource PaRuXRadiusPill}" />
+            <Setter Property="Padding" Value="8,1,8,1" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="Margin" Value="0,4,2,0" />
+        </Style>
+
+        <Style x:Key="PaRuXMessageRouteTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource PaRuXFontFamily}" />
+            <Setter Property="FontSize" Value="{StaticResource PaRuXFontSizeMicro}" />
+            <Setter Property="Foreground" Value="{ThemeResource PaRuXTextTertiaryBrush}" />
+        </Style>
+
+        <!-- Streaming caret: a cyan bar that pulses while tokens land. -->
+        <Style x:Key="PaRuXStreamCaretStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource PaRuXSecondaryBrush}" />
+            <Setter Property="Width" Value="7" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="CornerRadius" Value="{StaticResource PaRuXRadiusSmall}" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Margin" Value="0,2,0,4" />
+        </Style>
+
+        <!-- One dot of the three-dot "thinking" indicator. -->
+        <Style x:Key="PaRuXThinkingDotStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource PaRuXTextTertiaryBrush}" />
+            <Setter Property="Width" Value="7" />
+            <Setter Property="Height" Value="7" />
+            <Setter Property="CornerRadius" Value="{StaticResource PaRuXRadiusPill}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Health dot colours, fetched by key from the code-behind. Declared as
+             brushes over theme COLOURS so they repaint when the theme flips. -->
+        <SolidColorBrush x:Key="PaRuXDotOkBrush" Color="{ThemeResource PaRuXSuccessColor}" />
+        <SolidColorBrush x:Key="PaRuXDotWarnBrush" Color="{ThemeResource PaRuXWarnColor}" />
+        <SolidColorBrush x:Key="PaRuXDotOffBrush" Color="{ThemeResource PaRuXOffColor}" />
+
+        <!-- Plain text of a user turn, so it picks up the tinted-bubble ink colour. -->
+        <Style x:Key="PaRuXUserTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource PaRuXFontFamily}" />
+            <Setter Property="FontSize" Value="{StaticResource PaRuXFontSizeBody}" />
+            <Setter Property="Foreground" Value="{ThemeResource PaRuXUserBubbleTextBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="LineHeight" Value="20" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ==================== Header ==================== -->
+        <Border
+            Grid.Row="0"
+            BorderBrush="{ThemeResource PaRuXDividerBrush}"
+            BorderThickness="0,0,0,1"
+            Padding="24,12,24,12">
+            <Grid
+                x:Name="ChatHeaderGrid"
+                ColumnSpacing="{StaticResource PaRuXSpaceL}"
+                RowSpacing="{StaticResource PaRuXSpaceS}"
+                SizeChanged="ChatHeaderGrid_SizeChanged">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="148" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel
+                    x:Name="ChatHeaderTitlePanel"
+                    Grid.Row="0"
+                    Grid.Column="0"
+                    Grid.ColumnSpan="2"
+                    VerticalAlignment="Center"
+                    Spacing="2">
+                    <TextBlock
+                        Text="Chat"
+                        AutomationProperties.AutomationId="Chat_Header_Title_Text"
+                        TextWrapping="NoWrap"
+                        TextTrimming="CharacterEllipsis"
+                        Style="{StaticResource PaRuXTitleTextStyle}" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}">
+                        <!-- Live model state: a dot plus one short line, never a wall of text. -->
+                        <Border
+                            x:Name="ProfileDot"
+                            Width="7"
+                            Height="7"
+                            CornerRadius="{StaticResource PaRuXRadiusPill}"
+                            Background="{ThemeResource PaRuXTextTertiaryBrush}"
+                            VerticalAlignment="Center" />
+                        <TextBlock
+                            x:Name="ProfileText"
+                            AutomationProperties.AutomationId="Chat_Header_Profile_Text"
+                            Text="Model idle"
+                            TextWrapping="NoWrap"
+                            TextTrimming="CharacterEllipsis"
+                            Style="{StaticResource PaRuXSubtleCaptionStyle}"
+                            VerticalAlignment="Center" />
+                        <Border
+                            x:Name="GameBadge"
+                            Visibility="Collapsed"
+                            Style="{StaticResource PaRuXCautionPillStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceXS}">
+                                <FontIcon
+                                    Glyph="&#xE7FC;"
+                                    FontSize="11"
+                                    Foreground="{ThemeResource PaRuXCautionTextBrush}" />
+                                <TextBlock
+                                    Text="Gaming Mode"
+                                    FontSize="{StaticResource PaRuXFontSizeMicro}"
+                                    Foreground="{ThemeResource PaRuXCautionTextBrush}" />
+                            </StackPanel>
+                        </Border>
+                        <Button
+                            x:Name="ReturnToAiButton"
+                            AutomationProperties.AutomationId="Chat_Header_ReturnToAi_Button"
+                            AutomationProperties.Name="Return to AI"
+                            Visibility="Collapsed"
+                            Content="Return to AI"
+                            Padding="10,2"
+                            MinHeight="0"
+                            Height="24"
+                            FontSize="{StaticResource PaRuXFontSizeMicro}"
+                            VerticalAlignment="Center"
+                            Click="ReturnToAi_Click"
+                            ToolTipService.ToolTip="Leave Gaming Mode. Local AI loads again when you send your next message." />
+                        <Border
+                            x:Name="IncognitoBadge"
+                            Visibility="Collapsed"
+                            Style="{StaticResource PaRuXQuietPillStyle}"
+                            ToolTipService.ToolTip="This conversation is never saved - not on this PC, not synced to any paired device.">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceXS}">
+                                <FontIcon
+                                    Glyph="&#xED1A;"
+                                    FontSize="11"
+                                    Foreground="{ThemeResource PaRuXTextSecondaryBrush}" />
+                                <TextBlock
+                                    Text="Incognito"
+                                    FontSize="{StaticResource PaRuXFontSizeMicro}"
+                                    Foreground="{ThemeResource PaRuXTextSecondaryBrush}" />
+                            </StackPanel>
+                        </Border>
+                        <Button
+                            x:Name="ChatHelpButton"
+                            AutomationProperties.AutomationId="Chat_Header_Help_Button"
+                            AutomationProperties.Name="Help and guided tour"
+                            ToolTipService.ToolTip="Open PaRuX in-app help, guide topics and guided tour"
+                            Padding="8,2"
+                            MinHeight="0"
+                            Height="24"
+                            FontSize="{StaticResource PaRuXFontSizeMicro}"
+                            VerticalAlignment="Center"
+                            Click="ChatHelpButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceXS}">
+                                <FontIcon Glyph="&#xE897;" FontSize="11" />
+                                <TextBlock Text="Help" FontSize="{StaticResource PaRuXFontSizeMicro}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- The profile selector scrolls horizontally when necessary and moves beneath
+                     the title before it can squeeze or truncate the live model state. -->
+                <ScrollViewer
+                    x:Name="ProfileSelectorScrollViewer"
+                    AutomationProperties.AutomationId="Chat_ProfileSelector_ScrollViewer"
+                    Grid.Row="1"
+                    Grid.Column="0"
+                    Grid.ColumnSpan="2"
+                    MaxWidth="360"
+                    HorizontalAlignment="Left"
+                    HorizontalScrollBarVisibility="Hidden"
+                    HorizontalScrollMode="Enabled"
+                    VerticalScrollMode="Disabled">
+                    <Border x:Name="ProfileSelectorPanel" Style="{StaticResource PaRuXSegmentedShellStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                            <ToggleButton
+                                x:Name="AutoToggle"
+                                AutomationProperties.AutomationId="Chat_Profile_Auto_Toggle"
+                                Content="Auto"
+                                MinWidth="64"
+                                Height="28"
+                                Padding="12,0,12,0"
+                                FontSize="{StaticResource PaRuXFontSizeCaption}"
+                                CornerRadius="{StaticResource PaRuXRadiusPill}"
+                                Click="ProfileToggle_Click"
+                                Tag="AUTO"
+                                ToolTipService.ToolTip="Use whichever text profile is already loaded" />
+                            <ToggleButton
+                                x:Name="StandardToggle"
+                                AutomationProperties.AutomationId="Chat_Profile_Standard_Toggle"
+                                Content="Standard"
+                                MinWidth="80"
+                                Height="28"
+                                Padding="12,0,12,0"
+                                FontSize="{StaticResource PaRuXFontSizeCaption}"
+                                CornerRadius="{StaticResource PaRuXRadiusPill}"
+                                Click="ProfileToggle_Click"
+                                Tag="STANDARD"
+                                ToolTipService.ToolTip="Switch llama-server to the Standard profile (reloads the model)" />
+                            <ToggleButton
+                                x:Name="UncensoredToggle"
+                                AutomationProperties.AutomationId="Chat_Profile_Uncensored_Toggle"
+                                Content="Uncensored"
+                                MinWidth="92"
+                                Height="28"
+                                Padding="12,0,12,0"
+                                FontSize="{StaticResource PaRuXFontSizeCaption}"
+                                CornerRadius="{StaticResource PaRuXRadiusPill}"
+                                Click="ProfileToggle_Click"
+                                Tag="UNCENSORED"
+                                ToolTipService.ToolTip="Switch to the configured Uncensored provider (requires a compatible accelerator)" />
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <!-- ==================== Messages ==================== -->
+        <ScrollViewer
+            x:Name="MessagesScroll"
+            Grid.Row="1"
+            Padding="24,0,24,0"
+            VerticalScrollBarVisibility="Auto"
+            VerticalScrollMode="Auto">
+            <StackPanel
+                x:Name="MessagesPanel"
+                Spacing="{StaticResource PaRuXSpaceL}"
+                MaxWidth="820"
+                HorizontalAlignment="Center"
+                Margin="0,20,0,24" />
+        </ScrollViewer>
+
+        <!-- ==================== Empty state ==================== -->
+        <StackPanel
+            x:Name="EmptyState"
+            Grid.Row="1"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Spacing="{StaticResource PaRuXSpaceL}"
+            MaxWidth="560"
+            Padding="24">
+
+            <ContentControl
+                Width="56"
+                Height="56"
+                HorizontalAlignment="Center"
+                ContentTemplate="{StaticResource PrxOrbitMarkTemplate}"
+                IsHitTestVisible="False" />
+
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                <TextBlock
+                    Text="Ask PaRuX anything"
+                    Style="{StaticResource PaRuXDisplayTextStyle}"
+                    HorizontalAlignment="Center"
+                    TextAlignment="Center" />
+                <TextBlock
+                    Text="Running entirely on your machine, through your local Qwen model. Nothing leaves this PC."
+                    Style="{StaticResource PaRuXCaptionTextStyle}"
+                    HorizontalAlignment="Center"
+                    TextAlignment="Center"
+                    MaxWidth="420" />
+            </StackPanel>
+
+            <!-- Starters. These only prefill the composer; they never send. -->
+            <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Margin="0,8,0,0">
+                <Button
+                    Click="Suggestion_Click"
+                    AutomationProperties.Name="Improve this codebase"
+                    Tag="Improve the code in this project:"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Left"
+                    Height="40"
+                    Padding="12,0,12,0"
+                    CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                    Background="{ThemeResource PaRuXSurfaceCardBrush}"
+                    BorderBrush="{ThemeResource PaRuXStrokeBrush}"
+                    BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceM}" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE943;" FontSize="14" Foreground="{ThemeResource PaRuXBrandTextBrush}" />
+                        <TextBlock Text="Improve this codebase" Style="{StaticResource PaRuXBodyTextStyle}" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    Click="Suggestion_Click"
+                    AutomationProperties.Name="Analyse a problem in depth"
+                    Tag="Analyse this problem in depth:"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Left"
+                    Height="40"
+                    Padding="12,0,12,0"
+                    CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                    Background="{ThemeResource PaRuXSurfaceCardBrush}"
+                    BorderBrush="{ThemeResource PaRuXStrokeBrush}"
+                    BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceM}" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE9CE;" FontSize="14" Foreground="{ThemeResource PaRuXBrandTextBrush}" />
+                        <TextBlock Text="Analyse a problem in depth" Style="{StaticResource PaRuXBodyTextStyle}" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    Click="Suggestion_Click"
+                    AutomationProperties.Name="Summarise a text into key points"
+                    Tag="Summarise this into key points:"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Left"
+                    Height="40"
+                    Padding="12,0,12,0"
+                    CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                    Background="{ThemeResource PaRuXSurfaceCardBrush}"
+                    BorderBrush="{ThemeResource PaRuXStrokeBrush}"
+                    BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceM}" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE8BD;" FontSize="14" Foreground="{ThemeResource PaRuXBrandTextBrush}" />
+                        <TextBlock Text="Summarise a text into key points" Style="{StaticResource PaRuXBodyTextStyle}" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    Click="Suggestion_Click"
+                    AutomationProperties.Name="Generate an image"
+                    Tag="Generate an image of a futuristic purple landscape, no text"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Left"
+                    Height="40"
+                    Padding="12,0,12,0"
+                    CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                    Background="{ThemeResource PaRuXSurfaceCardBrush}"
+                    BorderBrush="{ThemeResource PaRuXStrokeBrush}"
+                    BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceM}" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xEB9F;" FontSize="14" Foreground="{ThemeResource PaRuXBrandTextBrush}" />
+                        <TextBlock Text="Generate an image" Style="{StaticResource PaRuXBodyTextStyle}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- ==================== Composer ==================== -->
+        <!-- MaxWidth 868 = the 820 content column plus its 24px gutters, so the
+             composer, the status pill and the route pill all line up with the
+             message column instead of drifting to the window edge. -->
+        <Grid
+            Grid.Row="2"
+            Padding="24,0,24,16"
+            MaxWidth="868"
+            RowSpacing="{StaticResource PaRuXSpaceS}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Transient status: never a bare "loading…" string, always paired
+                 with a live ring so a five-minute cold model load looks alive. -->
+            <Border
+                x:Name="StatusPanel"
+                Grid.Row="0"
+                Visibility="Collapsed"
+                HorizontalAlignment="Left"
+                Background="{ThemeResource PaRuXBrandSubtleBrush}"
+                BorderBrush="{ThemeResource PaRuXBrandBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource PaRuXRadiusPill}"
+                Padding="12,6,16,6">
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}">
+                    <ProgressRing
+                        x:Name="StatusRing"
+                        Width="16"
+                        Height="16"
+                        IsActive="True"
+                        Foreground="{ThemeResource PaRuXBrandBrush}"
+                        VerticalAlignment="Center" />
+                    <TextBlock
+                        x:Name="StatusText"
+                        Text=""
+                        VerticalAlignment="Center"
+                        Style="{StaticResource PaRuXSubtleCaptionStyle}"
+                        Foreground="{ThemeResource PaRuXBrandTextBrush}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer
+                x:Name="AttachmentPanel"
+                Grid.Row="1"
+                Visibility="Collapsed"
+                HorizontalScrollBarVisibility="Auto"
+                VerticalScrollBarVisibility="Disabled">
+                <StackPanel x:Name="AttachmentList" Orientation="Horizontal" Spacing="8" />
+            </ScrollViewer>
+
+            <Border
+                x:Name="ComposerBorder"
+                Grid.Row="2"
+                Background="{ThemeResource PaRuXSurfaceRaisedBrush}"
+                BorderBrush="{ThemeResource PaRuXStrokeStrongBrush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource PaRuXRadiusXLarge}"
+                Padding="8">
+                <Grid ColumnSpacing="{StaticResource PaRuXSpaceXS}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Bottom">
+                        <Button
+                            x:Name="AttachButton"
+                            AutomationProperties.Name="Attach images"
+                            Click="Attach_Click"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                            Foreground="{ThemeResource PaRuXTextTertiaryBrush}"
+                            VerticalAlignment="Bottom"
+                            Height="36"
+                            Width="36"
+                            Padding="0"
+                            ToolTipService.ToolTip="Attach images (PNG, JPEG, WebP, BMP)">
+                            <FontIcon Glyph="&#xE723;" FontSize="15" />
+                        </Button>
+                        <Button
+                            x:Name="AttachAudioButton"
+                            AutomationProperties.AutomationId="Chat_Audio_Attach_Button"
+                            AutomationProperties.Name="Attach audio"
+                            Click="AttachAudio_Click"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                            Foreground="{ThemeResource PaRuXTextTertiaryBrush}"
+                            VerticalAlignment="Bottom"
+                            Height="36"
+                            Width="36"
+                            Padding="0"
+                            ToolTipService.ToolTip="Attach audio to transcribe locally (WAV, MP3, M4A, OGG, FLAC)">
+                            <FontIcon Glyph="&#xE720;" FontSize="15" />
+                        </Button>
+                    </StackPanel>
+
+                    <TextBox
+                        x:Name="InputBox"
+                        AutomationProperties.AutomationId="Chat_Prompt_TextBox"
+                        Grid.Column="1"
+                        AcceptsReturn="True"
+                        TextWrapping="Wrap"
+                        MaxHeight="180"
+                        MinHeight="36"
+                        BorderThickness="0"
+                        Background="Transparent"
+                        Padding="6,6,6,6"
+                        FontSize="{StaticResource PaRuXFontSizeBody}"
+                        PlaceholderText="Message PaRuX…   (Enter to send, Shift+Enter for a new line)"
+                        VerticalAlignment="Bottom"
+                        GotFocus="InputBox_GotFocus"
+                        LostFocus="InputBox_LostFocus"
+                        PreviewKeyDown="InputBox_PreviewKeyDown"
+                        TextChanged="InputBox_TextChanged" />
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceXS}" VerticalAlignment="Bottom">
+                        <!-- Stop only exists while a reply streams, and reads as a
+                             neutral/danger control so it can never be mistaken for Send. -->
+                        <Button
+                            x:Name="StopButton"
+                            AutomationProperties.AutomationId="Chat_Stop_Button"
+                            AutomationProperties.Name="Stop generating"
+                            Visibility="Collapsed"
+                            Height="36"
+                            Width="36"
+                            Padding="0"
+                            CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                            Background="{ThemeResource PaRuXDangerSubtleBrush}"
+                            BorderBrush="{ThemeResource PaRuXDangerBorderBrush}"
+                            BorderThickness="1"
+                            Foreground="{ThemeResource PaRuXDangerTextBrush}"
+                            Click="Stop_Click"
+                            ToolTipService.ToolTip="Stop generating">
+                            <FontIcon Glyph="&#xE71A;" FontSize="14" />
+                        </Button>
+                        <Button
+                            x:Name="SendButton"
+                            AutomationProperties.AutomationId="Chat_Send_Button"
+                            AutomationProperties.Name="Send message"
+                            Height="36"
+                            Width="36"
+                            Padding="0"
+                            CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                            Style="{StaticResource AccentButtonStyle}"
+                            Click="Send_Click"
+                            ToolTipService.ToolTip="Send  (Enter)">
+                            <FontIcon Glyph="&#xE724;" FontSize="15" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Simple mode keeps the code folder beside the chat composer. -->
+            <ScrollViewer
+                x:Name="ComposerFooterScrollViewer"
+                AutomationProperties.AutomationId="Chat_ComposerFooter_ScrollViewer"
+                Grid.Row="3"
+                HorizontalScrollBarVisibility="Hidden"
+                HorizontalScrollMode="Enabled"
+                VerticalScrollBarVisibility="Disabled"
+                VerticalScrollMode="Disabled">
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}" Margin="12,0,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                    <Button
+                        x:Name="CodeFolderButton"
+                        AutomationProperties.AutomationId="Chat_CodeFolder_Button"
+                        AutomationProperties.Name="Choose code folder"
+                        Height="32"
+                        MaxWidth="240"
+                        Padding="10,0,10,0"
+                        FontSize="{StaticResource PaRuXFontSizeMicro}"
+                        Click="CodeFolderButton_Click"
+                        ToolTipService.ToolTip="Choose the repository PaRuX will work on">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8B7;" FontSize="12" />
+                            <TextBlock
+                                x:Name="CodeFolderLabel"
+                                AutomationProperties.AutomationId="Chat_CodeFolder_Label"
+                                Text="Choose code folder"
+                                MaxWidth="190"
+                                TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        x:Name="CodeFolderClearButton"
+                        AutomationProperties.AutomationId="Chat_CodeFolderClear_Button"
+                        AutomationProperties.Name="Clear code folder"
+                        Height="32"
+                        Width="32"
+                        Padding="0"
+                        Visibility="Collapsed"
+                        FontSize="{StaticResource PaRuXFontSizeMicro}"
+                        Click="CodeFolderClearButton_Click"
+                        ToolTipService.ToolTip="Clear code folder">
+                        <FontIcon Glyph="&#xE711;" FontSize="10" />
+                    </Button>
+                </StackPanel>
+                <Border
+                    x:Name="RoutePill"
+                    Visibility="Collapsed"
+                    HorizontalAlignment="Left"
+                    Style="{StaticResource PaRuXQuietPillStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon
+                            Glyph="&#xE8AB;"
+                            FontSize="10"
+                            Foreground="{ThemeResource PaRuXSecondaryTextBrush}"
+                            VerticalAlignment="Center" />
+                        <TextBlock
+                            x:Name="RouteLabel"
+                            Text=""
+                            FontSize="{StaticResource PaRuXFontSizeMicro}"
+                            Foreground="{ThemeResource PaRuXTextSecondaryBrush}"
+                            VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Simple mode: compact answering model label and route explanation button (hidden in Advanced mode) -->
+                <StackPanel
+                    x:Name="SimpleModeAnsweringModelPanel"
+                    Orientation="Horizontal"
+                    Spacing="6"
+                    VerticalAlignment="Center"
+                    Visibility="Collapsed">
+                    <Border
+                        x:Name="SimpleModeAnsweringModelBadge"
+                        Style="{StaticResource PaRuXQuietPillStyle}"
+                        VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon
+                                Glyph="&#xE99A;"
+                                FontSize="11"
+                                Foreground="{ThemeResource PaRuXSecondaryTextBrush}"
+                                VerticalAlignment="Center" />
+                            <TextBlock
+                                x:Name="SimpleModeAnsweringModelLabel"
+                                AutomationProperties.AutomationId="Chat_SimpleMode_AnsweringModel_Label"
+                                AutomationProperties.Name="Answering model"
+                                Text="Model: Auto"
+                                FontSize="{StaticResource PaRuXFontSizeMicro}"
+                                Foreground="{ThemeResource PaRuXTextSecondaryBrush}"
+                                VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <Button
+                        x:Name="SimpleModeRouteReasonButton"
+                        AutomationProperties.AutomationId="Chat_SimpleMode_RouteReason_Button"
+                        AutomationProperties.Name="Why this model?"
+                        AutomationProperties.HelpText="Open the model routing reason and evidence."
+                        Content="Why?"
+                        FontSize="{StaticResource PaRuXFontSizeMicro}"
+                        MinWidth="36"
+                        Padding="6,2,6,2"
+                        Click="ModelRouteExplanationButton_Click"
+                        ToolTipService.ToolTip="Why this model?" />
+                </StackPanel>
+
+                <!-- Simple mode: runtime health indicator and quick access to component lifecycle (hidden in Advanced mode) -->
+                <StackPanel
+                    x:Name="SimpleModeRuntimeHealthPanel"
+                    Orientation="Horizontal"
+                    Spacing="6"
+                    VerticalAlignment="Center"
+                    Visibility="Collapsed">
+                    <Button
+                        x:Name="SimpleModeRuntimeHealthButton"
+                        AutomationProperties.AutomationId="Chat_SimpleMode_RuntimeHealth_Button"
+                        AutomationProperties.Name="Runtime health"
+                        AutomationProperties.HelpText="View component health and manage local runtimes in Settings."
+                        Click="SimpleModeRuntimeHealthButton_Click"
+                        Padding="6,3,6,3"
+                        Background="Transparent"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon
+                                x:Name="SimpleModeRuntimeHealthIcon"
+                                Glyph="&#xE73E;"
+                                FontSize="11"
+                                Foreground="{ThemeResource PaRuXSecondaryTextBrush}"
+                                VerticalAlignment="Center" />
+                            <TextBlock
+                                x:Name="SimpleModeRuntimeHealthLabel"
+                                AutomationProperties.AutomationId="Chat_SimpleMode_RuntimeHealth_Label"
+                                AutomationProperties.Name="Runtime health"
+                                Text="Runtime: Checking…"
+                                FontSize="{StaticResource PaRuXFontSizeMicro}"
+                                Foreground="{ThemeResource PaRuXTextSecondaryBrush}"
+                                VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- AUTO estimates required intelligence before scoring speed. Choosing a concrete
+                     GGUF creates a sticky exact lock until the user explicitly returns to AUTO. -->
+                <ComboBox
+                    x:Name="ModelSelector"
+                    AutomationProperties.Name="Chat model"
+                    AutomationProperties.AutomationId="Chat_ModelSelector_ComboBox"
+                    MinWidth="205"
+                    FontSize="{StaticResource PaRuXFontSizeMicro}"
+                    Loaded="ModelSelector_Loaded"
+                    SelectionChanged="ModelSelector_SelectionChanged"
+                    ToolTipService.ToolTip="AUTO chooses by task intelligence; Manual locks the exact model until you change it" />
+
+                <Button
+                    x:Name="ModelRouteExplanationButton"
+                    Content="Why?"
+                    MinWidth="48"
+                    AutomationProperties.AutomationId="Chat_ModelRoute_Explain_Button"
+                    AutomationProperties.Name="Why this model?"
+                    AutomationProperties.HelpText="Open the model routing reason, capability estimate and available benchmark evidence."
+                    Click="ModelRouteExplanationButton_Click"
+                    ToolTipService.ToolTip="Why this model?" />
+
+                <!-- Skill: AUTO by default (server chooses); pick one to force it, or type a
+                     slash command (e.g. "/research …") which auto-selects and strips itself. -->
+                <ComboBox
+                    x:Name="SkillSelector"
+                    AutomationProperties.Name="Chat skill"
+                    AutomationProperties.AutomationId="Chat_SkillSelector_ComboBox"
+                    MinWidth="150"
+                    FontSize="{StaticResource PaRuXFontSizeMicro}"
+                    ToolTipService.ToolTip="Force a skill instead of AUTO routing"
+                    SelectionChanged="SkillSelector_SelectionChanged" />
+            </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>

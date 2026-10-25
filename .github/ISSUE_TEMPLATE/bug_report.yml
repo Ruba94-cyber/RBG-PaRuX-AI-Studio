@@ -1,0 +1,55 @@
+name: Bug report
+description: Something in PaRuX does not work the way it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        PaRuX runs locally, so we cannot see what happened on your machine. The more of the
+        following you can fill in, the faster this gets fixed.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PaRuX version
+      description: Settings shows it, or right-click PaRuX.exe → Properties → Details.
+      placeholder: 1.6.0
+    validations:
+      required: true
+  - type: textarea
+    id: machine
+    attributes:
+      label: Machine
+      description: Windows build, CPU, RAM, GPU and driver version. GPU matters for most inference issues.
+      placeholder: Windows 11 (build number), CPU model, RAM, GPU model and driver version
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model involved
+      description: The exact GGUF or model id, if the problem involves inference.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Relevant lines from the PaRuX log under %LOCALAPPDATA%\PaRuX. Please remove anything private
+        first — logs can contain prompt text.
+      render: text

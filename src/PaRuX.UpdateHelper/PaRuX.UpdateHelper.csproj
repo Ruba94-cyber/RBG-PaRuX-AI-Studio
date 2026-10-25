@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>PaRuX.UpdateHelper</RootNamespace>
+    <AssemblyName>PaRuX.UpdateHelper</AssemblyName>
+    <Version>1.9.6</Version>
+    <FileVersion>1.9.6.0</FileVersion>
+    <AssemblyVersion>1.9.6.0</AssemblyVersion>
+    <InformationalVersion>1.9.6</InformationalVersion>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>None</DebugType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Keep one cryptographic contract/trust anchor shared with the Desktop updater. -->
+  <ItemGroup>
+    <Compile Include="..\PaRuX.App\Services\SignedAppUpdateChannel.cs" Link="Security\SignedAppUpdateChannel.cs" />
+    <Compile Include="..\PaRuX.App\Services\ReleaseTrustAnchor.cs" Link="Security\ReleaseTrustAnchor.cs" />
+  </ItemGroup>
+</Project>

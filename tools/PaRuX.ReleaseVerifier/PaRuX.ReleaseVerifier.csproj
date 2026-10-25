@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>PaRuX.ReleaseVerifier</AssemblyName>
+    <RootNamespace>PaRuX.ReleaseVerifier</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Use the exact same verifier/trust anchor as Desktop and the elevated Update Helper. -->
+    <Compile Include="..\..\src\PaRuX.App\Services\SignedAppUpdateChannel.cs" Link="Security\SignedAppUpdateChannel.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ReleaseTrustAnchor.cs" Link="Security\ReleaseTrustAnchor.cs" />
+  </ItemGroup>
+</Project>

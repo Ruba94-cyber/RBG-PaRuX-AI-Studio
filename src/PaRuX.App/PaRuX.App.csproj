@@ -1,0 +1,94 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>PaRuX</RootNamespace>
+    <!-- Keep the internal namespace stable while the public process/binary is fully branded. -->
+    <AssemblyName>PaRuX</AssemblyName>
+    <Version>1.9.6</Version>
+    <FileVersion>1.9.6.0</FileVersion>
+    <AssemblyVersion>1.9.6.0</AssemblyVersion>
+    <InformationalVersion>1.9.6</InformationalVersion>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- Both .NET and Windows App SDK are shipped with PaRuX so a fresh PC does not need a
+         separately installed .NET runtime or Windows App Runtime before PaRuX can launch. -->
+    <SelfContained>true</SelfContained>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <!--
+      "annotations", not "disable" and not "enable".
+
+      With "disable" every `?` written in this project was inert: 355 of this solution's build
+      warnings were CS8632 telling us so, which means the nullability the code already documents
+      was doing nothing - not for the compiler, not for anyone consuming these types. Switching to
+      "annotations" turns those annotations on without turning on the warning analysis, so the
+      intent that is already written down becomes real and the 355 warnings disappear, with no
+      behavioural change and no sweep of new warnings to triage in one go.
+
+      Moving to "enable" is the eventual goal and is deliberately a separate piece of work: it
+      surfaces genuine null-safety findings across ~50k lines of UI code, and burying that in an
+      unrelated change would make it impossible to review.
+    -->
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <ApplicationIcon>Assets\parux.ico</ApplicationIcon>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <NoWarn>$(NoWarn);CA1416;MSB3277</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Concrete stable versions keep local and CI builds reproducible. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260804001" />
+    <PackageReference Include="H.NotifyIcon.WinUI" Version="2.1.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.30" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />
+    <PackageReference Include="ExcelDataReader" Version="3.9.0" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
+    <!-- Read-only Win32_Process snapshot to find the developer browser's own processes by profile. -->
+    <PackageReference Include="System.Management" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PaRuX.Contracts\PaRuX.Contracts.csproj" />
+    <ProjectReference Include="..\PaRuX.Intelligence\PaRuX.Intelligence.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\parux.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\prx-orbit-tray.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\prx-orbit-approved.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!--
+    The WinUI build creates loose XBF files and PaRuX.pri in TargetDir, but the
+    unpackaged .NET publish pipeline does not include them automatically. Keep
+    their relative layout so ms-appx XAML resource lookup also works from the
+    portable/MSI publish directory.
+  -->
+  <Target Name="CopyWinUiResourcesToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <PaRuXWinUiPublishResource Include="$(TargetDir)**\*.xbf" />
+      <PaRuXWinUiPublishResource Include="$(TargetDir)PaRuX.pri" />
+    </ItemGroup>
+    <Copy
+      SourceFiles="@(PaRuXWinUiPublishResource)"
+      DestinationFiles="@(PaRuXWinUiPublishResource->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')"
+      SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

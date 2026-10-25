@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>PaRuX — sign in</title>
+<!--
+  Reachable without credentials, so it is deliberately the smallest page PaRuX serves: a passphrase
+  box and nothing else. No CDN, no font host, no analytics - a product whose whole claim is that it
+  runs on your machine cannot have a sign-in page that phones out to render itself.
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfd; --panel: #fff; --ink: #16161a; --muted: #6b6b76;
+    --line: #e4e4ea; --accent: #4a3aff; --warn: #b23c17;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #131317; --panel: #1b1b21; --ink: #ececf1; --muted: #9a9aa6;
+            --line: #2c2c35; --accent: #9d92ff; --warn: #ff9a6c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg);
+         color: var(--ink); font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .card { width: min(24rem, calc(100vw - 2rem)); background: var(--panel); border: 1px solid var(--line);
+          border-radius: .9rem; padding: 1.6rem; }
+  h1 { margin: 0 0 .15rem; font-size: 1.35rem; letter-spacing: .01em; }
+  .sub { color: var(--muted); font-size: .85rem; margin-bottom: 1.3rem; }
+  label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: .35rem; }
+  input { width: 100%; padding: .6rem .7rem; font: inherit; color: inherit; background: var(--bg);
+          border: 1px solid var(--line); border-radius: .5rem; }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { width: 100%; margin-top: .9rem; padding: .65rem 1rem; font: inherit; font-weight: 600;
+           border-radius: .5rem; border: 1px solid transparent; background: var(--accent);
+           color: #fff; cursor: pointer; }
+  button[disabled] { opacity: .55; cursor: default; }
+  #error { color: var(--warn); font-size: .85rem; margin-top: .8rem; min-height: 1.2rem; }
+  .foot { margin-top: 1.2rem; padding-top: .9rem; border-top: 1px solid var(--line);
+          color: var(--muted); font-size: .75rem; }
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>PaRuX</h1>
+  <div class="sub">Your local AI, on this machine.</div>
+  <form id="form">
+    <label for="passphrase">Passphrase</label>
+    <input id="passphrase" type="password" autocomplete="current-password" autofocus required>
+    <button id="submit" type="submit">Sign in</button>
+  </form>
+  <div id="error" role="alert"></div>
+  <div class="foot">
+    Inference runs on the PC this page is served from. Nothing is sent to a cloud provider.
+  </div>
+</main>
+<script>
+(function () {
+  var form = document.getElementById('form');
+  var field = document.getElementById('passphrase');
+  var submit = document.getElementById('submit');
+  var error = document.getElementById('error');
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    error.textContent = '';
+    submit.disabled = true;
+    submit.textContent = 'Checking…';
+
+    fetch('/api/v1/web/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ passphrase: field.value })
+    }).then(function (response) {
+      return response.json().then(function (body) { return { ok: response.ok, body: body }; });
+    }).then(function (result) {
+      if (!result.ok) throw new Error(result.body && result.body.error ? result.body.error : 'Sign-in failed.');
+      // The CSRF token lives only in this tab's memory for the lifetime of the page. sessionStorage
+      // rather than localStorage so closing the tab discards it.
+      try { sessionStorage.setItem('parux_csrf', result.body.csrfToken); } catch (e) {}
+      location.replace('/app');
+    }).catch(function (failure) {
+      error.textContent = failure.message;
+      submit.disabled = false;
+      submit.textContent = 'Sign in';
+      field.select();
+    });
+  });
+})();
+</script>
+</body>
+</html>

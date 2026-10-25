@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>PaRuX.WinMlWorker</AssemblyName>
+    <RootNamespace>PaRuX.WinMlWorker</RootNamespace>
+    <Version>1.9.6</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Windows ML 2.x is isolated in this Windows-only helper so PaRuX.Server remains free of
+         WinRT/Windows-target TFM coupling and its ordinary unit tests stay platform-neutral. -->
+    <PackageReference Include="Microsoft.Windows.AI.MachineLearning" Version="2.3.42" />
+    <!-- Official ONNX Runtime GenAI build that shares Windows ML's ORT/runtime and supports the
+         resident token-generation loop. Provider libraries are still discovered/installed by the
+         Windows ML ExecutionProviderCatalog; PaRuX does not bundle vendor EP binaries. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI.WinML" Version="0.15.2" />
+  </ItemGroup>
+</Project>

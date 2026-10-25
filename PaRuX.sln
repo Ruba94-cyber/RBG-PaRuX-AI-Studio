@@ -1,0 +1,83 @@
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PaRuX.App", "src\PaRuX.App\PaRuX.App.csproj", "{2B3C1D40-9E51-4A77-9E2E-9B2C7C0A1E01}"
+	ProjectSection(ProjectDependencies) = postProject
+		{8C5E9951-3E20-4F26-9A7A-19AD13D2C202} = {8C5E9951-3E20-4F26-9A7A-19AD13D2C202}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaRuX.Contracts", "src\PaRuX.Contracts\PaRuX.Contracts.csproj", "{3DAE934A-92D5-497D-ABF5-59AC85FE2401}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaRuX.Intelligence", "src\PaRuX.Intelligence\PaRuX.Intelligence.csproj", "{F5F7904D-5B6E-4D25-9C5A-B97D44D8A6B1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaRuX.Server", "src\PaRuX.Server\PaRuX.Server.csproj", "{8C5E9951-3E20-4F26-9A7A-19AD13D2C202}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaRuX.Server.Tests", "tests\PaRuX.Server.Tests\PaRuX.Server.Tests.csproj", "{7E73D705-7373-4D58-B867-2A3B80E15763}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{D87263B8-0226-41DD-A7AB-7F1DBF3A2886}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaRuX.Cli", "src\PaRuX.Cli\PaRuX.Cli.csproj", "{828A2C72-1DB9-4656-B855-C54564FD9A60}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaRuX.UpdateHelper", "src\PaRuX.UpdateHelper\PaRuX.UpdateHelper.csproj", "{C7E86A20-6F49-4D4B-9D6A-7B4565F4A321}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaRuX.WinMlWorker", "src\PaRuX.WinMlWorker\PaRuX.WinMlWorker.csproj", "{A71B5C66-394C-4D0F-9C6C-C8B78A72A401}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{8518C65E-F545-44DB-AF9C-9720D4A60CC5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaRuX.UITests", "tests\PaRuX.UITests\PaRuX.UITests.csproj", "{C7EE51D2-6EB8-44E2-A4E1-1645AC403513}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2B3C1D40-9E51-4A77-9E2E-9B2C7C0A1E01}.Debug|x64.ActiveCfg = Debug|x64
+		{2B3C1D40-9E51-4A77-9E2E-9B2C7C0A1E01}.Debug|x64.Build.0 = Debug|x64
+		{2B3C1D40-9E51-4A77-9E2E-9B2C7C0A1E01}.Release|x64.ActiveCfg = Release|x64
+		{2B3C1D40-9E51-4A77-9E2E-9B2C7C0A1E01}.Release|x64.Build.0 = Release|x64
+		{3DAE934A-92D5-497D-ABF5-59AC85FE2401}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3DAE934A-92D5-497D-ABF5-59AC85FE2401}.Debug|x64.Build.0 = Debug|Any CPU
+		{3DAE934A-92D5-497D-ABF5-59AC85FE2401}.Release|x64.ActiveCfg = Release|Any CPU
+		{3DAE934A-92D5-497D-ABF5-59AC85FE2401}.Release|x64.Build.0 = Release|Any CPU
+		{F5F7904D-5B6E-4D25-9C5A-B97D44D8A6B1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F5F7904D-5B6E-4D25-9C5A-B97D44D8A6B1}.Debug|x64.Build.0 = Debug|Any CPU
+		{F5F7904D-5B6E-4D25-9C5A-B97D44D8A6B1}.Release|x64.ActiveCfg = Release|Any CPU
+		{F5F7904D-5B6E-4D25-9C5A-B97D44D8A6B1}.Release|x64.Build.0 = Release|Any CPU
+		{8C5E9951-3E20-4F26-9A7A-19AD13D2C202}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8C5E9951-3E20-4F26-9A7A-19AD13D2C202}.Debug|x64.Build.0 = Debug|Any CPU
+		{8C5E9951-3E20-4F26-9A7A-19AD13D2C202}.Release|x64.ActiveCfg = Release|Any CPU
+		{8C5E9951-3E20-4F26-9A7A-19AD13D2C202}.Release|x64.Build.0 = Release|Any CPU
+		{7E73D705-7373-4D58-B867-2A3B80E15763}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7E73D705-7373-4D58-B867-2A3B80E15763}.Debug|x64.Build.0 = Debug|Any CPU
+		{7E73D705-7373-4D58-B867-2A3B80E15763}.Release|x64.ActiveCfg = Release|Any CPU
+		{7E73D705-7373-4D58-B867-2A3B80E15763}.Release|x64.Build.0 = Release|Any CPU
+		{828A2C72-1DB9-4656-B855-C54564FD9A60}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{828A2C72-1DB9-4656-B855-C54564FD9A60}.Debug|x64.Build.0 = Debug|Any CPU
+		{828A2C72-1DB9-4656-B855-C54564FD9A60}.Release|x64.ActiveCfg = Release|Any CPU
+		{828A2C72-1DB9-4656-B855-C54564FD9A60}.Release|x64.Build.0 = Release|Any CPU
+		{C7E86A20-6F49-4D4B-9D6A-7B4565F4A321}.Debug|x64.ActiveCfg = Debug|x64
+		{C7E86A20-6F49-4D4B-9D6A-7B4565F4A321}.Debug|x64.Build.0 = Debug|x64
+		{C7E86A20-6F49-4D4B-9D6A-7B4565F4A321}.Release|x64.ActiveCfg = Release|x64
+		{C7E86A20-6F49-4D4B-9D6A-7B4565F4A321}.Release|x64.Build.0 = Release|x64
+		{A71B5C66-394C-4D0F-9C6C-C8B78A72A401}.Debug|x64.ActiveCfg = Debug|x64
+		{A71B5C66-394C-4D0F-9C6C-C8B78A72A401}.Debug|x64.Build.0 = Debug|x64
+		{A71B5C66-394C-4D0F-9C6C-C8B78A72A401}.Release|x64.ActiveCfg = Release|x64
+		{A71B5C66-394C-4D0F-9C6C-C8B78A72A401}.Release|x64.Build.0 = Release|x64
+		{C7EE51D2-6EB8-44E2-A4E1-1645AC403513}.Debug|x64.ActiveCfg = Debug|x64
+		{C7EE51D2-6EB8-44E2-A4E1-1645AC403513}.Debug|x64.Build.0 = Debug|x64
+		{C7EE51D2-6EB8-44E2-A4E1-1645AC403513}.Release|x64.ActiveCfg = Release|x64
+		{C7EE51D2-6EB8-44E2-A4E1-1645AC403513}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{F5F7904D-5B6E-4D25-9C5A-B97D44D8A6B1} = {D87263B8-0226-41DD-A7AB-7F1DBF3A2886}
+		{828A2C72-1DB9-4656-B855-C54564FD9A60} = {D87263B8-0226-41DD-A7AB-7F1DBF3A2886}
+		{C7E86A20-6F49-4D4B-9D6A-7B4565F4A321} = {D87263B8-0226-41DD-A7AB-7F1DBF3A2886}
+		{A71B5C66-394C-4D0F-9C6C-C8B78A72A401} = {D87263B8-0226-41DD-A7AB-7F1DBF3A2886}
+		{C7EE51D2-6EB8-44E2-A4E1-1645AC403513} = {8518C65E-F545-44DB-AF9C-9720D4A60CC5}
+	EndGlobalSection
+EndGlobal

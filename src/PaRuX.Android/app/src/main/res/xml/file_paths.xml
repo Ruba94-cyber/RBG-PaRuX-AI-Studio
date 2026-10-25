@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Only explicitly-created share payloads are exposable through FileProvider. Other cache
+         content (temporary audio, local state, future sensitive files) has no provider mapping. -->
+    <cache-path name="shared_media" path="shared-media/" />
+</paths>

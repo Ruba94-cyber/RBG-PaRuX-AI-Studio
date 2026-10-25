@@ -1,0 +1,21 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+# This ledger row describes required evidence and names no credential value.
+[[rules.allowlists]]
+description = "BIC release evidence wording, current documented line only"
+condition = "AND"
+regexTarget = "line"
+regexes = [ '''Real signed candidate with maintainer credentials: MSI/APK/envelope set''' ]
+paths = [ '''docs/BIC_IMPLEMENTATION_EVIDENCE_2026-09-10\.md$''' ]
+
+# Synthetic token in a benchmark fixture; not a live account or service credential.
+[[rules.allowlists]]
+description = "Synthetic dependency handoff fixture token"
+condition = "AND"
+regexTarget = "line"
+regexes = [ '''^\s*"token": "PARUX-DAG-HANDOFF-94721",?\s*$''' ]
+paths = [ '''benchmarks/multi-agent/dependency-handoff\.json$''' ]

@@ -1,0 +1,8 @@
+TASK.json
+STATE.json
+PLAN.md
+TEST_RESULT.json
+REVIEW_RESULT.json
+artifacts/*
+!artifacts/.gitkeep
+tools/

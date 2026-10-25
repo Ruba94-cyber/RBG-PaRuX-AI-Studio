@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.21)
+project(PaRuXEvalQt)
+find_package(Qt6 REQUIRED COMPONENTS Core Quick)
+add_executable(parux_eval MainWindow.cpp RingBuffer.cpp)
+target_link_libraries(parux_eval PRIVATE Qt6::Core Qt6::Quick)

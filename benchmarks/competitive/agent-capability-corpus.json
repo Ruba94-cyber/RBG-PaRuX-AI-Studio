@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "parux-vs-hermes-agent-adversarial-v1",
+  "purpose": "External capability/task-completion benchmark. Hermes/Nous is a competitor target only; no runtime, package or agent code from the competitor is required by PaRuX.",
+  "rules": {
+    "minimumRunsPerScenario": 3,
+    "sameRepositorySnapshot": true,
+    "sameTaskPrompt": true,
+    "sameNetworkPolicy": true,
+    "sameToolPermissions": true,
+    "sameTimeBudget": true,
+    "scoreOnlyObservedEvidence": true,
+    "featurePresenceAloneNeverPasses": true
+  },
+  "scenarios": [
+    { "id": "single-repo-bugfix", "weight": 8, "mandatory": true, "gates": ["tests_pass", "minimal_patch", "no_unrelated_changes", "failure_recovery"] },
+    { "id": "multi-repo-contract-change", "weight": 10, "mandatory": true, "gates": ["atomic_repository_authority", "cross_repo_reasoning", "tests_pass", "atomic_apply"] },
+    { "id": "resume-after-process-restart", "weight": 8, "mandatory": true, "gates": ["durable_checkpoint", "same_worktree_resume", "no_duplicate_work", "verification_resume"] },
+    { "id": "long-context-180k-constraints", "weight": 10, "mandatory": true, "gates": ["no_silent_truncation", "constraint_recall", "decision_supersession", "contradiction_detection"] },
+    { "id": "tool-schema-recovery", "weight": 7, "mandatory": true, "gates": ["valid_tool_schema", "bad_tool_result_recovery", "bounded_retry", "audit_trace"] },
+    { "id": "browser-devtools-debug", "weight": 8, "mandatory": true, "gates": ["devtools_evidence", "network_console_reasoning", "fix_verified", "no_blind_click_loop"] },
+    { "id": "visual-app-fix", "weight": 7, "mandatory": true, "gates": ["region_context", "before_after_evidence", "functional_verification"] },
+    { "id": "delegated-parallel-work", "weight": 8, "mandatory": true, "gates": ["bounded_delegation", "independent_work", "conflict_reconciliation", "failure_isolation"] },
+    { "id": "memory-session-recall", "weight": 6, "mandatory": true, "gates": ["durable_memory", "relevant_recall", "no_stale_superseded_fact"] },
+    { "id": "mcp-toolchain", "weight": 6, "mandatory": true, "gates": ["discovery", "allowlist", "schema_routing", "telemetry", "recovery"] },
+    { "id": "scheduled-autonomy", "weight": 5, "mandatory": true, "gates": ["durable_schedule", "condition_or_cadence_correct", "cancellation", "observable_result"] },
+    { "id": "offline-privacy", "weight": 8, "mandatory": true, "gates": ["no_undeclared_network", "local_execution", "secret_redaction", "backup_restore"] },
+    { "id": "gaming-hard-off", "weight": 5, "mandatory": true, "gates": ["active_work_cancelled", "no_restart_during_game", "gpu_released", "post_game_recovery"] },
+    { "id": "self-improvement-guarded", "weight": 4, "mandatory": true, "gates": ["benchmark_before_promotion", "regression_guard", "rollback", "evidence_persisted"] }
+  ],
+  "resultSchema": {
+    "scenarioId": "string",
+    "run": "integer",
+    "status": "passed|failed|inconclusive",
+    "wallTimeMs": "number",
+    "gateResults": "object<string,bool>",
+    "evidence": "array<string>",
+    "error": "string|null"
+  },
+  "winnerPolicy": {
+    "mandatoryFailureMeansOverallLoss": true,
+    "primary": "mandatory pass rate",
+    "secondary": "weighted scenario score",
+    "tertiary": "median wall time among equally successful runs",
+    "bestInClass": "PaRuX must pass every mandatory scenario and equal or exceed the competitor's mandatory pass rate and weighted score. A faster failed task never beats a slower correct task."
+  }
+}

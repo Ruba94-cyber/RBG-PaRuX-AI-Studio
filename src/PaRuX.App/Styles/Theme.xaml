@@ -1,0 +1,539 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    PaRuX design system
+    ====================
+    One place for every colour, size, radius and text style PaRuX uses.
+
+    Structure
+      1. ThemeDictionaries  - Light / Dark / HighContrast colour tokens.
+                              Consume these with {ThemeResource ...} so the
+                              Settings theme switch actually repaints.
+      2. Scale tokens       - spacing, radii, type ramp, font families.
+                              (The monospace family is NOT here: it is hardcoded in
+                              Services\MarkdownRenderer.cs, which this pass was not
+                              allowed to touch.)
+                              Theme-independent, so they live outside the
+                              theme dictionaries. Consume with {StaticResource ...}.
+      3. Component styles   - Border / TextBlock / Grid only.
+                              Deliberately no Control styles: an explicit Style
+                              on a templated control without a verified BasedOn
+                              key is the one thing that can silently blank a
+                              control at runtime, and this tree has never been
+                              compiled. Buttons therefore carry token values
+                              inline and get their hover/pressed states from the
+                              WinUI theme-resource overrides below.
+
+    The five style keys the C# looks up by name
+    (PaRuXUserBubbleStyle, PaRuXAssistantBubbleStyle, PaRuXErrorBubbleStyle,
+     PaRuXCodeBlockStyle, PaRuXSubtleCaptionStyle) intentionally stay in
+    App.xaml's own dictionary, NOT here, because ChatView / MarkdownRenderer
+    reach them via Application.Current.Resources.TryGetValue and merged-dictionary
+    traversal for that API is not worth betting the app on.
+-->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ResourceDictionary.ThemeDictionaries>
+
+        <!-- ==================================================================
+             LIGHT
+             ================================================================== -->
+        <ResourceDictionary x:Key="Light">
+
+            <!-- brand ramp -->
+            <Color x:Key="PaRuXBrandColor">#2563EB</Color>
+            <Color x:Key="PaRuXBrandDeepColor">#1D4ED8</Color>
+            <Color x:Key="PaRuXBrandLightColor">#3B82F6</Color>
+            <Color x:Key="PaRuXSuccessColor">#0F7B3C</Color>
+            <Color x:Key="PaRuXWarnColor">#B8860B</Color>
+            <Color x:Key="PaRuXOffColor">#8A87A0</Color>
+
+            <SolidColorBrush x:Key="PaRuXBrandBrush" Color="#2563EB" />
+            <SolidColorBrush x:Key="PaRuXBrandTextBrush" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="PaRuXBrandSubtleBrush" Color="#EAF2FF" />
+            <SolidColorBrush x:Key="PaRuXBrandBorderBrush" Color="#BCD4FF" />
+            <SolidColorBrush x:Key="PaRuXOnBrandBrush" Color="#FFFFFF" />
+
+            <SolidColorBrush x:Key="PaRuXSecondaryBrush" Color="#0FA9C7" />
+            <SolidColorBrush x:Key="PaRuXSecondaryTextBrush" Color="#0B7E97" />
+
+            <SolidColorBrush x:Key="PaRuXDangerTextBrush" Color="#B02A1D" />
+            <SolidColorBrush x:Key="PaRuXDangerSubtleBrush" Color="#FDF0EE" />
+            <SolidColorBrush x:Key="PaRuXDangerBorderBrush" Color="#F3C9C4" />
+
+            <SolidColorBrush x:Key="PaRuXCautionTextBrush" Color="#8A6100" />
+            <SolidColorBrush x:Key="PaRuXCautionSubtleBrush" Color="#FFF6E0" />
+            <SolidColorBrush x:Key="PaRuXCautionBorderBrush" Color="#F2DFB0" />
+
+            <!-- surfaces. PaRuXSurfaceAppBrush is deliberately translucent so the
+                 main window's Mica backdrop stays visible behind the content area.
+                 The recessed sidebar tone lives in the NavigationView*PaneBackground
+                 overrides further down, so there is exactly one source for it. -->
+            <SolidColorBrush x:Key="PaRuXSurfaceSolidBrush" Color="#FBFAFD" />
+            <SolidColorBrush x:Key="PaRuXSurfaceAppBrush" Color="#B8FFFFFF" />
+            <SolidColorBrush x:Key="PaRuXSurfaceCardBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="PaRuXSurfaceRaisedBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="PaRuXSurfaceCodeBrush" Color="#F3F1FA" />
+            <SolidColorBrush x:Key="PaRuXSurfaceSubtleBrush" Color="#F6F5FA" />
+
+            <SolidColorBrush x:Key="PaRuXStrokeBrush" Color="#E6E3F0" />
+            <SolidColorBrush x:Key="PaRuXStrokeStrongBrush" Color="#D5D0E4" />
+            <SolidColorBrush x:Key="PaRuXDividerBrush" Color="#EDEBF3" />
+
+            <SolidColorBrush x:Key="PaRuXTextPrimaryBrush" Color="#1B1A21" />
+            <SolidColorBrush x:Key="PaRuXTextSecondaryBrush" Color="#5B5870" />
+            <SolidColorBrush x:Key="PaRuXTextTertiaryBrush" Color="#7C7992" />
+
+            <SolidColorBrush x:Key="PaRuXUserBubbleBrush" Color="#EAF2FF" />
+            <SolidColorBrush x:Key="PaRuXUserBubbleBorderBrush" Color="#C9DCFF" />
+            <SolidColorBrush x:Key="PaRuXUserBubbleTextBrush" Color="#122B5D" />
+
+            <SolidColorBrush x:Key="PaRuXFocusBrush" Color="#2563EB" />
+
+            <!-- WinUI theme-resource overrides: brand instead of Windows blue -->
+            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#2563EB" />
+            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#E52563EB" />
+            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#CC2563EB" />
+            <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#1E40AF" />
+            <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="#2563EB" />
+
+            <SolidColorBrush x:Key="AccentButtonBackground" Color="#2563EB" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#1E40AF" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="#D8D5E4" />
+            <SolidColorBrush x:Key="AccentButtonForeground" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#EFECFF" />
+            <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#9A97A8" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrush" Color="#00000000" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrushPointerOver" Color="#00000000" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrushPressed" Color="#00000000" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrushDisabled" Color="#00000000" />
+
+            <SolidColorBrush x:Key="ToggleButtonBackground" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#142563EB" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#262563EB" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundDisabled" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="#2563EB" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="#1E40AF" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedDisabled" Color="#C9C4E6" />
+            <SolidColorBrush x:Key="ToggleButtonForeground" Color="#5B5870" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundPointerOver" Color="#1B1A21" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundPressed" Color="#1B1A21" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundDisabled" Color="#A3A0B2" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="#EFECFF" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedDisabled" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrush" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushPointerOver" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushPressed" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushDisabled" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPointerOver" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPressed" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedDisabled" Color="#00000000" />
+
+            <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#2563EB" />
+            <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#1E40AF" />
+            <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#2563EB" />
+            <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#1E40AF" />
+
+            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="#00000000" />
+            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#00000000" />
+            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#A6F1EFF7" />
+            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#A6F1EFF7" />
+            <SolidColorBrush x:Key="NavigationViewCompactPaneBackground" Color="#A6F1EFF7" />
+            <SolidColorBrush x:Key="NavigationViewMinimalPaneBackground" Color="#A6F1EFF7" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundPointerOver" Color="#142563EB" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundPressed" Color="#262563EB" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelected" Color="#EAF2FF" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPointerOver" Color="#DEEAFF" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPressed" Color="#D1E2FF" />
+            <SolidColorBrush x:Key="NavigationViewItemForeground" Color="#3A3849" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundPointerOver" Color="#1B1A21" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundPressed" Color="#1B1A21" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundSelected" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPointerOver" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPressed" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="#2563EB" />
+
+            <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#2563EB" />
+            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#2563EB" />
+            <SolidColorBrush x:Key="HyperlinkForeground" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="HyperlinkButtonForeground" Color="#1D4ED8" />
+
+            <!-- Keyboard focus rectangle: brand blue instead of the WinUI default
+                 white/black double outline, which reads as a stray bright-white
+                 border on buttons and chat-message action icons. -->
+            <SolidColorBrush x:Key="SystemControlFocusVisualPrimaryBrush" Color="#2563EB" />
+            <SolidColorBrush x:Key="SystemControlFocusVisualSecondaryBrush" Color="#00000000" />
+        </ResourceDictionary>
+
+        <!-- ==================================================================
+             DARK
+             ================================================================== -->
+        <ResourceDictionary x:Key="Dark">
+
+            <Color x:Key="PaRuXBrandColor">#3B82F6</Color>
+            <Color x:Key="PaRuXBrandDeepColor">#2563EB</Color>
+            <Color x:Key="PaRuXBrandLightColor">#60A5FA</Color>
+            <Color x:Key="PaRuXSuccessColor">#6CCB8F</Color>
+            <Color x:Key="PaRuXWarnColor">#F5CE72</Color>
+            <Color x:Key="PaRuXOffColor">#868399</Color>
+
+            <SolidColorBrush x:Key="PaRuXBrandBrush" Color="#2563EB" />
+            <SolidColorBrush x:Key="PaRuXBrandTextBrush" Color="#7DD3FC" />
+            <SolidColorBrush x:Key="PaRuXBrandSubtleBrush" Color="#14233E" />
+            <SolidColorBrush x:Key="PaRuXBrandBorderBrush" Color="#244878" />
+            <SolidColorBrush x:Key="PaRuXOnBrandBrush" Color="#FFFFFF" />
+
+            <SolidColorBrush x:Key="PaRuXSecondaryBrush" Color="#22D3EE" />
+            <SolidColorBrush x:Key="PaRuXSecondaryTextBrush" Color="#56DFF5" />
+
+            <SolidColorBrush x:Key="PaRuXDangerTextBrush" Color="#FF9A8F" />
+            <SolidColorBrush x:Key="PaRuXDangerSubtleBrush" Color="#3A1F1C" />
+            <SolidColorBrush x:Key="PaRuXDangerBorderBrush" Color="#5C2E28" />
+
+            <SolidColorBrush x:Key="PaRuXCautionTextBrush" Color="#F5CE72" />
+            <SolidColorBrush x:Key="PaRuXCautionSubtleBrush" Color="#3A2E14" />
+            <SolidColorBrush x:Key="PaRuXCautionBorderBrush" Color="#5A4720" />
+
+            <SolidColorBrush x:Key="PaRuXSurfaceSolidBrush" Color="#16151C" />
+            <SolidColorBrush x:Key="PaRuXSurfaceAppBrush" Color="#A61C1B24" />
+            <SolidColorBrush x:Key="PaRuXSurfaceCardBrush" Color="#1F1E28" />
+            <SolidColorBrush x:Key="PaRuXSurfaceRaisedBrush" Color="#262532" />
+            <SolidColorBrush x:Key="PaRuXSurfaceCodeBrush" Color="#121119" />
+            <SolidColorBrush x:Key="PaRuXSurfaceSubtleBrush" Color="#1A1922" />
+
+            <SolidColorBrush x:Key="PaRuXStrokeBrush" Color="#2E2C3B" />
+            <SolidColorBrush x:Key="PaRuXStrokeStrongBrush" Color="#3E3B50" />
+            <SolidColorBrush x:Key="PaRuXDividerBrush" Color="#26242F" />
+
+            <SolidColorBrush x:Key="PaRuXTextPrimaryBrush" Color="#F2F1F7" />
+            <SolidColorBrush x:Key="PaRuXTextSecondaryBrush" Color="#B3B0C4" />
+            <SolidColorBrush x:Key="PaRuXTextTertiaryBrush" Color="#868399" />
+
+            <SolidColorBrush x:Key="PaRuXUserBubbleBrush" Color="#16284A" />
+            <SolidColorBrush x:Key="PaRuXUserBubbleBorderBrush" Color="#244878" />
+            <SolidColorBrush x:Key="PaRuXUserBubbleTextBrush" Color="#E7F0FF" />
+
+            <SolidColorBrush x:Key="PaRuXFocusBrush" Color="#60A5FA" />
+
+            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#2563EB" />
+            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#E52563EB" />
+            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#CC2563EB" />
+            <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#7DD3FC" />
+            <SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#93C5FD" />
+            <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="#7DD3FC" />
+
+            <SolidColorBrush x:Key="AccentButtonBackground" Color="#2563EB" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#3B82F6" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="#2F2E3A" />
+            <SolidColorBrush x:Key="AccentButtonForeground" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#EFECFF" />
+            <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#6E6B7E" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrush" Color="#00000000" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrushPointerOver" Color="#00000000" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrushPressed" Color="#00000000" />
+            <SolidColorBrush x:Key="AccentButtonBorderBrushDisabled" Color="#00000000" />
+
+            <SolidColorBrush x:Key="ToggleButtonBackground" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#1AFFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#26FFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundDisabled" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="#2563EB" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#3B82F6" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedDisabled" Color="#3A3560" />
+            <SolidColorBrush x:Key="ToggleButtonForeground" Color="#B3B0C4" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundPointerOver" Color="#F2F1F7" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundPressed" Color="#F2F1F7" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundDisabled" Color="#6E6B7E" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="#EFECFF" />
+            <SolidColorBrush x:Key="ToggleButtonForegroundCheckedDisabled" Color="#C9C4E6" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrush" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushPointerOver" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushPressed" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushDisabled" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPointerOver" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPressed" Color="#00000000" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedDisabled" Color="#00000000" />
+
+            <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#2563EB" />
+            <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#3B82F6" />
+            <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#1D4ED8" />
+            <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#2563EB" />
+            <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#3B82F6" />
+            <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#1D4ED8" />
+
+            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="#00000000" />
+            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#00000000" />
+            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="#B312111A" />
+            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#B312111A" />
+            <SolidColorBrush x:Key="NavigationViewCompactPaneBackground" Color="#B312111A" />
+            <SolidColorBrush x:Key="NavigationViewMinimalPaneBackground" Color="#B312111A" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundPointerOver" Color="#14FFFFFF" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundPressed" Color="#24FFFFFF" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelected" Color="#1D2F52" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPointerOver" Color="#243A63" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPressed" Color="#182844" />
+            <SolidColorBrush x:Key="NavigationViewItemForeground" Color="#C6C3D6" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundPointerOver" Color="#F2F1F7" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundPressed" Color="#F2F1F7" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundSelected" Color="#93C5FD" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPointerOver" Color="#93C5FD" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundSelectedPressed" Color="#93C5FD" />
+            <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="#3B82F6" />
+
+            <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#2563EB" />
+            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#3B82F6" />
+            <SolidColorBrush x:Key="HyperlinkForeground" Color="#7DD3FC" />
+            <SolidColorBrush x:Key="HyperlinkButtonForeground" Color="#7DD3FC" />
+
+            <!-- Keyboard focus rectangle: brand blue instead of the WinUI default
+                 white/black double outline, which reads as a stray bright-white
+                 border on buttons and chat-message action icons. -->
+            <SolidColorBrush x:Key="SystemControlFocusVisualPrimaryBrush" Color="#60A5FA" />
+            <SolidColorBrush x:Key="SystemControlFocusVisualSecondaryBrush" Color="#00000000" />
+        </ResourceDictionary>
+
+        <!-- ==================================================================
+             HIGH CONTRAST
+             Every key defined above must exist here too, or a resource lookup
+             fails at runtime the moment Windows switches to a HC theme.
+             ================================================================== -->
+        <ResourceDictionary x:Key="HighContrast">
+
+            <Color x:Key="PaRuXBrandColor">#FF0078D4</Color>
+            <Color x:Key="PaRuXBrandDeepColor">#FF0078D4</Color>
+            <Color x:Key="PaRuXBrandLightColor">#FF0078D4</Color>
+            <Color x:Key="PaRuXSuccessColor">#FF00FF00</Color>
+            <Color x:Key="PaRuXWarnColor">#FFFFFF00</Color>
+            <Color x:Key="PaRuXOffColor">#FF808080</Color>
+
+            <SolidColorBrush x:Key="PaRuXBrandBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="PaRuXBrandTextBrush" Color="{ThemeResource SystemColorHotlightColor}" />
+            <SolidColorBrush x:Key="PaRuXBrandSubtleBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="PaRuXBrandBorderBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+            <SolidColorBrush x:Key="PaRuXOnBrandBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+
+            <SolidColorBrush x:Key="PaRuXSecondaryBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="PaRuXSecondaryTextBrush" Color="{ThemeResource SystemColorHotlightColor}" />
+
+            <SolidColorBrush x:Key="PaRuXDangerTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="PaRuXDangerSubtleBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="PaRuXDangerBorderBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+
+            <SolidColorBrush x:Key="PaRuXCautionTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="PaRuXCautionSubtleBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="PaRuXCautionBorderBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+
+            <SolidColorBrush x:Key="PaRuXSurfaceSolidBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="PaRuXSurfaceAppBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="PaRuXSurfaceCardBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="PaRuXSurfaceRaisedBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="PaRuXSurfaceCodeBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="PaRuXSurfaceSubtleBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+            <SolidColorBrush x:Key="PaRuXStrokeBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="PaRuXStrokeStrongBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="PaRuXDividerBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+
+            <SolidColorBrush x:Key="PaRuXTextPrimaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="PaRuXTextSecondaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="PaRuXTextTertiaryBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
+
+            <SolidColorBrush x:Key="PaRuXUserBubbleBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="PaRuXUserBubbleBorderBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+            <SolidColorBrush x:Key="PaRuXUserBubbleTextBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+
+            <SolidColorBrush x:Key="PaRuXFocusBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+
+            <SolidColorBrush x:Key="SystemControlFocusVisualPrimaryBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="SystemControlFocusVisualSecondaryBrush" Color="{ThemeResource SystemColorWindowColor}" />
+        </ResourceDictionary>
+
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- The approved PRX artwork is the single source used throughout the shell. -->
+    <DataTemplate x:Key="PrxOrbitMarkTemplate">
+        <Image Source="ms-appx:///Assets/prx-orbit-approved.png" Stretch="Uniform" />
+    </DataTemplate>
+
+    <!-- ======================================================================
+         SCALE TOKENS  (theme independent)
+         ====================================================================== -->
+
+    <!-- Spacing. Layout rhythm - gaps between blocks, cards and sections - is
+         always one of these. Optical padding inside a pill or between a label and
+         its description drops to a 2px sub-step where 4 would look loose. -->
+    <x:Double x:Key="PaRuXSpaceXS">4</x:Double>
+    <x:Double x:Key="PaRuXSpaceS">8</x:Double>
+    <x:Double x:Key="PaRuXSpaceM">12</x:Double>
+    <x:Double x:Key="PaRuXSpaceL">16</x:Double>
+    <x:Double x:Key="PaRuXSpaceXL">24</x:Double>
+
+    <Thickness x:Key="PaRuXCardPadding">16</Thickness>
+    <Thickness x:Key="PaRuXCardPaddingTight">12</Thickness>
+
+    <!-- Corner radius: 4 controls / 8 cards+bubbles / 12 panels / 16 composer / pill -->
+    <CornerRadius x:Key="PaRuXRadiusSmall">4</CornerRadius>
+    <CornerRadius x:Key="PaRuXRadiusMedium">8</CornerRadius>
+    <CornerRadius x:Key="PaRuXRadiusLarge">12</CornerRadius>
+    <CornerRadius x:Key="PaRuXRadiusXLarge">16</CornerRadius>
+    <CornerRadius x:Key="PaRuXRadiusPill">999</CornerRadius>
+
+    <!-- Type ramp -->
+    <FontFamily x:Key="PaRuXFontFamily">Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="PaRuXDisplayFontFamily">Segoe UI Variable Display, Segoe UI</FontFamily>
+
+    <x:Double x:Key="PaRuXFontSizeDisplay">28</x:Double>
+    <x:Double x:Key="PaRuXFontSizeTitle">20</x:Double>
+    <x:Double x:Key="PaRuXFontSizeSubtitle">16</x:Double>
+    <x:Double x:Key="PaRuXFontSizeBody">14</x:Double>
+    <x:Double x:Key="PaRuXFontSizeCaption">12</x:Double>
+    <x:Double x:Key="PaRuXFontSizeMicro">11</x:Double>
+
+    <!-- Motion lives in code, not here: the entrance, page-swap and bubble-expand
+         transitions are Storyboards built in the view code-behind (180-220 ms,
+         CubicEase EaseOut), and the pulsing caret / thinking dots use SineEase.
+         Nothing is longer than 250 ms and nothing overshoots. -->
+
+    <!-- ======================================================================
+         COMPONENT STYLES
+         Border / TextBlock / Grid only - none of these types has a
+         ControlTemplate, so a keyed Style can never blank them out.
+         ====================================================================== -->
+
+    <Style x:Key="PaRuXDisplayTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource PaRuXDisplayFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource PaRuXFontSizeDisplay}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{ThemeResource PaRuXTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="PaRuXTitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource PaRuXDisplayFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource PaRuXFontSizeTitle}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{ThemeResource PaRuXTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="PaRuXSubtitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource PaRuXFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource PaRuXFontSizeSubtitle}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{ThemeResource PaRuXTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- Small all-caps label that opens a group of settings or a list section. -->
+    <Style x:Key="PaRuXSectionHeaderTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource PaRuXFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource PaRuXFontSizeCaption}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="CharacterSpacing" Value="60" />
+        <Setter Property="Foreground" Value="{ThemeResource PaRuXTextTertiaryBrush}" />
+    </Style>
+
+    <Style x:Key="PaRuXBodyTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource PaRuXFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource PaRuXFontSizeBody}" />
+        <Setter Property="Foreground" Value="{ThemeResource PaRuXTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="PaRuXBodyStrongTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource PaRuXFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource PaRuXFontSizeBody}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{ThemeResource PaRuXTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- The description line under a setting, and other muted metadata. -->
+    <Style x:Key="PaRuXCaptionTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource PaRuXFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource PaRuXFontSizeCaption}" />
+        <Setter Property="Foreground" Value="{ThemeResource PaRuXTextSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="PaRuXMicroTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource PaRuXFontFamily}" />
+        <Setter Property="FontSize" Value="{StaticResource PaRuXFontSizeMicro}" />
+        <Setter Property="Foreground" Value="{ThemeResource PaRuXTextTertiaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- Surfaces -->
+    <Style x:Key="PaRuXCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource PaRuXSurfaceCardBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource PaRuXStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource PaRuXRadiusLarge}" />
+        <Setter Property="Padding" Value="{StaticResource PaRuXCardPadding}" />
+    </Style>
+
+    <Style x:Key="PaRuXInsetCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource PaRuXSurfaceSubtleBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource PaRuXStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource PaRuXRadiusMedium}" />
+        <Setter Property="Padding" Value="{StaticResource PaRuXCardPaddingTight}" />
+    </Style>
+
+    <Style x:Key="PaRuXDividerStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource PaRuXDividerBrush}" />
+        <Setter Property="Height" Value="1" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
+    <!-- Pills. Quiet = metadata (route badge). Accent = live/selected state. -->
+    <Style x:Key="PaRuXQuietPillStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource PaRuXSurfaceSubtleBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource PaRuXStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource PaRuXRadiusPill}" />
+        <Setter Property="Padding" Value="8,2,8,2" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="PaRuXCautionPillStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource PaRuXCautionSubtleBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource PaRuXCautionBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource PaRuXRadiusPill}" />
+        <Setter Property="Padding" Value="8,2,8,2" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Segmented control shell that holds the AUTO / STANDARD / UNCENSORED toggles. -->
+    <Style x:Key="PaRuXSegmentedShellStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource PaRuXSurfaceSubtleBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource PaRuXStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource PaRuXRadiusPill}" />
+        <Setter Property="Padding" Value="3" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- One row of a settings card: label block left, control right, even height. -->
+    <Style x:Key="PaRuXSettingsRowStyle" TargetType="Grid">
+        <Setter Property="MinHeight" Value="44" />
+    </Style>
+
+</ResourceDictionary>

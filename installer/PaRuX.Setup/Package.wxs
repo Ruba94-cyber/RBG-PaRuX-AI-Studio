@@ -1,0 +1,109 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package
+      Name="PaRuX"
+      Manufacturer="Ruba94-cyber"
+      Version="$(var.ProductVersion)"
+      Language="1033"
+      Scope="perMachine"
+      UpgradeCode="{F69DACAC-90BA-435D-9990-872ACE68B543}"
+      InstallerVersion="500">
+
+    <!-- New releases are full MSI major upgrades: old PaRuX is removed, then the new build is installed.
+
+         AllowSameVersionUpgrades is required, not cosmetic. Every build of a given release carries the
+         same three-part ProductVersion (1.8.0) and the same four-part FileVersion (1.8.0.0), so without
+         it two things went wrong at once on a rebuild of the same version: FindRelatedProducts did not
+         treat the installed product as related, leaving a second "PaRuX" entry registered in Installed
+         Apps; and the file-versioning rules skipped every payload file as already current, so the new
+         binaries never landed while msiexec still reported success. Users were told they had upgraded
+         and were still running the previous build. -->
+    <MajorUpgrade
+        AllowSameVersionUpgrades="yes"
+        DowngradeErrorMessage="A newer version of PaRuX is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- The application itself targets Windows 10+ x64. Extremely old Windows 10 builds are no longer supported.
+
+         The built-in VersionNT property is fed by GetVersionExW, which the OS's application-
+         compatibility shim engine can override for a process that lacks a matching compatibility
+         GUID in its manifest - observed for real on a genuine Windows 11 (build 26100) machine,
+         where VersionNT resolved to 603 (Windows 8.1) instead of 1000 during acceptance testing,
+         wrongly refusing "PaRuX requires Windows 10 or newer." CurrentMajorVersionNumber is a
+         plain DWORD registry read with no version-query API involved, so it is not subject to the
+         same shimming; it did not exist before Windows 10, so its mere presence is the check. -->
+    <Property Id="PARUXWIN10ORLATER" Secure="yes">
+      <RegistrySearch Id="ParuxWin10OrLaterSearch" Root="HKLM"
+                       Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                       Name="CurrentMajorVersionNumber" Type="raw" />
+    </Property>
+    <Launch Condition="VersionNT64" Message="PaRuX requires 64-bit Windows." />
+    <Launch Condition="Installed OR PARUXWIN10ORLATER" Message="PaRuX requires Windows 10 or newer." />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="PaRuX">
+        <!-- parux.exe is installed in INSTALLFOLDER\Cli. Append only that folder to the machine
+             PATH and let Windows Installer remove exactly its own entry during uninstall. -->
+        <Component Id="PaRuXCliPathComponent" Bitness="always64">
+          <Environment
+              Id="PaRuXCliPath"
+              Name="PATH"
+              Action="set"
+              Part="last"
+              Permanent="no"
+              System="yes"
+              Value="[INSTALLFOLDER]Cli" />
+          <RegistryValue
+              Root="HKLM"
+              Key="Software\Ruba94-cyber\PaRuX"
+              Name="CliPathRegistered"
+              Type="integer"
+              Value="1"
+              KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Harvest the complete self-contained Desktop + Core + CLI publish output. Debug symbols are not shipped. -->
+    <Files Include="$(var.PublishDir)\**" Directory="INSTALLFOLDER">
+      <Exclude Files="$(var.PublishDir)\**\*.pdb" />
+    </Files>
+
+    <Icon Id="PaRuX.ico" SourceFile="$(var.PublishDir)\Assets\parux.ico" />
+    <Property Id="ARPPRODUCTICON" Value="PaRuX.ico" />
+
+    <!-- Machine-wide Start Menu entry. The registry key path is removed with the MSI. -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="PaRuXProgramMenuFolder" Name="PaRuX">
+        <Component Id="PaRuXStartMenuComponent" Bitness="always64">
+          <Shortcut
+              Id="PaRuXStartMenuShortcut"
+              Name="PaRuX"
+              Description="Local-first AI workstation"
+              Target="[INSTALLFOLDER]PaRuX.exe"
+              WorkingDirectory="INSTALLFOLDER"
+              Icon="PaRuX.ico" />
+          <RemoveFolder Id="RemovePaRuXProgramMenuFolder" On="uninstall" />
+          <!-- ICE38/ICE43/ICE57 require a non-advertised shortcut's KeyPath to be an HKCU
+               registry value, matching how Windows Installer tracks per-user Start Menu
+               shortcut presence - this is standard MSI/WiX authoring guidance and independent
+               of the package's own perMachine Scope, which is what actually drives
+               ProgramMenuFolder resolving to the all-users Start Menu at install time. -->
+          <RegistryValue
+              Root="HKCU"
+              Key="Software\Ruba94-cyber\PaRuX"
+              Name="InstallDir"
+              Type="string"
+              Value="[INSTALLFOLDER]"
+              KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Normal installer wizard: license, destination folder, install/repair/remove UI. -->
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" ExtendedPathValidation="yes" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+
+    <!-- WiX v5+ creates a single default feature and assigns the harvested/component resources. -->
+  </Package>
+</Wix>

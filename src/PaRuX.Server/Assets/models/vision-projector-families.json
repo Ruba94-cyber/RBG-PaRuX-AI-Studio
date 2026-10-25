@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "projectorQuantizationPreference": [ "F16", "BF16", "Q8_0", "F32" ],
+  "families": [
+    {
+      "id": "qwen3.8",
+      "visionCapable": true,
+      "tokens": [ "qwen3.8" ],
+      "bundledModels": [
+        {
+          "role": "standard",
+          "modelFileName": "Qwen3.8-27B-UD-IQ4_XS.gguf",
+          "projectorFileName": "mmproj-Qwen3.8-27B-Q8_0.gguf"
+        },
+        {
+          "role": "uncensored",
+          "modelFileName": "Qwen3.8-27B-Uncensored-noMTP-IQ4_XS.gguf",
+          "projectorFileName": "Qwen3.8-27B-Uncensored-vision-f16.gguf"
+        }
+      ]
+    },
+    { "id": "qwen3-vl", "visionCapable": true, "tokens": [ "qwen3-vl", "qwen3vl" ] },
+    { "id": "qwen2.5-vl", "visionCapable": true, "tokens": [ "qwen2.5-vl", "qwen2.5vl" ] },
+    { "id": "qwen2-vl", "visionCapable": true, "tokens": [ "qwen2-vl", "qwen2vl" ] },
+    { "id": "llava", "visionCapable": true, "tokens": [ "llava", "bakllava" ] },
+    { "id": "minicpm-v", "visionCapable": true, "tokens": [ "minicpm-v", "minicpmv" ] },
+    { "id": "internvl", "visionCapable": true, "tokens": [ "internvl" ] }
+  ]
+}

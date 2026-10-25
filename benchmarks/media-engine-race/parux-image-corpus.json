@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "name": "parux-image-engine-race-v1",
+  "description": "Deterministic local text-to-image corpus for comparing PaRuX-managed ComfyUI and Diffusers on identical prompts, resolutions and resolved seeds. Production publication runs should use at least 3 runs per case on the same hardware with no competing GPU workload.",
+  "methodology": {
+    "primaryMetric": "accepted independent quality score",
+    "secondaryMetric": "cold end-to-end renderer latency",
+    "qualityJudge": "technical hard gate plus pinned offline CPU CLIP semantic similarity",
+    "latencyMode": "cold renderer start; shared prompt preprocessing excluded",
+    "orderControl": "candidate order alternates deterministically with seed parity",
+    "artifactPolicy": "benchmark requests evidence-only responses; generated images are not embedded in benchmark JSON/CSV",
+    "publicationMinimumRunsPerCase": 3
+  },
+  "cases": [
+    {
+      "id": "portrait-natural-light",
+      "category": "photorealism",
+      "seed": 31001,
+      "width": 896,
+      "height": 1152,
+      "prompt": "Photorealistic editorial portrait of an elderly Italian violin maker in a warm wooden workshop, natural window light from camera left, detailed skin texture, gray hair, leather apron, shallow depth of field, realistic hands resting on an unfinished violin, 50mm lens look, restrained cinematic color grading."
+    },
+    {
+      "id": "hands-fine-action",
+      "category": "anatomy",
+      "seed": 31002,
+      "width": 1024,
+      "height": 1024,
+      "prompt": "Close-up photorealistic view of two human hands carefully tying a thin red ribbon around a small kraft-paper gift box on a clean oak table, all ten fingers naturally positioned and fully visible, accurate joints and nails, soft daylight, crisp textile fibers, realistic shadows."
+    },
+    {
+      "id": "product-reflections",
+      "category": "product",
+      "seed": 31003,
+      "width": 1024,
+      "height": 1024,
+      "prompt": "Premium studio product photograph of a matte black over-ear headphone set beside a brushed aluminum portable music player on dark slate, controlled rim lighting, realistic metal and plastic materials, subtle reflections, clean commercial composition, no brand logos, extremely sharp details."
+    },
+    {
+      "id": "architecture-perspective",
+      "category": "architecture",
+      "seed": 31004,
+      "width": 1152,
+      "height": 896,
+      "prompt": "Photorealistic contemporary alpine house built into a snowy hillside at blue hour, timber and exposed concrete facade, large warm illuminated windows, accurate two-point architectural perspective, fresh snow on roof edges, distant mountains in mist, physically plausible exterior and interior lighting."
+    },
+    {
+      "id": "landscape-atmosphere",
+      "category": "landscape",
+      "seed": 31005,
+      "width": 1216,
+      "height": 832,
+      "prompt": "Wide cinematic landscape of a quiet glacial lake at dawn, low fog drifting over turquoise water, dark pine forest on both shores, snow-covered mountain reflected in the lake, first orange sunlight touching only the summit, realistic atmospheric depth and fine natural detail."
+    },
+    {
+      "id": "stylized-storybook",
+      "category": "illustration",
+      "seed": 31006,
+      "width": 1024,
+      "height": 1024,
+      "prompt": "Whimsical hand-painted children's storybook illustration of a brave seven-year-old explorer in a yellow raincoat sharing an umbrella with a tiny fox in a rainy enchanted forest, expressive friendly faces, watercolor and gouache texture, luminous mushrooms, coherent anatomy, rich but gentle detail."
+    },
+    {
+      "id": "low-light-neon",
+      "category": "low-light",
+      "seed": 31007,
+      "width": 1152,
+      "height": 896,
+      "prompt": "Photorealistic rainy city street at night viewed from sidewalk height, one cyclist passing through a pool of cyan and magenta neon reflections, wet asphalt, realistic motion blur only on the wheels, sharp storefront details, deep shadows retaining texture, cinematic high dynamic range lighting."
+    },
+    {
+      "id": "multi-object-composition",
+      "category": "composition",
+      "seed": 31008,
+      "width": 1152,
+      "height": 896,
+      "prompt": "Top-down editorial photograph of a travel planning desk with exactly these distinct objects arranged clearly without overlap: an open paper map, a silver compass, a red notebook, a black fountain pen, a compact camera, two train tickets and a ceramic cup of coffee; balanced composition, realistic materials and soft morning light."
+    },
+    {
+      "id": "poster-typography",
+      "category": "typography",
+      "seed": 31009,
+      "width": 896,
+      "height": 1152,
+      "prompt": "Clean modern vertical technology poster with a dark minimal background, one glowing abstract local-computing symbol, and the exact large headline text 'PARUX LOCAL AI' centered near the top, with the exact smaller text 'PRIVATE. FAST. YOURS.' centered near the bottom, professional Swiss graphic design, legible typography."
+    },
+    {
+      "id": "spatial-relations",
+      "category": "spatial",
+      "seed": 31010,
+      "width": 1024,
+      "height": 1024,
+      "prompt": "Bright realistic tabletop scene: a small blue cube is to the left of a tall red cylinder, a yellow sphere is centered between them, and a green ceramic mug is behind the red cylinder; all four objects fully visible, clean white background, soft studio shadows, unambiguous spatial relationships."
+    },
+    {
+      "id": "food-macro",
+      "category": "food",
+      "seed": 31011,
+      "width": 1024,
+      "height": 1024,
+      "prompt": "High-end food photograph of fresh handmade tagliatelle with porcini mushrooms and parsley in a shallow white ceramic bowl, visible steam, glossy but natural sauce, fine pasta texture, a few grated parmesan flakes, rustic stone table, soft side light, shallow depth of field."
+    },
+    {
+      "id": "vehicle-motion",
+      "category": "motion",
+      "seed": 31012,
+      "width": 1216,
+      "height": 832,
+      "prompt": "Photorealistic dark blue modern station wagon driving through a sweeping mountain road in autumn, front three-quarter tracking shot, car body and headlights sharply detailed, natural wheel motion blur, realistic tire contact with asphalt, golden trees and distant peaks, late afternoon sunlight, premium automotive photography."
+    }
+  ]
+}

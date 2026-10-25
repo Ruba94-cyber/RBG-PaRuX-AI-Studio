@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="PaRuX.Shell.BubbleWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="PaRuX Quick Chat">
+
+    <!--
+        Every CornerRadius in this file is 0 on purpose: a rounded SetWindowRgn clip (tried first,
+        see the code-behind's ApplyRoundedRegion) showed a speckled light/dark fringe wherever its
+        hard GDI curve disagreed with WinUI's own anti-aliased rendering of the same curve. A plain
+        rectangle has no curve for the two to disagree about. RootGrid stays transparent regardless
+        (SetWindowRgn still clips the window to its real bounds, so this matters if that clip is
+        ever off by a pixel); ExpandedView carries its own opaque background below since it can no
+        longer rely on RootGrid for one.
+    -->
+    <Grid x:Name="RootGrid" Background="Transparent" Loaded="RootGrid_Loaded">
+
+        <!-- ==================== Collapsed: the floating pill ==================== -->
+        <Grid
+            x:Name="CollapsedView"
+            PointerPressed="Bubble_PointerPressed"
+            PointerMoved="Bubble_PointerMoved"
+            PointerReleased="Bubble_PointerReleased"
+            PointerEntered="Bubble_PointerEntered"
+            PointerExited="Bubble_PointerExited"
+            RightTapped="Bubble_RightTapped"
+            Background="Transparent">
+
+            <Border CornerRadius="0">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#FF101A2C" Offset="0" />
+                        <GradientStop Color="#FF0D1625" Offset="0.55" />
+                        <GradientStop Color="#FF0A0F14" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
+
+                <Grid>
+                    <Border CornerRadius="0" Opacity="0.42">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#4DFFFFFF" Offset="0" />
+                                <GradientStop Color="#00FFFFFF" Offset="0.42" />
+                                <GradientStop Color="#00000000" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+
+                    <Grid Margin="6,0,14,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Grid
+                            x:Name="CollapsedMarkContainer"
+                            Grid.Column="0"
+                            Width="36"
+                            Height="36"
+                            RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <ScaleTransform x:Name="CollapsedMarkScale" ScaleX="1" ScaleY="1" />
+                            </Grid.RenderTransform>
+                            <ContentControl
+                                Width="30"
+                                Height="30"
+                                ContentTemplate="{StaticResource PrxOrbitMarkTemplate}"
+                                IsHitTestVisible="False" />
+                            <Ellipse
+                                x:Name="CollapsedStateRing"
+                                Width="35"
+                                Height="22"
+                                Stroke="{ThemeResource PaRuXSecondaryBrush}"
+                                StrokeThickness="1.5"
+                                StrokeDashArray="1,2"
+                                StrokeDashCap="Round"
+                                Opacity="0"
+                                RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <RotateTransform x:Name="CollapsedStateRingRotation" Angle="-25" />
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Grid>
+
+                        <TextBlock
+                            x:Name="CollapsedStatusText"
+                            Grid.Column="1"
+                            Text="PaRuX"
+                            Foreground="#FFFFFFFF"
+                            FontSize="12"
+                            FontWeight="SemiBold"
+                            TextTrimming="CharacterEllipsis"
+                            VerticalAlignment="Center"
+                            Margin="4,0,0,0" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ==================== Expanded: quick chat ==================== -->
+        <Grid x:Name="ExpandedView" Visibility="Collapsed" Background="{ThemeResource PaRuXSurfaceSolidBrush}">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- drag handle / header -->
+                <Border
+                    Grid.Row="0"
+                    Background="{ThemeResource PaRuXSurfaceSubtleBrush}"
+                    BorderBrush="{ThemeResource PaRuXDividerBrush}"
+                    BorderThickness="0,0,0,1"
+                    CornerRadius="0">
+                    <Grid
+                        Padding="12,8,8,8"
+                        ColumnSpacing="{StaticResource PaRuXSpaceS}"
+                        Background="Transparent"
+                        PointerPressed="Bubble_PointerPressed"
+                        PointerMoved="Bubble_PointerMoved"
+                        PointerReleased="Bubble_PointerReleased">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}" VerticalAlignment="Center">
+                            <ContentControl
+                                Width="20"
+                                Height="20"
+                                ContentTemplate="{StaticResource PrxOrbitMarkTemplate}"
+                                IsHitTestVisible="False" />
+                            <TextBlock
+                                Text="PaRuX"
+                                Style="{StaticResource PaRuXBodyStrongTextStyle}"
+                                VerticalAlignment="Center" />
+                            <Border
+                                x:Name="BubbleRoutePill"
+                                Visibility="Collapsed"
+                                Style="{StaticResource PaRuXQuietPillStyle}"
+                                Padding="6,1,6,1">
+                                <TextBlock
+                                    x:Name="BubbleRoute"
+                                    Text=""
+                                    FontSize="{StaticResource PaRuXFontSizeMicro}"
+                                    Foreground="{ThemeResource PaRuXTextSecondaryBrush}"
+                                    VerticalAlignment="Center" />
+                            </Border>
+                        </StackPanel>
+
+                        <Button
+                            Grid.Column="1"
+                            Content="Open in PaRuX"
+                            FontSize="{StaticResource PaRuXFontSizeCaption}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="{ThemeResource PaRuXBrandTextBrush}"
+                            CornerRadius="{StaticResource PaRuXRadiusSmall}"
+                            Padding="8,4,8,4"
+                            Height="28"
+                            Click="OpenInMain_Click"
+                            ToolTipService.ToolTip="Continue this thread in the main window" />
+
+                        <Button
+                            Grid.Column="2"
+                            Width="28"
+                            Height="28"
+                            Padding="0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="{ThemeResource PaRuXTextSecondaryBrush}"
+                            CornerRadius="{StaticResource PaRuXRadiusSmall}"
+                            Click="Collapse_Click"
+                            AutomationProperties.Name="Close Quick Chat"
+                            ToolTipService.ToolTip="Close  (Esc)">
+                            <FontIcon Glyph="&#xE711;" FontSize="12" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- response -->
+                <ScrollViewer
+                    x:Name="BubbleScroll"
+                    Grid.Row="1"
+                    Padding="16,12,16,0"
+                    VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="BubbleContent" Margin="0,0,0,12" />
+                </ScrollViewer>
+
+                <!-- empty state -->
+                <StackPanel
+                    x:Name="BubbleEmpty"
+                    Grid.Row="1"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="{StaticResource PaRuXSpaceS}"
+                    Padding="24">
+                    <FontIcon
+                        Glyph="&#xE8BD;"
+                        FontSize="22"
+                        Foreground="{ThemeResource PaRuXTextTertiaryBrush}"
+                        HorizontalAlignment="Center" />
+                    <TextBlock
+                        Text="Ask me something"
+                        Style="{StaticResource PaRuXBodyStrongTextStyle}"
+                        Foreground="{ThemeResource PaRuXTextSecondaryBrush}"
+                        HorizontalAlignment="Center" />
+                    <TextBlock
+                        Text="Answers stay on this machine."
+                        Style="{StaticResource PaRuXCaptionTextStyle}"
+                        Foreground="{ThemeResource PaRuXTextTertiaryBrush}"
+                        HorizontalAlignment="Center"
+                        TextAlignment="Center" />
+                </StackPanel>
+
+                <!-- composer -->
+                <Grid Grid.Row="2" Padding="12,0,12,12" RowSpacing="{StaticResource PaRuXSpaceS}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Border
+                        x:Name="BubbleStatusPanel"
+                        Grid.Row="0"
+                        Visibility="Collapsed"
+                        HorizontalAlignment="Left"
+                        Background="{ThemeResource PaRuXBrandSubtleBrush}"
+                        BorderBrush="{ThemeResource PaRuXBrandBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource PaRuXRadiusPill}"
+                        Padding="12,4,12,4">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ProgressRing
+                                Width="14"
+                                Height="14"
+                                IsActive="True"
+                                Foreground="{ThemeResource PaRuXBrandBrush}"
+                                VerticalAlignment="Center" />
+                            <TextBlock
+                                x:Name="BubbleStatus"
+                                FontSize="{StaticResource PaRuXFontSizeMicro}"
+                                Foreground="{ThemeResource PaRuXBrandTextBrush}"
+                                VerticalAlignment="Center"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border
+                        x:Name="BubbleComposerBorder"
+                        Grid.Row="1"
+                        Background="{ThemeResource PaRuXSurfaceRaisedBrush}"
+                        BorderBrush="{ThemeResource PaRuXStrokeStrongBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource PaRuXRadiusLarge}"
+                        Padding="6">
+                        <Grid ColumnSpacing="{StaticResource PaRuXSpaceXS}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox
+                                x:Name="BubbleInput"
+                                Grid.Column="0"
+                                AcceptsReturn="True"
+                                TextWrapping="Wrap"
+                                MaxHeight="96"
+                                MinHeight="32"
+                                BorderThickness="0"
+                                Background="Transparent"
+                                Padding="6,6,10,6"
+                                FontSize="{StaticResource PaRuXFontSizeBody}"
+                                PlaceholderText="Quick question…"
+                                PreviewKeyDown="BubbleInput_PreviewKeyDown" />
+                            <Button
+                                x:Name="BubbleSend"
+                                Grid.Column="1"
+                                Width="32"
+                                Height="32"
+                                MinWidth="32"
+                                MinHeight="32"
+                                Padding="0"
+                                Margin="2,0,0,0"
+                                CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                                VerticalAlignment="Bottom"
+                                HorizontalAlignment="Right"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Click="BubbleSend_Click"
+                                AutomationProperties.Name="Send from Quick Chat"
+                                ToolTipService.ToolTip="Send  (Enter)">
+                                <FontIcon Glyph="&#xE724;" FontSize="13" />
+                            </Button>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <Border
+                CornerRadius="0"
+                BorderThickness="1"
+                BorderBrush="{ThemeResource PaRuXStrokeStrongBrush}"
+                IsHitTestVisible="False" />
+        </Grid>
+    </Grid>
+</Window>

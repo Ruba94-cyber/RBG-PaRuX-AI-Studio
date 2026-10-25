@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "name": "PaRuX Virtual Context deterministic recall corpus",
+  "description": "Synthetic persisted histories. Acceptance checks the Core-selected context pack before any model judgement, so retrieval regressions cannot be hidden by a lucky completion.",
+  "cases": [
+    {
+      "id": "logical-128k",
+      "targetLogicalTokens": 131072,
+      "sentinel": "PARUX_VCTX_128K_CRC32C",
+      "constraint": "Decision for ATLAS-128: the frame checksum MUST remain CRC32C and the acceptance marker is PARUX_VCTX_128K_CRC32C.",
+      "question": "For ATLAS-128, what checksum and acceptance marker did we decide?"
+    },
+    {
+      "id": "logical-256k",
+      "targetLogicalTokens": 262144,
+      "sentinel": "PARUX_VCTX_256K_OFFLINE_ONLY",
+      "constraint": "Hard requirement for BOREAL-256: runtime inference MUST remain offline-only; preserve marker PARUX_VCTX_256K_OFFLINE_ONLY.",
+      "question": "Recall the BOREAL-256 runtime requirement and its exact marker."
+    },
+    {
+      "id": "logical-1m",
+      "targetLogicalTokens": 1048576,
+      "sentinel": "PARUX_VCTX_1M_NEVER_REWRITE_HISTORY",
+      "constraint": "Release decision for COSMOS-1M: NEVER rewrite signed migration history; exact marker PARUX_VCTX_1M_NEVER_REWRITE_HISTORY.",
+      "question": "What old COSMOS-1M release decision must still be respected? Include the exact marker."
+    }
+  ]
+}

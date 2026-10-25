@@ -1,0 +1,4 @@
+#conversation-drawer { width: 280px; }
+@media (max-width: 640px) {
+  #conversation-drawer { display: none; }
+}

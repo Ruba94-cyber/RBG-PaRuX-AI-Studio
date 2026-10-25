@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 3,
+  "name": "PaRuX Codex-class coding-agent corpus",
+  "description": "Runs only in isolated coding-agent worktrees. Deterministic acceptance is evaluated from real worktree state. verificationCommands, when present, are run by the benchmark harness after the agent exits; model/verifier self-reports are never sufficient for benchmark success.",
+  "tasks": [
+    {
+      "id": "bounded-edit",
+      "goal": "Create a new file benchmark-fixtures/agent/BoundedEditMarker.cs containing a small internal static C# class named BoundedEditMarker in namespace PaRuX.Benchmarks with a public const string Value equal to parux-agent-benchmark. Do not change unrelated files. Verify that the repository still builds or run the most relevant available .NET verification command before reporting done.",
+      "maxRepairAttempts": 1,
+      "acceptance": {
+        "requiredFiles": ["benchmark-fixtures/agent/BoundedEditMarker.cs"],
+        "requiredText": [
+          { "path": "benchmark-fixtures/agent/BoundedEditMarker.cs", "contains": "class BoundedEditMarker" },
+          { "path": "benchmark-fixtures/agent/BoundedEditMarker.cs", "contains": "parux-agent-benchmark" }
+        ],
+        "allowedChangedPathPrefixes": ["benchmark-fixtures/agent/BoundedEditMarker.cs"],
+        "requireVerificationSuccess": true,
+        "verificationCommands": [
+          "dotnet build PaRuX.sln --no-restore"
+        ]
+      }
+    },
+    {
+      "id": "targeted-test",
+      "goal": "Add a focused xUnit test file under tests/PaRuX.Server.Tests named BenchmarkArithmeticSmokeTests.cs with one deterministic test asserting that 21 * 2 equals 42. Do not modify production code. Run that test project or the narrowest relevant test command before reporting done.",
+      "maxRepairAttempts": 1,
+      "acceptance": {
+        "requiredFiles": ["tests/PaRuX.Server.Tests/BenchmarkArithmeticSmokeTests.cs"],
+        "requiredText": [
+          { "path": "tests/PaRuX.Server.Tests/BenchmarkArithmeticSmokeTests.cs", "contains": "21 * 2" },
+          { "path": "tests/PaRuX.Server.Tests/BenchmarkArithmeticSmokeTests.cs", "contains": "42" }
+        ],
+        "allowedChangedPathPrefixes": ["tests/PaRuX.Server.Tests/BenchmarkArithmeticSmokeTests.cs"],
+        "requireVerificationSuccess": true,
+        "verificationCommands": [
+          "dotnet test tests/PaRuX.Server.Tests/PaRuX.Server.Tests.csproj --no-restore --filter FullyQualifiedName~BenchmarkArithmeticSmokeTests"
+        ]
+      }
+    },
+    {
+      "id": "repo-reasoning",
+      "goal": "Inspect the repository and add docs/benchmark-agent-context.md containing: the server project path, the desktop app project path, the Android app root path, and the canonical execution-plan filename. Derive every value from repository evidence, not guesses. Do not change any other file. Use git diff before reporting done.",
+      "maxRepairAttempts": 1,
+      "acceptance": {
+        "requiredFiles": ["docs/benchmark-agent-context.md"],
+        "requiredText": [
+          { "path": "docs/benchmark-agent-context.md", "contains": "src/PaRuX.Server" },
+          { "path": "docs/benchmark-agent-context.md", "contains": "src/PaRuX.App" },
+          { "path": "docs/benchmark-agent-context.md", "contains": "src/PaRuX.Android" },
+          { "path": "docs/benchmark-agent-context.md", "contains": "PARUX_EXECUTION_PLAN.md" }
+        ],
+        "allowedChangedPathPrefixes": ["docs/benchmark-agent-context.md"],
+        "requireVerificationSuccess": false,
+        "verificationCommands": []
+      }
+    },
+    {
+      "id": "multi-file-consistency",
+      "goal": "Create exactly two benchmark fixture files: benchmark-fixtures/agent/AgentPairA.txt with the single line PAIR_ID=PARUX-BIC-2026 and benchmark-fixtures/agent/AgentPairB.txt with the same single line. Do not change unrelated files. Inspect git diff before reporting done.",
+      "maxRepairAttempts": 1,
+      "acceptance": {
+        "requiredFiles": [
+          "benchmark-fixtures/agent/AgentPairA.txt",
+          "benchmark-fixtures/agent/AgentPairB.txt"
+        ],
+        "requiredText": [
+          { "path": "benchmark-fixtures/agent/AgentPairA.txt", "contains": "PAIR_ID=PARUX-BIC-2026" },
+          { "path": "benchmark-fixtures/agent/AgentPairB.txt", "contains": "PAIR_ID=PARUX-BIC-2026" }
+        ],
+        "allowedChangedPathPrefixes": [
+          "benchmark-fixtures/agent/AgentPairA.txt",
+          "benchmark-fixtures/agent/AgentPairB.txt"
+        ],
+        "requireVerificationSuccess": false,
+        "verificationCommands": []
+      }
+    },
+    {
+      "id": "constraint-retention",
+      "goal": "Create docs/benchmark-long-context-constraint.md. The document must contain exactly these three non-empty lines in this order: TITLE=PaRuX Agent Context Test, DO_NOT_RENAME=critical-middle-constraint-94721, RESULT=retained. Before editing, inspect repository status. Do not rename the required middle key and do not change any other file. Inspect git diff before reporting done.",
+      "maxRepairAttempts": 1,
+      "acceptance": {
+        "requiredFiles": ["docs/benchmark-long-context-constraint.md"],
+        "requiredText": [
+          { "path": "docs/benchmark-long-context-constraint.md", "contains": "TITLE=PaRuX Agent Context Test" },
+          { "path": "docs/benchmark-long-context-constraint.md", "contains": "DO_NOT_RENAME=critical-middle-constraint-94721" },
+          { "path": "docs/benchmark-long-context-constraint.md", "contains": "RESULT=retained" }
+        ],
+        "allowedChangedPathPrefixes": ["docs/benchmark-long-context-constraint.md"],
+        "requireVerificationSuccess": false,
+        "verificationCommands": []
+      }
+    }
+  ]
+}

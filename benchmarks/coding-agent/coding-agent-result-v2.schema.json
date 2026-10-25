@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PaRuX coding-agent corpus v2 result",
+  "description": "Output of scripts/benchmark-coding-agent-competitors.ps1 -TaskCorpusV2. One row per provider and task; pass/fail comes only from the hidden verifier plus budget checks, never from agent self-report.",
+  "type": "object",
+  "required": ["schema", "corpusVersion", "corpusSha256", "taskHashes", "split", "mode", "fairness", "providers", "paRuXCompetitiveVerdict", "results"],
+  "properties": {
+    "schema": { "const": "parux-coding-agent-result/2" },
+    "corpusVersion": { "type": "string" },
+    "corpusSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "taskHashes": { "type": "array", "items": { "type": "object", "required": ["id", "fixtureSha256", "verifierSha256"] } },
+    "split": { "enum": ["held-out", "optimization", "all"] },
+    "mode": { "enum": ["Run", "CollectManual", "selftest"] },
+    "fairness": {
+      "type": "object",
+      "description": "Every flag must be true for WIN or TIE. A LOSS may be reported with imperfect fairness.",
+      "required": ["claimableSplitAndSize", "allProvidersCompleteTaskSet", "noSkippedOrUnrunTasks", "zeroInterventions", "stepBudgetEnforcedForAllProviders", "sameMeasurementMethodForAllProviders", "noSelfTestAdapters", "providerMetadataComparable", "sameCorpusAndHiddenVerifiers"]
+    },
+    "paRuXCompetitiveVerdict": { "enum": ["WIN", "TIE", "LOSS", "INCONCLUSIVE", "NOT_A_CLAIM"] },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["provider", "caseId", "split", "status", "success", "wallTimeMs", "steps", "stepsSource", "interventions", "measurement", "verifierExitCode"],
+        "properties": {
+          "provider": { "type": "string" },
+          "caseId": { "type": "string" },
+          "split": { "enum": ["held-out", "optimization"] },
+          "status": { "enum": ["PASS", "FAIL", "TIMEOUT", "SKIPPED_TOOLCHAIN", "NOT_RUN", "VERIFIER_ERROR"] },
+          "success": { "type": "boolean" },
+          "wallTimeMs": { "type": "number", "minimum": 0 },
+          "timedOut": { "type": "boolean" },
+          "timeBudgetSeconds": { "type": "integer" },
+          "steps": { "type": ["integer", "null"] },
+          "stepBudget": { "type": "integer" },
+          "stepsSource": { "enum": ["unavailable", "adapter-reported", "operator-attested", "self-test-oracle", "self-test-noop"] },
+          "stepsExceeded": { "type": "boolean" },
+          "interventions": { "type": "integer", "minimum": 0 },
+          "measurement": { "enum": ["harness-timed", "operator-attested", "self-test-oracle", "self-test-noop"] },
+          "verifierExitCode": { "type": ["integer", "null"] },
+          "outOfScopePaths": { "type": "array", "items": { "type": "string" } },
+          "verifierOutputTail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

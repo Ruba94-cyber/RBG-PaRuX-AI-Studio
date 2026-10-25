@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same brand tokens as src/PaRuX.App/Styles/Theme.xaml, so the Android app reads
+         as the same product rather than a re-skin. -->
+    <color name="parux_brand">#2563EB</color>
+    <color name="parux_brand_light">#3B82F6</color>
+    <color name="parux_brand_deep">#1D4ED8</color>
+    <color name="parux_secondary">#22D3EE</color>
+    <color name="parux_brand_violet">#7C3AED</color>
+    <color name="parux_brand_core">#0A0F14</color>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Actual theming (colors, typography, dark/light) is owned by Compose's
+         MaterialTheme in PaRuXTheme.kt. This is only the OS-level launch/chrome
+         theme so the system window (status bar, splash) is not stock Material blue
+         for the first frame before Compose takes over. -->
+    <style name="Theme.PaRuX" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/parux_brand_deep</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>

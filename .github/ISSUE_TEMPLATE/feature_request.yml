@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest something PaRuX should be able to do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do that PaRuX makes hard?
+      description: Describe the situation, not the solution — it usually leads somewhere better.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like it to do instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: local
+    attributes:
+      label: Does this need anything outside your own machine?
+      description: PaRuX's core AI must keep working with no cloud service. Requests that require one are unlikely to land as core features.
+      options:
+        - No — it can work entirely locally
+        - Yes — it needs an internet service
+        - Not sure
+    validations:
+      required: true

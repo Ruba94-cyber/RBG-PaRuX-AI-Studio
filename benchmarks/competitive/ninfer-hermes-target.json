@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "id": "ninfer-hermes-rtx5090-adversarial-v1",
+  "displayName": "NInfer + Nous/Hermes Agent adversarial target",
+  "purpose": "External competitor target only. This file must never be interpreted as an integration dependency, managed runtime, bundled component or install recommendation for PaRuX.",
+  "competitor": {
+    "runtime": "NInfer",
+    "agent": "Hermes Agent / Nous Research",
+    "referenceHardware": "NVIDIA GeForce RTX 5090 32 GB",
+    "referenceModelFamily": "Qwen 27B NVFP4",
+    "notes": [
+      "NInfer is intentionally specialized for selected NVIDIA/Blackwell model paths; compare on identical hardware and model/quality wherever an exact common format is available.",
+      "Hermes Agent is evaluated as the agentic layer above inference: tools, memory, delegation, browser/computer use, MCP, scheduling, recovery and long-running autonomy.",
+      "The user's observed ~100 tok/s at ~180k context is a local observation and must not be treated as a repository-certified public benchmark until reproduced by the competitive runner."
+    ]
+  },
+  "fairness": {
+    "samePhysicalMachine": true,
+    "sameGpu": true,
+    "sameDriver": true,
+    "sameModelWeightsWherePossible": true,
+    "sameQuantizationQualityClass": true,
+    "samePromptBytes": true,
+    "sameRequestedOutputTokens": true,
+    "sequentialStacks": true,
+    "noCompetingGpuWorkload": true,
+    "minimumRunsPerCell": 3,
+    "thermalWarmupRuns": 1,
+    "publishOnlyMeasuredValues": true,
+    "neverPromoteFromVendorClaimsAlone": true
+  },
+  "inferenceMatrix": {
+    "contextTargetsTokens": [8192, 32768, 65536, 131072, 180000],
+    "concurrency": [1, 2, 4, 8],
+    "outputTokens": 512,
+    "metrics": [
+      "request_success_rate",
+      "time_to_first_token_ms",
+      "prompt_tokens_per_second",
+      "decode_tokens_per_second_per_request",
+      "aggregate_decode_tokens_per_second",
+      "end_to_end_ms",
+      "peak_vram_mib",
+      "average_gpu_power_w",
+      "peak_gpu_temperature_c",
+      "quality_guard_pass_rate"
+    ],
+    "promotionRules": {
+      "qualityRegressionTolerancePercent": 0.5,
+      "minimumSuccessRatePercent": 99.0,
+      "requireNoContextTruncation": true,
+      "requireNoSilentModelSubstitution": true,
+      "requireSustainedThermalRun": true,
+      "bestInClassRequiresWinAtAllMandatoryContexts": true
+    }
+  },
+  "agentMatrix": [
+    {
+      "id": "coding-multirepo",
+      "category": "coding",
+      "requirements": ["multi_repository", "isolated_worktree", "test_execution", "atomic_apply", "verifier_repair", "resume_after_restart"]
+    },
+    {
+      "id": "tool-use-recovery",
+      "category": "tools",
+      "requirements": ["schema_tool_calling", "bounded_retry", "tool_error_recovery", "permission_boundary", "audit_evidence"]
+    },
+    {
+      "id": "browser-computer-use",
+      "category": "computer_use",
+      "requirements": ["browser_devtools", "visual_context", "before_after_evidence", "bounded_actions", "recovery"]
+    },
+    {
+      "id": "durable-memory",
+      "category": "memory",
+      "requirements": ["session_recall", "durable_constraints", "decision_supersession", "contradiction_tracking", "cross_repository_context"]
+    },
+    {
+      "id": "delegation",
+      "category": "agents",
+      "requirements": ["subagent_delegation", "capability_scoping", "parallel_safe_work", "result_reconciliation", "failure_isolation"]
+    },
+    {
+      "id": "long-context-agent",
+      "category": "context",
+      "requirements": ["180k_context_stress", "constraint_recall", "needle_recall", "no_silent_truncation", "context_compaction_evidence"]
+    },
+    {
+      "id": "mcp",
+      "category": "protocol",
+      "requirements": ["mcp_discovery", "allowlist", "schema_routing", "telemetry", "tool_failure_recovery"]
+    },
+    {
+      "id": "automation",
+      "category": "autonomy",
+      "requirements": ["scheduled_work", "conditional_work", "durable_resume", "cancellation", "observability"]
+    },
+    {
+      "id": "offline-privacy",
+      "category": "product",
+      "requirements": ["fully_local_mode", "no_undeclared_network", "gaming_hard_off", "resource_budget", "backup_restore"]
+    }
+  ],
+  "decision": {
+    "runtimeWinner": "PaRuX may claim a runtime win only from same-machine measured evidence across the mandatory context/concurrency matrix with quality guards passing.",
+    "agentWinner": "PaRuX may claim an agent win only when it passes every mandatory capability scenario and has equal-or-better task completion/recovery evidence, not merely a larger feature list.",
+    "overallWinner": "Best-in-class requires both runtime and agent wins; neither layer can compensate for a failed mandatory gate in the other."
+  }
+}

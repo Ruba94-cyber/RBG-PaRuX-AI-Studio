@@ -1,0 +1,1265 @@
+{
+  "schemaVersion": 5,
+  "corpusVersion": "2.0.0",
+  "name": "PaRuX coding-agent self-contained corpus v2 (held-out + optimization)",
+  "description": "Small self-contained tasks (bug fix, feature, refactor, test writing) in C#, Python, TypeScript and JavaScript. Each task has a generated fixture, an independent hidden verifier and a separately stored reference solution. Regenerate with corpus-v2/corpus_tool.py build; validate with check; prove fail-before/pass-after with selftest. Supersedes parux-corpus.json (schemaVersion 3 smoke tasks, kept for orchestrator smoke runs) for any comparative claim.",
+  "evaluationPolicy": {
+    "absoluteSuccessFloorPercent": 70,
+    "claimSplit": "held-out",
+    "mandatoryCaseIds": [
+      "py-bug-lru-recency",
+      "py-refactor-extract-validators",
+      "js-feat-template-render",
+      "ts-bug-paginate",
+      "cs-bug-interval-overlap"
+    ],
+    "splitCounts": {
+      "held-out": 21,
+      "optimization": 15
+    },
+    "minimumHeldOutTasks": 15,
+    "tuningRule": "Prompts, tool policies, routing and model choices may be tuned ONLY against tasks with split=optimization. Tasks with split=held-out must never be read, run for tuning, or used to select configurations; any held-out run used for tuning permanently invalidates that corpusVersion for claims. A new held-out set requires a new corpusVersion.",
+    "budgetRule": "A task counts as solved only if the hidden verifier passes AND wall time <= budgets.timeSeconds AND, when the provider reports steps, steps <= budgets.steps. Providers that cannot report steps are recorded with stepsEnforced=false and cannot produce a WIN.",
+    "verifierIsolation": "The verifier is copied into the workspace only after the agent stops, from a hash-checked directory; edits to the fixture outside allowedChangedPathPrefixes fail the task."
+  },
+  "tasks": [
+    {
+      "id": "py-bug-slugify",
+      "language": "python",
+      "kind": "bugfix",
+      "split": "optimization",
+      "difficulty": "easy",
+      "goal": "The function slugify in src/slugify.py must lowercase text, replace every run of non-alphanumeric ASCII characters with a single hyphen, and never return a leading or trailing hyphen. Fix it without changing its signature.",
+      "toolchains": [
+        "python"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 300,
+        "steps": 25
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/py-bug-slugify/fixture",
+      "verifierDir": "corpus-v2/tasks/py-bug-slugify/verifier",
+      "referenceDir": "corpus-v2/tasks/py-bug-slugify/reference",
+      "fixtureSha256": "4e194c77b4765ad603f3056721deb95ead93ae51159f98db6d370f0e36564905",
+      "verifierSha256": "ccd88caefd2da2d8872b115615d7b3830a1ceba3c1994f098317eae95414be8b",
+      "referenceSha256": "fbc4e0ec51304253e417a44086d7969727583a563f53032fba77a7e50fefcd02"
+    },
+    {
+      "id": "py-bug-days-inclusive",
+      "language": "python",
+      "kind": "bugfix",
+      "split": "held-out",
+      "difficulty": "easy",
+      "goal": "days_inclusive(start, end) in src/daterange.py takes two datetime.date values and must return how many calendar days the range covers, counting both endpoints (same day -> 1). If end is before start it must raise ValueError. Fix the function.",
+      "toolchains": [
+        "python"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 300,
+        "steps": 25
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/py-bug-days-inclusive/fixture",
+      "verifierDir": "corpus-v2/tasks/py-bug-days-inclusive/verifier",
+      "referenceDir": "corpus-v2/tasks/py-bug-days-inclusive/reference",
+      "fixtureSha256": "f5f9b309248bedc793face36717f13da12282fd74e0742eafcbfacae5bbbd03b",
+      "verifierSha256": "6e4f7a6dff2e73327e2a1f23bbf137582d496578226d6b17a8eea97b66bd2965",
+      "referenceSha256": "0191a885a6fa1fc7dc810d2884da5ca93f9117a1c6051c7c5ca84099b56340b6"
+    },
+    {
+      "id": "py-bug-lru-recency",
+      "language": "python",
+      "kind": "bugfix",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "LRUCache in src/lru.py must evict the least recently USED entry when capacity is exceeded. Reads via get() and overwrites via put() both count as use. Right now it behaves like a FIFO cache. Fix it and keep the public API (get returns None for a miss).",
+      "toolchains": [
+        "python"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/py-bug-lru-recency/fixture",
+      "verifierDir": "corpus-v2/tasks/py-bug-lru-recency/verifier",
+      "referenceDir": "corpus-v2/tasks/py-bug-lru-recency/reference",
+      "fixtureSha256": "e692da2038f4df85463248f0e9b3536ee0e5cd80b906b3ffb575be28e10ea8c2",
+      "verifierSha256": "f72afc7fc34f48c8be0507d902ccb8864aa12a34736c8c2b53d0030a7dac85c9",
+      "referenceSha256": "44f44a66e2fae851be4a1304f33318b6359e6e59945942b78d5547df0d47626e"
+    },
+    {
+      "id": "py-bug-csv-quotes",
+      "language": "python",
+      "kind": "bugfix",
+      "split": "optimization",
+      "difficulty": "medium",
+      "goal": "split_csv_line in src/csvline.py splits one CSV line into fields. It must support double-quoted fields containing commas and doubled quotes (\"\" means a literal quote inside a quoted field). Right now quoted fields containing escaped quotes are corrupted. Fix it.",
+      "toolchains": [
+        "python"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/py-bug-csv-quotes/fixture",
+      "verifierDir": "corpus-v2/tasks/py-bug-csv-quotes/verifier",
+      "referenceDir": "corpus-v2/tasks/py-bug-csv-quotes/reference",
+      "fixtureSha256": "5b3dba92fc49b84979c364674ac6e1eccda7c4c5ff9eb5b377e4a30cf32bd951",
+      "verifierSha256": "8b855817a3e822f3a1685779766647c7549198d86e8f48e0456672344e83b3b3",
+      "referenceSha256": "5278b63348418f3c8f448760e7f9717305320bf78dda1459806ef00c6358aaf3"
+    },
+    {
+      "id": "py-feat-ttl-cache",
+      "language": "python",
+      "kind": "feature",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "Add time-to-live support to SimpleCache in src/ttlcache.py. The constructor must accept an optional clock callable (default time.monotonic). put(key, value, ttl=None) stores a value that expires ttl seconds later (ttl None = never expires); get(key, default=None) must not return expired entries and should drop them. Existing behaviour without ttl must be unchanged.",
+      "toolchains": [
+        "python"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 480,
+        "steps": 35
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/py-feat-ttl-cache/fixture",
+      "verifierDir": "corpus-v2/tasks/py-feat-ttl-cache/verifier",
+      "referenceDir": "corpus-v2/tasks/py-feat-ttl-cache/reference",
+      "fixtureSha256": "87f029d7436bee53882a703659c1436ad06964e67aa709e1c7ee3d5372bda389",
+      "verifierSha256": "f1587f8fc1ad076d7c2a535eecc210defb86101e73f00ff7d4ff997e2e517a74",
+      "referenceSha256": "6efbcd54702bb11daeb6b281d7a0a60b0660f321ad9b41adf5065aa0210e85ab"
+    },
+    {
+      "id": "py-feat-flag-parser",
+      "language": "python",
+      "kind": "feature",
+      "split": "optimization",
+      "difficulty": "medium",
+      "goal": "parse_args(argv) in src/flags.py returns (options, positionals). Extend it: support --key=value as well as --key value, a bare --flag becomes True, a repeated option collects values into a list, and a lone -- ends option parsing (everything after it is positional). Keep existing behaviour for plain positionals.",
+      "toolchains": [
+        "python"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 480,
+        "steps": 35
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/py-feat-flag-parser/fixture",
+      "verifierDir": "corpus-v2/tasks/py-feat-flag-parser/verifier",
+      "referenceDir": "corpus-v2/tasks/py-feat-flag-parser/reference",
+      "fixtureSha256": "5b7268ac8225373f258e828d1383afe72eef5525a347c7cb61a292e346552e92",
+      "verifierSha256": "06cd660f24938de9b7856d018ff9cfb9cbe330c2445d526ece1cd15bf8a6912a",
+      "referenceSha256": "11ab54f908ccd86edd44ae01388a4bde940b2e33421eb0f0759a577bd6a1a0b9"
+    },
+    {
+      "id": "py-feat-money-format",
+      "language": "python",
+      "kind": "feature",
+      "split": "held-out",
+      "difficulty": "easy",
+      "goal": "format_money(cents, currency=\"USD\") in src/money.py currently returns e.g. \"USD 5.00\". Extend it so amounts use thousands separators (\"USD 1,234.50\"), negative amounts are shown in parentheses (\"(USD 1,234.50)\"), and the currency code always stays in front, for any currency (\"EUR 1,000.00\"). Zero must be \"USD 0.00\". Use integer arithmetic only (no float rounding).",
+      "toolchains": [
+        "python"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 300,
+        "steps": 25
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/py-feat-money-format/fixture",
+      "verifierDir": "corpus-v2/tasks/py-feat-money-format/verifier",
+      "referenceDir": "corpus-v2/tasks/py-feat-money-format/reference",
+      "fixtureSha256": "3eed109123d8d2bb8546ef6370dd576120e562a07e774c621b1d8c293007839b",
+      "verifierSha256": "2804bfb8bd5ef6ce0d2192fa751c5d51a289e2cf0f809da61196ef9811b2c09f",
+      "referenceSha256": "d18b0ee9ae4e6b0a0daad77b69e804a82ad6b0b52c57c2a4ac4477714c87c9af"
+    },
+    {
+      "id": "py-refactor-pricing-dedupe",
+      "language": "python",
+      "kind": "refactor",
+      "split": "optimization",
+      "difficulty": "medium",
+      "goal": "src/pricing.py has three public functions (price_basic, price_plus, price_pro) that each repeat the same discount-and-tax arithmetic with different constants. Refactor so all three delegate to one private helper named _apply_pricing(base_cents, discount_percent, tax_percent). Public behaviour and results must stay identical (integer cents, round half up on each step).",
+      "toolchains": [
+        "python"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/py-refactor-pricing-dedupe/fixture",
+      "verifierDir": "corpus-v2/tasks/py-refactor-pricing-dedupe/verifier",
+      "referenceDir": "corpus-v2/tasks/py-refactor-pricing-dedupe/reference",
+      "fixtureSha256": "ead5358c8deba1cbd541fb0e4c24b6492903ea6c04411291fbd4a922558b55e1",
+      "verifierSha256": "f892e2aa99a848ffca6e074a64c96fe6659f0917aafb84998087ede9083db154",
+      "referenceSha256": "f1618e2692f48cb14ca2d1c259ad06f59d535b6b5f90ca96f2bb0a025d2336e0"
+    },
+    {
+      "id": "py-refactor-extract-validators",
+      "language": "python",
+      "kind": "refactor",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "src/app.py mixes request handling with input validators. Move is_email and is_port into a new module src/validators.py. app.py must import them from validators (so `app.is_email` still resolves) and must no longer define them itself. register(email, port) behaviour must not change.",
+      "toolchains": [
+        "python"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/py-refactor-extract-validators/fixture",
+      "verifierDir": "corpus-v2/tasks/py-refactor-extract-validators/verifier",
+      "referenceDir": "corpus-v2/tasks/py-refactor-extract-validators/reference",
+      "fixtureSha256": "6ad3010c79d6fc1d1728dc32d1ea029619f13b090bd8cdf4238698ec2e83a775",
+      "verifierSha256": "6c546576540fe981c8cd9278a898886cb6d25bff4947a434c2cf4cd833c71694",
+      "referenceSha256": "7fe527c328bca9cd60ef0c02e663a5cc444501d9699562c2cdd4d5c22fbc1a91"
+    },
+    {
+      "id": "py-test-stack",
+      "language": "python",
+      "kind": "testwriting",
+      "split": "optimization",
+      "difficulty": "easy",
+      "goal": "Write unit tests for the Stack class in src/stack.py as tests/test_stack.py using the standard unittest module (run with: python -m unittest tests.test_stack from the repository root, with PYTHONPATH=src). Cover push/pop order, peek, len, empty-stack errors and the max_size limit. Do not modify src/.",
+      "toolchains": [
+        "python"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "tests/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/py-test-stack/fixture",
+      "verifierDir": "corpus-v2/tasks/py-test-stack/verifier",
+      "referenceDir": "corpus-v2/tasks/py-test-stack/reference",
+      "fixtureSha256": "304428f247342c891e3c3c61481abc8f6b60ce4752abfa23a96e88cbf791b025",
+      "verifierSha256": "04fe63f34271ce9672c61e5cabaee9f36f322649d670619bf0f9029dd142c5ee",
+      "referenceSha256": "007ad8e3cd8ca8a4cb69fd12bd6d2b954c145ec9f27a6b5207955fc52ef4242e"
+    },
+    {
+      "id": "py-test-merge-intervals",
+      "language": "python",
+      "kind": "testwriting",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "Write unit tests for merge_intervals in src/intervals.py as tests/test_intervals.py using unittest (run with: python -m unittest tests.test_intervals from the repository root, PYTHONPATH=src). The tests must exercise unsorted input, touching intervals, nested intervals, empty input, and invalid intervals (start > end raises ValueError). Do not modify src/.",
+      "toolchains": [
+        "python"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 480,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "tests/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/py-test-merge-intervals/fixture",
+      "verifierDir": "corpus-v2/tasks/py-test-merge-intervals/verifier",
+      "referenceDir": "corpus-v2/tasks/py-test-merge-intervals/reference",
+      "fixtureSha256": "6ca07a8babd1e531d45b7bcb53a22ac328eb77de26b30cc1820a6af1d7c8296f",
+      "verifierSha256": "7dfe0da04d62d2e223fb41fe3c55784b347d04b7ebe8c91de5f769eab2e92bd8",
+      "referenceSha256": "bf877c14c896eeae585e4f929e0a26df60af3792f9a6dcfe3da52c07799afd42"
+    },
+    {
+      "id": "py-bug-retry-backoff",
+      "language": "python",
+      "kind": "bugfix",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "retry(fn, attempts, base_delay, max_delay, sleep) in src/retry.py should call fn up to `attempts` times. After failed attempt n (1-based) it sleeps min(base_delay * 2**(n-1), max_delay) seconds, but never sleeps after the final attempt; if all attempts fail it re-raises the last exception. The current code sleeps linearly and also sleeps after the last failure. Fix it.",
+      "toolchains": [
+        "python"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/py-bug-retry-backoff/fixture",
+      "verifierDir": "corpus-v2/tasks/py-bug-retry-backoff/verifier",
+      "referenceDir": "corpus-v2/tasks/py-bug-retry-backoff/reference",
+      "fixtureSha256": "605289056c69c95a471be18363762a8a7873c74e07c1d57add256771726ae478",
+      "verifierSha256": "db1f888c7318c22b393ec46a18cb588ea33db60f16721e90ec02bbd8a47f53cf",
+      "referenceSha256": "2b790baca03eba087525b636ce4e47e29d2871ff8b31ccc903b7cb87eae3e8c9"
+    },
+    {
+      "id": "js-bug-debounce-args",
+      "language": "javascript",
+      "kind": "bugfix",
+      "split": "optimization",
+      "difficulty": "medium",
+      "goal": "createDebouncer(fn, wait, timers) in src/debounce.js returns a debounced function. When called repeatedly within `wait`, only ONE call to fn must happen, using the arguments of the LAST call, and the pending timer must be cleared on each new call. `timers` is an object with setTimeout/clearTimeout (injected for testing). Currently it uses the first call arguments and leaks timers. Fix it.",
+      "toolchains": [
+        "node"
+      ],
+      "verifyCommand": [
+        "{node}",
+        ".verify/verify.js"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/js-bug-debounce-args/fixture",
+      "verifierDir": "corpus-v2/tasks/js-bug-debounce-args/verifier",
+      "referenceDir": "corpus-v2/tasks/js-bug-debounce-args/reference",
+      "fixtureSha256": "f6b8b51385eff4acaa68628e65107bbf6a35a6c113be7fd0f7587f0be8ae1267",
+      "verifierSha256": "08344e49cb8630f06c9b3082fc61a22bd46c04d2ae6438acfd262892c93ae086",
+      "referenceSha256": "2424a68c5bb98b38564e7d3f32546134579d18a43e2b07f6ba1e387e0de2a45c"
+    },
+    {
+      "id": "js-bug-deep-equal",
+      "language": "javascript",
+      "kind": "bugfix",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "deepEqual(a, b) in src/deepequal.js must compare plain objects, arrays, Dates (by time value) and primitives structurally. NaN equals NaN, an array never equals an object with the same keys, and objects with different key counts differ. Fix the current implementation (no external dependencies).",
+      "toolchains": [
+        "node"
+      ],
+      "verifyCommand": [
+        "{node}",
+        ".verify/verify.js"
+      ],
+      "budgets": {
+        "timeSeconds": 480,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/js-bug-deep-equal/fixture",
+      "verifierDir": "corpus-v2/tasks/js-bug-deep-equal/verifier",
+      "referenceDir": "corpus-v2/tasks/js-bug-deep-equal/reference",
+      "fixtureSha256": "72cc7a5e8465ad2504a3ae6cf0eac26edeb1176969602663b8b454cca40749d7",
+      "verifierSha256": "eb834616e9147bfe94e21eab8ac6e7db7447a6d8f045898834eceecd2db69bee",
+      "referenceSha256": "c210041b0e5db182fc7be162395208ba716b357436d2d09128b65bbf6bdcb8a1"
+    },
+    {
+      "id": "js-bug-flatten-depth",
+      "language": "javascript",
+      "kind": "bugfix",
+      "split": "held-out",
+      "difficulty": "easy",
+      "goal": "flatten(arr, depth = 1) in src/flatten.js must flatten nested arrays up to `depth` levels (depth 0 = no flattening; Infinity = fully). It currently flattens everything regardless of depth. It must not mutate its input. Fix it without using Array.prototype.flat.",
+      "toolchains": [
+        "node"
+      ],
+      "verifyCommand": [
+        "{node}",
+        ".verify/verify.js"
+      ],
+      "budgets": {
+        "timeSeconds": 300,
+        "steps": 25
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/js-bug-flatten-depth/fixture",
+      "verifierDir": "corpus-v2/tasks/js-bug-flatten-depth/verifier",
+      "referenceDir": "corpus-v2/tasks/js-bug-flatten-depth/reference",
+      "fixtureSha256": "a60cd7ca19117d4146cace6aea5beceb778b1326bf8c0545cd0ac9ab0e416acc",
+      "verifierSha256": "30d310fdef94bcbff532f9803e69a59bd97535337741420701b0a08d7dd9595c",
+      "referenceSha256": "35456dfa28338d95dfcb6f3804fcfc5953739c7d31cba937a0c9501a2e34e560"
+    },
+    {
+      "id": "js-feat-emitter-once-off",
+      "language": "javascript",
+      "kind": "feature",
+      "split": "optimization",
+      "difficulty": "medium",
+      "goal": "Extend Emitter in src/emitter.js with once(event, listener) (the listener runs at most one time) and off(event, listener) (removes a specific listener; removing an unknown listener is a no-op). emit must return true if any listener ran, false otherwise, and must keep working if a listener removes itself while emitting.",
+      "toolchains": [
+        "node"
+      ],
+      "verifyCommand": [
+        "{node}",
+        ".verify/verify.js"
+      ],
+      "budgets": {
+        "timeSeconds": 480,
+        "steps": 35
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/js-feat-emitter-once-off/fixture",
+      "verifierDir": "corpus-v2/tasks/js-feat-emitter-once-off/verifier",
+      "referenceDir": "corpus-v2/tasks/js-feat-emitter-once-off/reference",
+      "fixtureSha256": "dac3d52959e6293f08d5599734941e33c7127a8a9eed02e56af40707750c954a",
+      "verifierSha256": "06876ad6c3af6c9c97e5dbf8247fdc13700aa2d8d93d6458a4943ba6468cef20",
+      "referenceSha256": "fb0a9d8e74c30785c0dc8c70da2e25a74c737478d4a3c95f2f81aba1b47f9b85"
+    },
+    {
+      "id": "js-feat-template-render",
+      "language": "javascript",
+      "kind": "feature",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "render(template, data) in src/render.js replaces {{name}} placeholders. Extend it: support dotted paths ({{user.name}}), a fallback after a pipe ({{nick|friend}} uses \"friend\" when the value is undefined or null), and HTML-escape &, <, > and \" in substituted values. Unknown placeholders without fallback must render as an empty string. Whitespace inside braces ({{ name }}) is allowed.",
+      "toolchains": [
+        "node"
+      ],
+      "verifyCommand": [
+        "{node}",
+        ".verify/verify.js"
+      ],
+      "budgets": {
+        "timeSeconds": 540,
+        "steps": 35
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/js-feat-template-render/fixture",
+      "verifierDir": "corpus-v2/tasks/js-feat-template-render/verifier",
+      "referenceDir": "corpus-v2/tasks/js-feat-template-render/reference",
+      "fixtureSha256": "123d85f20cb5552d3c886f5cb81dafb2322b7e2638a8280bc2b7493a92266836",
+      "verifierSha256": "442276f6ba9739ee55605ab00d6e36f586d901d560eb9b8117bc642ddeb3a680",
+      "referenceSha256": "5780019e1a0d3c70ebc62924cb10342e88f51ad704380eb0a079f158b0945b6b"
+    },
+    {
+      "id": "js-refactor-async-await",
+      "language": "javascript",
+      "kind": "refactor",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "src/loader.js exposes loadUser(id, cb) built on a callback-style helper chain. Refactor it into `async function loadUser(id)` that returns a promise resolving to the same value {id, name, plan} and rejecting with the same error messages. Keep fetchRaw(id, cb) in src/loader.js exported and unchanged (it is the I/O boundary). loadUser must no longer take a callback.",
+      "toolchains": [
+        "node"
+      ],
+      "verifyCommand": [
+        "{node}",
+        ".verify/verify.js"
+      ],
+      "budgets": {
+        "timeSeconds": 540,
+        "steps": 35
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/js-refactor-async-await/fixture",
+      "verifierDir": "corpus-v2/tasks/js-refactor-async-await/verifier",
+      "referenceDir": "corpus-v2/tasks/js-refactor-async-await/reference",
+      "fixtureSha256": "9ac0e0766f2d6d870091432c8198054baffe5290efe0fe21ebf8d992ee163084",
+      "verifierSha256": "21c0948277b1daf15d90e0c64cac382c8b00c102e8189fdf8c6efb861b0802c5",
+      "referenceSha256": "7db0369a4e372252478963ba96987216a1c03bac3259f4c8c4a81a6696afb302"
+    },
+    {
+      "id": "js-test-chunk-uniq",
+      "language": "javascript",
+      "kind": "testwriting",
+      "split": "optimization",
+      "difficulty": "easy",
+      "goal": "Write tests for chunk and uniqueBy in src/lists.js as tests/lists.test.js using the built-in node:test and node:assert modules (run with: node --test tests/lists.test.js from the repository root). Cover chunk sizes, remainder chunk, invalid sizes (throws RangeError), uniqueBy keeping the first occurrence and preserving order. Do not modify src/.",
+      "toolchains": [
+        "python",
+        "node"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "tests/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/js-test-chunk-uniq/fixture",
+      "verifierDir": "corpus-v2/tasks/js-test-chunk-uniq/verifier",
+      "referenceDir": "corpus-v2/tasks/js-test-chunk-uniq/reference",
+      "fixtureSha256": "7f7ac4ee784d9e7b2635f035f50ac5bb11f62c30578c75875d2a2bc39e79182a",
+      "verifierSha256": "f0e617e4bc10d172ed55e54e42bac6569b7aaa8a41bd644ee6565fa4cc47471f",
+      "referenceSha256": "986b512053ff15a2511eb6c500ddafb53858430e86da52b3798df743d40192f6"
+    },
+    {
+      "id": "js-bug-query-parse",
+      "language": "javascript",
+      "kind": "bugfix",
+      "split": "optimization",
+      "difficulty": "medium",
+      "goal": "parseQuery(qs) in src/query.js parses a URL query string (with or without leading \"?\") into an object. Values must be percent-decoded and \"+\" means space; keys that appear more than once become arrays in order; a key without \"=\" maps to an empty string. Fix the current implementation.",
+      "toolchains": [
+        "node"
+      ],
+      "verifyCommand": [
+        "{node}",
+        ".verify/verify.js"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/js-bug-query-parse/fixture",
+      "verifierDir": "corpus-v2/tasks/js-bug-query-parse/verifier",
+      "referenceDir": "corpus-v2/tasks/js-bug-query-parse/reference",
+      "fixtureSha256": "d1171ab30243fb376cc88f3d0695790993194a4d107432e2b3c1a1aeefea99b6",
+      "verifierSha256": "fd7752ae6849efcd7caa5e4793c3b52a5ced1b4032acbb5cbe228f30e8191b26",
+      "referenceSha256": "75c5be80c34a2855a8542a46f024beba445d51164aacbd9217602393027aace2"
+    },
+    {
+      "id": "ts-bug-sortby-stable",
+      "language": "typescript",
+      "kind": "bugfix",
+      "split": "optimization",
+      "difficulty": "easy",
+      "goal": "sortBy<T>(items, key, order = \"asc\") in src/sort.ts must return a NEW array sorted by key(item), stable for equal keys, and support order \"desc\" (also stable). It currently mutates its input and ignores the order argument. Write erasable TypeScript only (no enums or namespaces); it is executed by Node type stripping, import siblings with the .ts extension.",
+      "toolchains": [
+        "node"
+      ],
+      "verifyCommand": [
+        "{node}",
+        ".verify/verify.ts"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/ts-bug-sortby-stable/fixture",
+      "verifierDir": "corpus-v2/tasks/ts-bug-sortby-stable/verifier",
+      "referenceDir": "corpus-v2/tasks/ts-bug-sortby-stable/reference",
+      "fixtureSha256": "88b2eadc3d73daece2191cf77f29e831467558bb9c80934d49b8fd9dd09f6557",
+      "verifierSha256": "883efd273e962fdacc3f272f6d0c20654d4efed8e3711059185bf80e2d9189bc",
+      "referenceSha256": "4d8d217a23e481ee09a8a6f11cb40dc6aadb3f56fed02a78efaf36a78ed55341"
+    },
+    {
+      "id": "ts-feat-result-combinators",
+      "language": "typescript",
+      "kind": "feature",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "src/result.ts defines a Result<T, E> union with ok()/err() constructors. Add exported helpers map(result, fn), mapErr(result, fn), andThen(result, fn) and unwrapOr(result, fallback): map/mapErr transform only their own side and pass the other through untouched; andThen chains a function returning a Result and short-circuits on err; unwrapOr returns the value or the fallback. Write erasable TypeScript only (no enums or namespaces); it is executed by Node type stripping, import siblings with the .ts extension.",
+      "toolchains": [
+        "node"
+      ],
+      "verifyCommand": [
+        "{node}",
+        ".verify/verify.ts"
+      ],
+      "budgets": {
+        "timeSeconds": 480,
+        "steps": 35
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/ts-feat-result-combinators/fixture",
+      "verifierDir": "corpus-v2/tasks/ts-feat-result-combinators/verifier",
+      "referenceDir": "corpus-v2/tasks/ts-feat-result-combinators/reference",
+      "fixtureSha256": "8f524f610e80dc59a4b2d7d054b72c5dc561da36878e2f6e2c7de63c35b9b60c",
+      "verifierSha256": "16b0e6a90b2c54d9e09fef78fa8eb7ef48d1b88c8a8a2223c58c182b0e2e7a2c",
+      "referenceSha256": "0f123ebd82c813fd024d54f8176365bcb5e1486c91a99ac1d851eac24ba165a3"
+    },
+    {
+      "id": "ts-bug-paginate",
+      "language": "typescript",
+      "kind": "bugfix",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "paginate(total, page, pageSize) in src/paginate.ts returns {page, pageSize, totalPages, offset, limit, hasPrev, hasNext}. totalPages is ceil(total/pageSize) with a minimum of 1; page is clamped into [1,totalPages]; offset is (page-1)*pageSize; limit is the number of items on that page (the last page may be short; an empty collection gives limit 0). pageSize must be a positive integer or a RangeError is thrown. Fix the existing implementation. Write erasable TypeScript only (no enums or namespaces); it is executed by Node type stripping, import siblings with the .ts extension.",
+      "toolchains": [
+        "node"
+      ],
+      "verifyCommand": [
+        "{node}",
+        ".verify/verify.ts"
+      ],
+      "budgets": {
+        "timeSeconds": 480,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/ts-bug-paginate/fixture",
+      "verifierDir": "corpus-v2/tasks/ts-bug-paginate/verifier",
+      "referenceDir": "corpus-v2/tasks/ts-bug-paginate/reference",
+      "fixtureSha256": "d2347e7f32beac74ea9ba7ed8c4ec6ba95f5f50f0ba42723f363fb5f7bd8b080",
+      "verifierSha256": "7eae1e10c7cf065cc10b88f223dcabf304f69756dc824e2f0ca5d318d8b1bbb3",
+      "referenceSha256": "e6c7b10ef7dcc7ec3781c41ae7bd334b10f3757b7a3f7f45c72983adf3930b32"
+    },
+    {
+      "id": "ts-refactor-switch-table",
+      "language": "typescript",
+      "kind": "refactor",
+      "split": "optimization",
+      "difficulty": "easy",
+      "goal": "shippingCost(region, weightKg) in src/shipping.ts is a long switch statement. Refactor it to a data-driven lookup table (a const object or Map of region -> {base, perKg}) with no `switch` statement left. Results must not change: unknown regions throw an Error whose message is \"unknown region: <region>\". Write erasable TypeScript only (no enums or namespaces); it is executed by Node type stripping, import siblings with the .ts extension.",
+      "toolchains": [
+        "node"
+      ],
+      "verifyCommand": [
+        "{node}",
+        ".verify/verify.ts"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/ts-refactor-switch-table/fixture",
+      "verifierDir": "corpus-v2/tasks/ts-refactor-switch-table/verifier",
+      "referenceDir": "corpus-v2/tasks/ts-refactor-switch-table/reference",
+      "fixtureSha256": "6338f183e1e0436c2357051371b1cf16e6ea8999f3a40be0b987a4792768a57a",
+      "verifierSha256": "9f5ff94cdf39b17daaa69936b85da47403ccc36b7fb13a10e59a7753220180c7",
+      "referenceSha256": "d3396bd87634d137bf752b65711ee85427445d9a56d6117b592bc544bd670797"
+    },
+    {
+      "id": "ts-feat-semver-prerelease",
+      "language": "typescript",
+      "kind": "feature",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "compareSemver(a, b) in src/semver.ts compares \"MAJOR.MINOR.PATCH\" strings and returns -1, 0 or 1. Extend it to support SemVer pre-release tags (\"1.0.0-alpha.1\"): a pre-release is lower than the same version without one; pre-release identifiers are compared left to right, numeric identifiers numerically, alphanumeric ones lexically, numeric lower than alphanumeric, and a shorter list is lower when all preceding identifiers are equal. Build metadata (+...) is ignored. Invalid input throws a TypeError. Write erasable TypeScript only (no enums or namespaces); it is executed by Node type stripping, import siblings with the .ts extension.",
+      "toolchains": [
+        "node"
+      ],
+      "verifyCommand": [
+        "{node}",
+        ".verify/verify.ts"
+      ],
+      "budgets": {
+        "timeSeconds": 600,
+        "steps": 40
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/ts-feat-semver-prerelease/fixture",
+      "verifierDir": "corpus-v2/tasks/ts-feat-semver-prerelease/verifier",
+      "referenceDir": "corpus-v2/tasks/ts-feat-semver-prerelease/reference",
+      "fixtureSha256": "7d1d9b1914812404a8e592a2b46f242254594a50f670184c8435409d78649da9",
+      "verifierSha256": "ede8cdfbf3bae45e5a6a0f55d576a2591c2e8c55422b759a91467ab1193263da",
+      "referenceSha256": "354ede59bb451a571f4ac12a6d0bd3b845de19199f1a507ea525cd556d70a96e"
+    },
+    {
+      "id": "ts-test-password-policy",
+      "language": "typescript",
+      "kind": "testwriting",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "Write tests for validatePassword in src/policy.ts as tests/policy.test.ts using node:test and node:assert (run with: node --test tests/policy.test.ts from the repository root). Cover the minimum length, each required character class, the forbidden substring rule, and boundary lengths. Do not modify src/. Write erasable TypeScript only; import src with the .ts extension.",
+      "toolchains": [
+        "python",
+        "node"
+      ],
+      "verifyCommand": [
+        "{python}",
+        "-B",
+        ".verify/verify.py"
+      ],
+      "budgets": {
+        "timeSeconds": 480,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "tests/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/ts-test-password-policy/fixture",
+      "verifierDir": "corpus-v2/tasks/ts-test-password-policy/verifier",
+      "referenceDir": "corpus-v2/tasks/ts-test-password-policy/reference",
+      "fixtureSha256": "9d6c6259c55e96c1cbf6a48725061209d0ee50981798c65851b90529952deea8",
+      "verifierSha256": "21d7f5535e25995188ea8cfd76e57d1f51897244208990499f692760de0b3c84",
+      "referenceSha256": "52f55bd75413d81142bc90b59cecec9fe66fca748c2e4ffc1c5c0822e97d6384"
+    },
+    {
+      "id": "cs-bug-percentile",
+      "language": "csharp",
+      "kind": "bugfix",
+      "split": "optimization",
+      "difficulty": "medium",
+      "goal": "Stats.Percentile(IReadOnlyList<double> values, double p) in src/Stats.cs must return the p-th percentile (0..100) using linear interpolation between closest ranks on the SORTED values (rank = p/100 * (n-1)). It must not reorder the caller's list, must throw ArgumentException for an empty list and ArgumentOutOfRangeException when p is outside 0..100. Fix it. All types live in the global namespace in src/. Do not add a Main method or change src/Lib.csproj.",
+      "toolchains": [
+        "dotnet"
+      ],
+      "verifyCommand": [
+        "{dotnet}",
+        "run",
+        "--project",
+        ".verify/Verify.csproj",
+        "-c",
+        "Release",
+        "--nologo",
+        "-v",
+        "q"
+      ],
+      "budgets": {
+        "timeSeconds": 600,
+        "steps": 35
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/cs-bug-percentile/fixture",
+      "verifierDir": "corpus-v2/tasks/cs-bug-percentile/verifier",
+      "referenceDir": "corpus-v2/tasks/cs-bug-percentile/reference",
+      "fixtureSha256": "c21b8896979a8d7a42cc45bdbe2065248a1b7147ec10ec7d4fb3def5868b23e3",
+      "verifierSha256": "e06335f88957df2ea487b0a79184bc4e0901d84a5d5dafacea08cb753de89d5f",
+      "referenceSha256": "ace37484686dfe5387a1471626c132eea4383fff42446d3edb3b49da0a5e9e30"
+    },
+    {
+      "id": "cs-bug-wordwrap",
+      "language": "csharp",
+      "kind": "bugfix",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "TextTools.Wrap(string text, int width) in src/TextTools.cs must greedily wrap on single spaces so no line exceeds `width` characters (a single word longer than width stays alone on its line, unbroken). Words are separated by any amount of whitespace, lines are joined with \"\\n\", and there is no trailing newline or trailing space. width < 1 throws ArgumentOutOfRangeException. Empty/whitespace text returns \"\". Fix the current implementation. All types live in the global namespace in src/. Do not add a Main method or change src/Lib.csproj.",
+      "toolchains": [
+        "dotnet"
+      ],
+      "verifyCommand": [
+        "{dotnet}",
+        "run",
+        "--project",
+        ".verify/Verify.csproj",
+        "-c",
+        "Release",
+        "--nologo",
+        "-v",
+        "q"
+      ],
+      "budgets": {
+        "timeSeconds": 600,
+        "steps": 35
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/cs-bug-wordwrap/fixture",
+      "verifierDir": "corpus-v2/tasks/cs-bug-wordwrap/verifier",
+      "referenceDir": "corpus-v2/tasks/cs-bug-wordwrap/reference",
+      "fixtureSha256": "9afc11cf334c534804b0b5da6012dde8a5ff58d06e2644870d7def8776ad1bbc",
+      "verifierSha256": "f05b162b3d44f34b2660b303945502dd09753a3952c1de4e8358c9151a7b7e37",
+      "referenceSha256": "775cd07678cff7cb5c8ca1b780b8f1e60dcc7c47c3fbcc70e90decf1740ecc5b"
+    },
+    {
+      "id": "cs-bug-interval-overlap",
+      "language": "csharp",
+      "kind": "bugfix",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "Booking.Overlaps(a, b) and Booking.FindConflicts(existing, candidate) in src/Booking.cs decide whether half-open time ranges [Start, End) collide. Two ranges overlap only when each starts strictly before the other ends, so back-to-back bookings (a.End == b.Start) do NOT conflict, and a booking that fully contains another does conflict. FindConflicts returns the existing bookings that overlap the candidate, in original order. A range with End <= Start is invalid and must throw ArgumentException in Overlaps. Fix the current logic. All types live in the global namespace in src/. Do not add a Main method or change src/Lib.csproj.",
+      "toolchains": [
+        "dotnet"
+      ],
+      "verifyCommand": [
+        "{dotnet}",
+        "run",
+        "--project",
+        ".verify/Verify.csproj",
+        "-c",
+        "Release",
+        "--nologo",
+        "-v",
+        "q"
+      ],
+      "budgets": {
+        "timeSeconds": 600,
+        "steps": 35
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/cs-bug-interval-overlap/fixture",
+      "verifierDir": "corpus-v2/tasks/cs-bug-interval-overlap/verifier",
+      "referenceDir": "corpus-v2/tasks/cs-bug-interval-overlap/reference",
+      "fixtureSha256": "3da380f8ea38f7a7b7beb7369bd8f05f4df431b60bcd32e4070a48137718534b",
+      "verifierSha256": "cc1a48346ac9e8965c749081c478850bc583d414eba7af2f92091b0c78c1cd41",
+      "referenceSha256": "d24d4466f48c18b34752f1392938edf70ffd329d9cac97f1c912ecc6d761a4ff"
+    },
+    {
+      "id": "cs-feat-token-bucket",
+      "language": "csharp",
+      "kind": "feature",
+      "split": "optimization",
+      "difficulty": "medium",
+      "goal": "Implement TokenBucket in src/TokenBucket.cs. Constructor TokenBucket(int capacity, double refillPerSecond, Func<DateTime> clock). It starts full. bool TryAcquire(int tokens = 1) refills based on elapsed clock time (fractional tokens accumulate, never exceeding capacity), then consumes `tokens` if enough are available and returns true, else consumes nothing and returns false. tokens < 1 or > capacity throws ArgumentOutOfRangeException. Property double Available reports the current (refilled) token count. All types live in the global namespace in src/. Do not add a Main method or change src/Lib.csproj.",
+      "toolchains": [
+        "dotnet"
+      ],
+      "verifyCommand": [
+        "{dotnet}",
+        "run",
+        "--project",
+        ".verify/Verify.csproj",
+        "-c",
+        "Release",
+        "--nologo",
+        "-v",
+        "q"
+      ],
+      "budgets": {
+        "timeSeconds": 600,
+        "steps": 35
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/cs-feat-token-bucket/fixture",
+      "verifierDir": "corpus-v2/tasks/cs-feat-token-bucket/verifier",
+      "referenceDir": "corpus-v2/tasks/cs-feat-token-bucket/reference",
+      "fixtureSha256": "60d2bd63eea459cacdc891f1dc09263f98c73a2af9e485b6c91428572dd90051",
+      "verifierSha256": "a690da004d0f447663c41b46dfae5c45866a95ec642262ec332f690b87dd3206",
+      "referenceSha256": "ac1d14bfa1f7e60578292bacd9fadabced9ce9dbcfcf6303f3bd10fd29f17d6a"
+    },
+    {
+      "id": "cs-feat-csv-escape",
+      "language": "csharp",
+      "kind": "feature",
+      "split": "held-out",
+      "difficulty": "easy",
+      "goal": "CsvWriter.Row(IEnumerable<string> fields) in src/CsvWriter.cs currently joins fields with commas. Make it RFC 4180 compliant: a field that contains a comma, a double quote, CR or LF is wrapped in double quotes with embedded quotes doubled; null becomes an empty field; other fields are untouched. Add CsvWriter.Table(IEnumerable<IEnumerable<string>> rows) that joins rows with \"\\r\\n\" (no trailing line break). All types live in the global namespace in src/. Do not add a Main method or change src/Lib.csproj.",
+      "toolchains": [
+        "dotnet"
+      ],
+      "verifyCommand": [
+        "{dotnet}",
+        "run",
+        "--project",
+        ".verify/Verify.csproj",
+        "-c",
+        "Release",
+        "--nologo",
+        "-v",
+        "q"
+      ],
+      "budgets": {
+        "timeSeconds": 480,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/cs-feat-csv-escape/fixture",
+      "verifierDir": "corpus-v2/tasks/cs-feat-csv-escape/verifier",
+      "referenceDir": "corpus-v2/tasks/cs-feat-csv-escape/reference",
+      "fixtureSha256": "8abffdfa460f70248b981c9322b5f6260e1d0bbd4269bfcfbad2af07a67f3e12",
+      "verifierSha256": "d7fa4786e8257a554bb876ec9bbb9c2d9801422ecebcee6d62d5ab3f8398b2a0",
+      "referenceSha256": "ed9a8029ba154fbcf60a778fd5a08854d4d95829cbc448ec40a829e4f7d637f8"
+    },
+    {
+      "id": "cs-feat-inventory-reserve",
+      "language": "csharp",
+      "kind": "feature",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "Inventory in src/Inventory.cs tracks stock per SKU. Add Reserve(string sku, int qty) returning a reservation id (int, starting at 1 and increasing), Release(int reservationId) which returns the quantity to available stock (releasing an unknown or already released id returns false, otherwise true), and Commit(int reservationId) which permanently removes reserved stock (returns false for unknown ids). Available(sku) = stock minus active reservations. Reserve must throw InvalidOperationException when qty exceeds Available, and ArgumentOutOfRangeException when qty < 1. Unknown SKUs have 0 stock. All types live in the global namespace in src/. Do not add a Main method or change src/Lib.csproj.",
+      "toolchains": [
+        "dotnet"
+      ],
+      "verifyCommand": [
+        "{dotnet}",
+        "run",
+        "--project",
+        ".verify/Verify.csproj",
+        "-c",
+        "Release",
+        "--nologo",
+        "-v",
+        "q"
+      ],
+      "budgets": {
+        "timeSeconds": 600,
+        "steps": 35
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/cs-feat-inventory-reserve/fixture",
+      "verifierDir": "corpus-v2/tasks/cs-feat-inventory-reserve/verifier",
+      "referenceDir": "corpus-v2/tasks/cs-feat-inventory-reserve/reference",
+      "fixtureSha256": "7843e2f3271df76a57efd31b35d5a57eda44a802c81e52cdfa48e75ef9b1b2ea",
+      "verifierSha256": "14a7733075af1aebe189a59afc04bd5f618070ebd45649081be27ede4404bbf6",
+      "referenceSha256": "a9f5aaa2510ce63460771599df9ed6abe2c06287d02eab20aac96b8a5633394e"
+    },
+    {
+      "id": "cs-refactor-discount-table",
+      "language": "csharp",
+      "kind": "refactor",
+      "split": "optimization",
+      "difficulty": "easy",
+      "goal": "DiscountPolicy.Percent(string customerTier) in src/DiscountPolicy.cs uses a chain of if/else-if statements. Refactor it to a static readonly Dictionary<string,int> lookup (case-insensitive keys) with no `else if` left in the file. Behaviour must be identical: unknown or null tiers give 0. All types live in the global namespace in src/. Do not add a Main method or change src/Lib.csproj.",
+      "toolchains": [
+        "dotnet"
+      ],
+      "verifyCommand": [
+        "{dotnet}",
+        "run",
+        "--project",
+        ".verify/Verify.csproj",
+        "-c",
+        "Release",
+        "--nologo",
+        "-v",
+        "q"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 30
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/cs-refactor-discount-table/fixture",
+      "verifierDir": "corpus-v2/tasks/cs-refactor-discount-table/verifier",
+      "referenceDir": "corpus-v2/tasks/cs-refactor-discount-table/reference",
+      "fixtureSha256": "b8d2052b596b771897a17f959e9192d05b438293f16fe4e101754cfd05b7a2c0",
+      "verifierSha256": "c745e08fcb492436c7649e3605aa3be339cd0f7933dc17dd8e4aac003c0e2998",
+      "referenceSha256": "76d037cf692a05dff7a3f99f3d2f4ee139a5019bbe3d99b9bc771705e26453f6"
+    },
+    {
+      "id": "cs-refactor-extract-tax",
+      "language": "csharp",
+      "kind": "refactor",
+      "split": "held-out",
+      "difficulty": "medium",
+      "goal": "Order in src/Order.cs computes tax inline. Extract the tax computation into a new public class TaxCalculator (src/TaxCalculator.cs) with an instance method `decimal Tax(decimal netAmount, string countryCode)` and have Order.Total() call it. Rates: \"DE\" 19%, \"FR\" 20%, \"IT\" 22%, \"US\" 0%; unknown countries throw ArgumentException. Round tax to 2 decimals using MidpointRounding.AwayFromZero. Order must keep its constructor and Total() behaviour, and must no longer contain the rate numbers itself. All types live in the global namespace in src/. Do not add a Main method or change src/Lib.csproj.",
+      "toolchains": [
+        "dotnet"
+      ],
+      "verifyCommand": [
+        "{dotnet}",
+        "run",
+        "--project",
+        ".verify/Verify.csproj",
+        "-c",
+        "Release",
+        "--nologo",
+        "-v",
+        "q"
+      ],
+      "budgets": {
+        "timeSeconds": 600,
+        "steps": 35
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/cs-refactor-extract-tax/fixture",
+      "verifierDir": "corpus-v2/tasks/cs-refactor-extract-tax/verifier",
+      "referenceDir": "corpus-v2/tasks/cs-refactor-extract-tax/reference",
+      "fixtureSha256": "274a2e100e0cd2681b80667cb962eb3aaf76ac561d90d830ebc9497cd7637216",
+      "verifierSha256": "81f0983373d7dca551f51681e3eb590ba067c532bb17a2e6a412f6a434f6e5f9",
+      "referenceSha256": "d1f57edbb467f5ebb58e7a2ed989f4e86ace130cda15dfd5ea51681dec9daf73"
+    },
+    {
+      "id": "cs-bug-expire-sessions",
+      "language": "csharp",
+      "kind": "bugfix",
+      "split": "optimization",
+      "difficulty": "easy",
+      "goal": "SessionStore.ExpireOlderThan(DateTime cutoff) in src/SessionStore.cs must remove every session whose LastSeen is strictly before the cutoff and return how many were removed. It currently throws InvalidOperationException because it removes items from the list while enumerating it. Fix it. All types live in the global namespace in src/. Do not add a Main method or change src/Lib.csproj.",
+      "toolchains": [
+        "dotnet"
+      ],
+      "verifyCommand": [
+        "{dotnet}",
+        "run",
+        "--project",
+        ".verify/Verify.csproj",
+        "-c",
+        "Release",
+        "--nologo",
+        "-v",
+        "q"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 25
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/cs-bug-expire-sessions/fixture",
+      "verifierDir": "corpus-v2/tasks/cs-bug-expire-sessions/verifier",
+      "referenceDir": "corpus-v2/tasks/cs-bug-expire-sessions/reference",
+      "fixtureSha256": "13ced9f02adcfcc7664f113fa105a7de921885210f2b32f0304286f279630aa5",
+      "verifierSha256": "763cf2b25377496a2431ad1e027bf39bcffa8d2a55d07c4cb58f46aec2eb64e9",
+      "referenceSha256": "f32ba7a9cbae8a091126364952e57825ac28bc538d35ee97dda34fcac2ea91af"
+    },
+    {
+      "id": "cs-bug-header-lookup",
+      "language": "csharp",
+      "kind": "bugfix",
+      "split": "held-out",
+      "difficulty": "easy",
+      "goal": "HeaderBag in src/HeaderBag.cs stores HTTP headers. Header names are case-insensitive: Set(\"Content-Type\", ...) then Get(\"content-type\") must find it, Set with a different casing replaces the value, Remove must work in any casing, and Names must still return the name casing used by the most recent Set. Get returns null when absent. Fix the implementation. All types live in the global namespace in src/. Do not add a Main method or change src/Lib.csproj.",
+      "toolchains": [
+        "dotnet"
+      ],
+      "verifyCommand": [
+        "{dotnet}",
+        "run",
+        "--project",
+        ".verify/Verify.csproj",
+        "-c",
+        "Release",
+        "--nologo",
+        "-v",
+        "q"
+      ],
+      "budgets": {
+        "timeSeconds": 420,
+        "steps": 25
+      },
+      "allowedChangedPathPrefixes": [
+        "src/"
+      ],
+      "expectedBaseline": {
+        "verifierFailsOnFixture": true,
+        "verifierPassesWithReference": true
+      },
+      "fixtureDir": "corpus-v2/tasks/cs-bug-header-lookup/fixture",
+      "verifierDir": "corpus-v2/tasks/cs-bug-header-lookup/verifier",
+      "referenceDir": "corpus-v2/tasks/cs-bug-header-lookup/reference",
+      "fixtureSha256": "c1067f1ba4e3e521db3f07096fa987dd066dee95a144cfe01382390ed4306363",
+      "verifierSha256": "3ba519e62beb2a5abd85667261d274578cef36ac2c78510e19387d7118151fc4",
+      "referenceSha256": "b6b0c11ba77259987d8e42eb37c6d7cf57be62d006b2ba699710083d4f448c3c"
+    }
+  ]
+}

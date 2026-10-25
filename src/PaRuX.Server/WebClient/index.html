@@ -1,0 +1,752 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>PaRuX</title>
+<!--
+  Served on loopback to the desktop token, and - once browser access is switched on - to a signed-in
+  browser session reaching PaRuX through a reverse proxy on this machine.
+
+  Built from nothing but this file: no CDN, no font host, no analytics. A product whose whole claim
+  is that it runs on your machine cannot have a client that phones out to render itself, and a
+  headless Core is frequently on a box with no outbound access at all. The Content-Security-Policy
+  the server sends makes that the browser's rule rather than a promise.
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfd; --panel: #fff; --sunken: #f3f3f7; --ink: #16161a; --muted: #6b6b76;
+    --line: #e4e4ea; --accent: #4a3aff; --accent-ink: #fff; --warn: #b23c17; --ok: #1f7a4d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #131317; --panel: #1b1b21; --sunken: #16161b; --ink: #ececf1; --muted: #9a9aa6;
+            --line: #2c2c35; --accent: #9d92ff; --accent-ink: #16161a; --warn: #ff9a6c; --ok: #5ad19b; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); overflow: hidden;
+         font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+  #shell { display: grid; grid-template-columns: 15rem 1fr; height: 100vh; }
+  nav { background: var(--sunken); border-right: 1px solid var(--line); display: flex;
+        flex-direction: column; min-height: 0; }
+  .brand { padding: .95rem 1rem .6rem; font-weight: 700; letter-spacing: .02em; }
+  .model-choice { display: flex; align-items: center; gap: .35rem; font-size: .8rem; }
+  .brand small { display: block; font-weight: 400; font-size: .72rem; color: var(--muted); }
+  .tabs { display: flex; flex-direction: column; padding: .35rem .5rem; gap: 1px; }
+  .tab { text-align: left; padding: .45rem .6rem; border-radius: .4rem; border: 0; cursor: pointer;
+         background: transparent; color: var(--ink); font: inherit; font-size: .88rem; }
+  .tab:hover { background: var(--panel); }
+  .tab[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+  .navfoot { margin-top: auto; padding: .6rem .75rem; border-top: 1px solid var(--line);
+             font-size: .74rem; color: var(--muted); }
+  .navfoot button { margin-top: .4rem; }
+
+  main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .page { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .page.active { display: flex; }
+  .topbar { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+            padding: .6rem .95rem; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .topbar h1 { font-size: .98rem; margin: 0 auto 0 0; }
+  .scroll { flex: 1; overflow-y: auto; padding: 1rem; min-height: 0; }
+
+  select, input[type=text], input[type=password], textarea {
+    padding: .38rem .5rem; font: inherit; font-size: .86rem; color: inherit; background: var(--bg);
+    border: 1px solid var(--line); border-radius: .4rem; }
+  textarea { width: 100%; resize: vertical; }
+  button { padding: .4rem .75rem; font: inherit; font-size: .86rem; border-radius: .4rem;
+           border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+  button.danger { color: var(--warn); }
+  button[disabled] { opacity: .5; cursor: default; }
+  label.field { display: block; margin-bottom: .8rem; font-size: .8rem; color: var(--muted); }
+  label.field > span { display: block; margin-bottom: .25rem; }
+
+  .dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--muted); display: inline-block; }
+  .dot.ok { background: var(--ok); } .dot.bad { background: var(--warn); }
+
+  /* Chat */
+  #chatpage { display: none; }
+  #chatpage.active { display: grid; grid-template-columns: 14rem 1fr; min-height: 0; }
+  .convlist { border-right: 1px solid var(--line); overflow-y: auto; padding: .5rem; min-height: 0; }
+  .conv { display: flex; align-items: center; gap: .3rem; }
+  .conv > button.open { flex: 1; text-align: left; border: 0; background: transparent; padding: .4rem .5rem;
+        border-radius: .4rem; font-size: .82rem; color: var(--ink); cursor: pointer; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; }
+  .conv > button.open:hover { background: var(--panel); }
+  .conv[data-active="true"] > button.open { background: var(--panel); font-weight: 600; }
+  .conv > button.del { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: .2rem .35rem; }
+  .chatmain { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  #log { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .9rem; }
+  .turn { padding: .7rem .9rem; border: 1px solid var(--line); border-radius: .6rem; background: var(--panel);
+          max-width: 54rem; }
+  .turn.user { background: transparent; border-style: dashed; margin-left: auto; }
+  .who { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: .3rem; }
+  .body { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .note { font-size: .76rem; color: var(--muted); margin-top: .4rem; overflow-wrap: anywhere; }
+  .note.leaving { color: var(--warn); font-weight: 600; }
+  .composer { border-top: 1px solid var(--line); background: var(--panel); padding: .7rem .95rem;
+              display: flex; gap: .55rem; align-items: flex-end; }
+  .composer textarea { min-height: 3rem; max-height: 40vh; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th, td { text-align: left; padding: .42rem .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: .6rem;
+          padding: .9rem 1rem; margin-bottom: .9rem; max-width: 44rem; }
+  .card h3 { margin: 0 0 .25rem; font-size: .92rem; }
+  .card p.hint { margin: 0 0 .7rem; font-size: .8rem; color: var(--muted); }
+  .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+  .msg { font-size: .82rem; margin-top: .5rem; min-height: 1.1rem; }
+  .msg.bad { color: var(--warn); } .msg.good { color: var(--ok); }
+  .empty { color: var(--muted); font-size: .85rem; padding: 1rem 0; }
+
+  @media (max-width: 800px) {
+    #shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    nav { flex-direction: row; align-items: center; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+    .brand { display: none; } .tabs { flex-direction: row; } .navfoot { display: none; }
+    #chatpage.active { grid-template-columns: 1fr; } .convlist { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="shell">
+  <nav>
+    <div class="brand">PaRuX<small id="brandsub">local AI</small></div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-page="chat" aria-selected="true">Chat</button>
+      <button class="tab" role="tab" data-page="models">Models</button>
+      <button class="tab" role="tab" data-page="runtime">Runtime</button>
+      <button class="tab" role="tab" data-page="settings">Settings</button>
+    </div>
+    <div class="navfoot">
+      <div id="navstatus"><span class="dot"></span> connecting…</div>
+      <button id="signout" hidden>Sign out</button>
+    </div>
+  </nav>
+
+  <main>
+    <!-- Chat -->
+    <section class="page active" id="chatpage">
+      <div class="convlist">
+        <button class="primary" id="newchat" style="width:100%;margin-bottom:.5rem">New chat</button>
+        <div id="convs"></div>
+      </div>
+      <div class="chatmain">
+        <div class="topbar">
+          <h1 id="convtitle">New chat</h1>
+          <label class="model-choice">Mode<select id="mode" title="Model selection mode">
+            <option value="auto">Auto</option>
+            <option value="standard">Standard</option>
+            <option value="uncensored">Uncensored</option>
+          </select></label>
+          <label class="model-choice">Model<select id="modelpick" title="Model"><option value="">Auto — let PaRuX choose</option></select></label>
+        </div>
+        <div id="log"></div>
+        <form class="composer" id="composer">
+          <textarea id="prompt" aria-label="Message PaRuX" placeholder="Ask PaRuX… (Enter to send, Shift+Enter for a new line)" autofocus></textarea>
+          <button class="primary" id="send" type="submit">Send</button>
+          <button id="stop" type="button" hidden>Stop</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Models -->
+    <section class="page" id="modelspage">
+      <div class="topbar"><h1>Models</h1><button id="refreshmodels">Refresh</button></div>
+      <div class="scroll">
+        <div id="modelsmsg" class="msg"></div>
+        <table><thead><tr><th>Model</th><th>Size</th><th>Quant</th><th></th></tr></thead>
+          <tbody id="modelsbody"></tbody></table>
+      </div>
+    </section>
+
+    <!-- Runtime -->
+    <section class="page" id="runtimepage">
+      <div class="topbar"><h1>Runtime</h1><button id="refreshruntime">Refresh</button></div>
+      <div class="scroll" id="runtimebody"></div>
+    </section>
+
+    <!-- Settings -->
+    <section class="page" id="settingspage">
+      <div class="topbar"><h1>Settings</h1></div>
+      <div class="scroll">
+        <div class="card">
+          <h3>Web search</h3>
+          <p class="hint">Off by default. When on, an explicit request like "search the web for…" runs
+            one keyless search and reads the top results. Inference always stays local.</p>
+          <div class="row">
+            <button id="netoff">Turn off</button>
+            <button id="neton">Turn on</button>
+            <span id="netstate" class="msg"></span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>This session</h3>
+          <p class="hint">You are signed in to PaRuX from a browser. Inference runs on the PC serving
+            this page; nothing is sent to a cloud provider.</p>
+          <div id="sessioninfo" class="msg"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // Two ways in, deliberately. The desktop launches this page with its own token in the URL,
+  // because a browser cannot set a header on a navigation; the token is moved into sessionStorage
+  // and stripped from the address bar at once, so it does not sit in history, a bookmark or a
+  // screenshot. Everyone else arrives with a session cookie the browser holds and script cannot
+  // read, and echoes the CSRF token the sign-in call handed back.
+  const url = new URL(location.href);
+  const fromQuery = url.searchParams.get("token");
+  if (fromQuery) {
+    try { sessionStorage.setItem("parux-token", fromQuery); } catch { /* private mode */ }
+    url.searchParams.delete("token");
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }
+  let token = fromQuery;
+  if (!token) { try { token = sessionStorage.getItem("parux-token"); } catch { token = null; } }
+  let csrf = null;
+  try { csrf = sessionStorage.getItem("parux_csrf"); } catch { csrf = null; }
+
+  const $ = (id) => document.getElementById(id);
+
+  function headers(extra) {
+    const base = {};
+    if (token) base["X-PaRuX-Token"] = token;
+    if (csrf) base["X-PaRuX-Csrf"] = csrf;
+    return Object.assign(base, extra || {});
+  }
+
+  async function api(path, options) {
+    const opts = Object.assign({ credentials: "same-origin" }, options || {});
+    // The browser client carries the PaRuX token on each API request. Never let fetch forward it
+    // while automatically following a redirect to a different endpoint.
+    opts.redirect = "error";
+    opts.headers = headers(opts.headers);
+    const response = await fetch(path, opts);
+    if (response.status === 401) { location.replace("/app/login"); throw new Error("Signed out."); }
+    return response;
+  }
+
+  async function json(path, options) {
+    const response = await api(path, options);
+    if (!response.ok) {
+      let detail = "";
+      try { detail = (await response.json()).error || ""; } catch { /* not json */ }
+      throw new Error(detail || ("HTTP " + response.status));
+    }
+    if (response.status === 204) return null;
+    return response.json();
+  }
+
+  /* ---------------------------------------------------------------- navigation */
+
+  const pages = { chat: "chatpage", models: "modelspage", runtime: "runtimepage", settings: "settingspage" };
+  const loaders = {};
+
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => show(tab.dataset.page));
+  });
+
+  function show(name) {
+    document.querySelectorAll(".tab").forEach((tab) =>
+      tab.setAttribute("aria-selected", String(tab.dataset.page === name)));
+    Object.keys(pages).forEach((key) => {
+      $(pages[key]).classList.toggle("active", key === name);
+    });
+    if (loaders[name]) loaders[name]();
+  }
+
+  /* ---------------------------------------------------------------- chat */
+
+  const log = $("log");
+  let messages = [];
+  let conversationId = null;
+  let streaming = false;
+  let abort = null;
+
+  function addTurn(who, text) {
+    const turn = document.createElement("div");
+    turn.className = "turn " + (who === "You" ? "user" : "assistant");
+    const label = document.createElement("div");
+    label.className = "who";
+    label.textContent = who;
+    const body = document.createElement("div");
+    body.className = "body";
+    body.textContent = text;
+    turn.append(label, body);
+    log.append(turn);
+    log.scrollTop = log.scrollHeight;
+    return { turn, body };
+  }
+
+  function addNote(turn, text, leaving) {
+    const note = document.createElement("div");
+    note.className = "note" + (leaving ? " leaving" : "");
+    note.textContent = text;
+    turn.append(note);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function renderMessages() {
+    log.replaceChildren();
+    messages.forEach((message) => {
+      if (message.role === "system") return;
+      addTurn(message.role === "user" ? "You" : "PaRuX", message.content);
+    });
+  }
+
+  async function send(text) {
+    messages.push({ role: "user", content: text });
+    addTurn("You", text);
+    const { turn, body } = addTurn("PaRuX", "");
+
+    const payload = { messages: messages, stream: true };
+    const mode = $("mode").value;
+    if (mode !== "auto") payload.role = mode;
+    const picked = $("modelpick").value;
+    if (picked) payload.model = picked;
+
+    abort = new AbortController();
+    let response;
+    try {
+      response = await api("/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: abort.signal
+      });
+    } catch (failure) {
+      if (failure.name === "AbortError") { addNote(turn, "Stopped."); return; }
+      addNote(turn, "Could not reach PaRuX Core: " + failure.message, true);
+      return;
+    }
+
+    if (!response.ok) {
+      let detail = "";
+      try { detail = (await response.json()).error || ""; } catch { detail = await response.text(); }
+      addNote(turn, "HTTP " + response.status + (detail ? " — " + detail : ""), true);
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let answer = "";
+
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let cut;
+        while ((cut = buffer.indexOf("\n\n")) >= 0) {
+          const frame = buffer.slice(0, cut).trim();
+          buffer = buffer.slice(cut + 2);
+          if (!frame.startsWith("data:")) continue;
+          const data = frame.slice(5).trim();
+          if (data === "[DONE]") { buffer = ""; break; }
+
+          let parsed;
+          try { parsed = JSON.parse(data); } catch { continue; }
+
+          if (parsed.parux_event === "cloud_fallback") {
+            // Announced before the first token, in the colour reserved for it: the user should know
+            // this turn left the machine before they read the answer, not after.
+            addNote(turn, "Answered by " + parsed.provider + (parsed.model ? " (" + parsed.model + ")" : "")
+              + " — this turn left your machine. Local inference: " + (parsed.reason || "unavailable"), true);
+            continue;
+          }
+          if (parsed.parux_event === "model_routed") {
+            addNote(turn, "Model · " + (parsed.selectedModel || "configured model")
+              + (parsed.engineId ? " · " + parsed.engineId : ""));
+            continue;
+          }
+          if (parsed.parux_event === "context_compacted") {
+            addNote(turn, parsed.explanation || "Older messages were compacted to fit the model's context.");
+            continue;
+          }
+          if (parsed.parux_event === "rag_sources" && Array.isArray(parsed.files) && parsed.files.length) {
+            addNote(turn, "Sources: " + parsed.files.join(", "));
+            continue;
+          }
+          if (parsed.parux_event) continue;
+          if (parsed.error) { addNote(turn, parsed.error.message || "The model reported an error.", true); continue; }
+
+          const delta = parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
+          if (delta && typeof delta.content === "string") {
+            answer += delta.content;
+            body.textContent = answer;
+            log.scrollTop = log.scrollHeight;
+          }
+        }
+      }
+    } catch (failure) {
+      if (failure.name === "AbortError") addNote(turn, "Stopped.");
+      else addNote(turn, failure.message, true);
+    }
+
+    if (answer) { messages.push({ role: "assistant", content: answer }); await persist(); }
+    else if (!turn.querySelector(".note")) addNote(turn, "The model returned nothing.", true);
+  }
+
+  /* Conversations are stored through the same endpoints the desktop app uses, so a chat started in
+     the browser is the same chat when the desktop app is opened, and the other way round. */
+  async function persist() {
+    const now = new Date().toISOString();
+    const first = messages.find((message) => message.role === "user");
+    const title = first ? first.content.slice(0, 60) : "New chat";
+    const doc = JSON.stringify({ messages: messages });
+    try {
+      if (!conversationId) {
+        conversationId = "web-" + Date.now().toString(36) + "-" +
+          Math.random().toString(36).slice(2, 8);
+      }
+      await json("/api/v1/conversations/" + encodeURIComponent(conversationId), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title, createdUtc: now, updatedUtc: now, documentJson: doc })
+      });
+      $("convtitle").textContent = title;
+      await loadConversations();
+    } catch (failure) { /* a chat that cannot be saved must still be usable */ }
+  }
+
+  async function loadConversations() {
+    let list;
+    try { list = await json("/api/v1/conversations"); } catch { return; }
+    const host = $("convs");
+    host.replaceChildren();
+    if (!Array.isArray(list) || !list.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "No saved chats yet.";
+      host.append(empty);
+      return;
+    }
+    list.sort((a, b) => (b.updatedUtc || "").localeCompare(a.updatedUtc || ""));
+    list.forEach((summary) => {
+      const row = document.createElement("div");
+      row.className = "conv";
+      row.dataset.active = String(summary.id === conversationId);
+
+      const open = document.createElement("button");
+      open.className = "open";
+      open.textContent = summary.title || "Untitled";
+      open.title = summary.title || "Untitled";
+      open.addEventListener("click", () => openConversation(summary.id));
+
+      const remove = document.createElement("button");
+      remove.className = "del";
+      remove.textContent = "×";
+      remove.title = "Delete this chat";
+      // The visible "×" is read aloud as "times"; name the action and the chat it deletes.
+      remove.setAttribute("aria-label", "Delete chat: " + (summary.title || "Untitled"));
+      remove.addEventListener("click", async () => {
+        try { await json("/api/v1/conversations/" + encodeURIComponent(summary.id), { method: "DELETE" }); }
+        catch { /* already gone */ }
+        if (summary.id === conversationId) newChat();
+        await loadConversations();
+      });
+
+      row.append(open, remove);
+      host.append(row);
+    });
+  }
+
+  async function openConversation(id) {
+    try {
+      const doc = await json("/api/v1/conversations/" + encodeURIComponent(id));
+      let parsed = {};
+      try { parsed = JSON.parse(doc.documentJson || "{}"); } catch { parsed = {}; }
+      messages = Array.isArray(parsed.messages) ? parsed.messages : [];
+      conversationId = id;
+      $("convtitle").textContent = doc.title || "Untitled";
+      renderMessages();
+      await loadConversations();
+    } catch (failure) { /* leave the current chat alone */ }
+  }
+
+  function newChat() {
+    messages = [];
+    conversationId = null;
+    $("convtitle").textContent = "New chat";
+    log.replaceChildren();
+    $("prompt").focus();
+  }
+
+  $("newchat").addEventListener("click", () => { newChat(); loadConversations(); });
+
+  $("composer").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const text = $("prompt").value.trim();
+    if (!text || streaming) return;
+    streaming = true;
+    $("send").disabled = true;
+    $("stop").hidden = false;
+    $("prompt").value = "";
+    try { await send(text); }
+    finally {
+      streaming = false; abort = null;
+      $("send").disabled = false; $("stop").hidden = true; $("prompt").focus();
+    }
+  });
+
+  $("stop").addEventListener("click", () => { if (abort) abort.abort(); });
+
+  $("prompt").addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      $("composer").requestSubmit();
+    }
+  });
+
+  loaders.chat = loadConversations;
+
+  /* ---------------------------------------------------------------- models */
+
+  function formatSize(bytes) {
+    if (!bytes) return "—";
+    const gb = bytes / (1024 * 1024 * 1024);
+    return gb >= 1 ? gb.toFixed(1) + " GB" : (bytes / (1024 * 1024)).toFixed(0) + " MB";
+  }
+
+  async function loadModels() {
+    const body = $("modelsbody");
+    const msg = $("modelsmsg");
+    msg.className = "msg";
+    msg.textContent = "";
+    let list;
+    try { list = await json("/api/v1/models/library"); }
+    catch (failure) { msg.className = "msg bad"; msg.textContent = failure.message; return; }
+
+    const models = Array.isArray(list) ? list : (list && list.models) || [];
+    body.replaceChildren();
+    const picker = $("modelpick");
+    const chosen = picker.value;
+    picker.replaceChildren();
+    const auto = document.createElement("option");
+    auto.value = ""; auto.textContent = "Auto — let PaRuX choose";
+    picker.append(auto);
+
+    if (!models.length) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 4; cell.className = "empty";
+      cell.textContent = "No models in the library yet. Download one from the desktop app's Model Hub.";
+      row.append(cell); body.append(row);
+      return;
+    }
+
+    models.forEach((model) => {
+      const row = document.createElement("tr");
+      const name = document.createElement("td");
+      name.textContent = model.alias || model.fileName;
+      const size = document.createElement("td");
+      size.textContent = formatSize(model.sizeBytes);
+      const quant = document.createElement("td");
+      quant.textContent = model.quantization || "—";
+      const action = document.createElement("td");
+
+      const load = document.createElement("button");
+      load.textContent = "Load";
+      load.addEventListener("click", async () => {
+        load.disabled = true; load.textContent = "Loading…";
+        msg.className = "msg"; msg.textContent = "Loading " + (model.alias || model.fileName) + "…";
+        try {
+          await json("/api/v1/models/library/" + encodeURIComponent(model.fileName) + "/load", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ role: "standard" })
+          });
+          msg.className = "msg good"; msg.textContent = "Loaded.";
+          refreshStatus();
+        } catch (failure) { msg.className = "msg bad"; msg.textContent = failure.message; }
+        finally { load.disabled = false; load.textContent = "Load"; }
+      });
+      action.append(load);
+
+      row.append(name, size, quant, action);
+      body.append(row);
+
+      const option = document.createElement("option");
+      option.value = model.fileName;
+      option.textContent = model.alias || model.fileName;
+      picker.append(option);
+    });
+    picker.value = chosen;
+  }
+
+  $("refreshmodels").addEventListener("click", loadModels);
+  loaders.models = loadModels;
+
+  /* ---------------------------------------------------------------- runtime */
+
+  async function loadRuntime() {
+    const host = $("runtimebody");
+    let status;
+    try { status = await json("/api/v1/runtime/status"); }
+    catch (failure) {
+      host.replaceChildren();
+      const bad = document.createElement("div");
+      bad.className = "msg bad"; bad.textContent = failure.message;
+      host.append(bad);
+      return;
+    }
+
+    host.replaceChildren();
+
+    const active = document.createElement("div");
+    active.className = "card";
+    const heading = document.createElement("h3");
+    heading.textContent = "Active model";
+    const detail = document.createElement("p");
+    detail.className = "hint";
+    detail.textContent = (status.activeProfile || "none")
+      + (status.activeModelPath ? " · " + status.activeModelPath.split(/[\\/]/).pop() : "")
+      + " · role " + (status.activeRole || "standard");
+    active.append(heading, detail);
+
+    const unload = document.createElement("button");
+    unload.textContent = "Unload model";
+    unload.addEventListener("click", async () => {
+      unload.disabled = true;
+      try { await json("/api/v1/models/library/unload", { method: "POST" }); }
+      catch { /* reported by the refresh below */ }
+      unload.disabled = false;
+      loadRuntime(); refreshStatus();
+    });
+    active.append(unload);
+    host.append(active);
+
+    const backends = document.createElement("div");
+    backends.className = "card";
+    const bh = document.createElement("h3");
+    bh.textContent = "Backends";
+    backends.append(bh);
+    const table = document.createElement("table");
+    const head = document.createElement("thead");
+    head.innerHTML = "<tr><th>Backend</th><th>Installed</th><th>Running</th><th>Healthy</th></tr>";
+    const tbody = document.createElement("tbody");
+    (status.backends || []).forEach((backend) => {
+      const row = document.createElement("tr");
+      ["backend", "installed", "running", "healthy"].forEach((key) => {
+        const cell = document.createElement("td");
+        cell.textContent = typeof backend[key] === "boolean" ? (backend[key] ? "yes" : "no") : backend[key];
+        row.append(cell);
+      });
+      tbody.append(row);
+    });
+    table.append(head, tbody);
+    backends.append(table);
+    host.append(backends);
+
+    const machine = document.createElement("div");
+    machine.className = "card";
+    const mh = document.createElement("h3");
+    mh.textContent = "This machine";
+    const md = document.createElement("p");
+    md.className = "hint";
+    const ram = status.ramTotalBytes ? (status.ramTotalBytes / (1024 ** 3)).toFixed(0) + " GB RAM" : "";
+    const adapters = (status.gpuAdapters || [])
+      .filter((adapter) => !adapter.isSoftware)
+      .map((adapter) => adapter.name).join(", ");
+    md.textContent = [ram, adapters || "no GPU adapter reported"].filter(Boolean).join(" · ");
+    machine.append(mh, md);
+    host.append(machine);
+  }
+
+  $("refreshruntime").addEventListener("click", loadRuntime);
+  loaders.runtime = loadRuntime;
+
+  /* ---------------------------------------------------------------- settings */
+
+  async function loadSettings() {
+    const state = $("netstate");
+    try {
+      const internet = await json("/api/v1/internet");
+      state.className = "msg " + (internet.enabled ? "good" : "");
+      state.textContent = internet.enabled ? "On" : "Off";
+    } catch (failure) { state.className = "msg bad"; state.textContent = failure.message; }
+
+    const info = $("sessioninfo");
+    try {
+      const session = await json("/api/v1/web/session");
+      info.textContent = session.authenticated
+        ? "Signed in with a browser session on this device."
+        : "Using the desktop token from this machine.";
+    } catch { info.textContent = "Using the desktop token from this machine."; }
+  }
+
+  async function setInternet(enabled) {
+    const state = $("netstate");
+    try {
+      await json("/api/v1/internet", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: enabled })
+      });
+      state.className = "msg " + (enabled ? "good" : "");
+      state.textContent = enabled ? "On" : "Off";
+    } catch (failure) { state.className = "msg bad"; state.textContent = failure.message; }
+  }
+
+  $("neton").addEventListener("click", () => setInternet(true));
+  $("netoff").addEventListener("click", () => setInternet(false));
+  loaders.settings = loadSettings;
+
+  /* ---------------------------------------------------------------- status */
+
+  async function refreshStatus() {
+    const host = $("navstatus");
+    host.replaceChildren();
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    const text = document.createElement("span");
+    host.append(dot, document.createTextNode(" "), text);
+    try {
+      const health = await json("/api/v1/health");
+      dot.classList.add(health.providerReady ? "ok" : "bad");
+      text.textContent = health.providerReady
+        ? (health.gamingMode ? "Gaming Mode" : "model ready")
+        : "no model loaded";
+    } catch (failure) {
+      dot.classList.add("bad");
+      text.textContent = "Core unreachable";
+    }
+  }
+
+  $("signout").addEventListener("click", async () => {
+    try { await api("/api/v1/web/session", { method: "DELETE" }); } catch { /* going anyway */ }
+    try { sessionStorage.removeItem("parux_csrf"); } catch { /* private mode */ }
+    location.replace("/app/login");
+  });
+
+  (async () => {
+    // A browser session shows Sign out; the desktop's own window has nothing to sign out of.
+    try {
+      const session = await json("/api/v1/web/session");
+      if (session && session.authenticated) {
+        $("signout").hidden = false;
+        if (session.csrfToken) {
+          csrf = session.csrfToken;
+          try { sessionStorage.setItem("parux_csrf", csrf); } catch { /* private mode */ }
+        }
+      }
+    } catch { /* desktop token path */ }
+
+    refreshStatus();
+    loadModels();
+    loadConversations();
+    setInterval(refreshStatus, 15000);
+  })();
+})();
+</script>
+</body>
+</html>

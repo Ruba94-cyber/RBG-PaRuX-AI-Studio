@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="PaRuX.Views.OnboardingView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <Grid Background="{ThemeResource PaRuXSurfaceAppBrush}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24,20,24,32">
+            <StackPanel Spacing="{StaticResource PaRuXSpaceXL}" MaxWidth="760"
+                        HorizontalAlignment="Center" Margin="0,28,0,36">
+
+                <StackPanel Spacing="{StaticResource PaRuXSpaceXS}">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}" VerticalAlignment="Center">
+                        <ContentControl Width="48" Height="48"
+                            ContentTemplate="{StaticResource PrxOrbitMarkTemplate}" IsHitTestVisible="False" />
+                        <TextBlock Text="Welcome to PaRuX" Style="{StaticResource PaRuXDisplayTextStyle}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource PaRuXBodyTextStyle}" TextWrapping="Wrap"
+                        Text="The installer includes a verified llama.cpp Vulkan engine, so the baseline runtime needs no extra download. A chat model is still required: choose one below and download it when you are ready. Optional accelerators and media tools can be installed later."
+                        Margin="44,4,0,0" />
+                </StackPanel>
+
+                <!-- One primary action: detect, keep the runtime, pick a fitting model, download it
+                     (after licence review), assign roles and prove chat works. Every step is also
+                     available manually below. -->
+                <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                    <TextBlock Text="AUTOMATIC SETUP" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                    <Border x:Name="AutoSetupCard"
+                            AutomationProperties.AutomationId="Onboarding_AutoSetup_Card"
+                            AutomationProperties.Name="Automatic setup"
+                            Style="{StaticResource PaRuXCardStyle}">
+                        <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                            <TextBlock x:Name="AutoSetupHeadlineText"
+                                       AutomationProperties.AutomationId="Onboarding_AutoSetup_Headline_Text"
+                                       Text="Set up PaRuX in one step" TextWrapping="Wrap"
+                                       Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                            <TextBlock x:Name="AutoSetupDetailText"
+                                       AutomationProperties.AutomationId="Onboarding_AutoSetup_Detail_Text"
+                                       TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            <ProgressBar x:Name="AutoSetupProgress"
+                                         AutomationProperties.AutomationId="Onboarding_AutoSetup_Progress"
+                                         Minimum="0" Maximum="1" Visibility="Collapsed" />
+                            <TextBlock x:Name="AutoSetupProgressText"
+                                       AutomationProperties.AutomationId="Onboarding_AutoSetup_ProgressText"
+                                       Visibility="Collapsed" TextWrapping="Wrap"
+                                       Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}">
+                                <Button x:Name="AutoSetupStartButton"
+                                        AutomationProperties.AutomationId="Onboarding_AutoSetup_Start_Button"
+                                        Content="Set up automatically"
+                                        Style="{StaticResource AccentButtonStyle}" Click="AutoSetupStart_Click" />
+                                <Button x:Name="AutoSetupCancelButton"
+                                        AutomationProperties.AutomationId="Onboarding_AutoSetup_Cancel_Button"
+                                        Content="Cancel" Visibility="Collapsed" Click="AutoSetupCancel_Click" />
+                                <Button x:Name="AutoSetupRetryButton"
+                                        AutomationProperties.AutomationId="Onboarding_AutoSetup_Retry_Button"
+                                        Content="Retry" Visibility="Collapsed"
+                                        Style="{StaticResource AccentButtonStyle}" Click="AutoSetupRetry_Click" />
+                                <Button x:Name="AutoSetupSkipButton"
+                                        AutomationProperties.AutomationId="Onboarding_AutoSetup_Skip_Button"
+                                        Content="Skip" Visibility="Collapsed" Click="AutoSetupSkip_Click" />
+                            </StackPanel>
+                            <TextBlock AutomationProperties.AutomationId="Onboarding_AutoSetup_Manual_Text"
+                                       Text="Prefer to choose yourself? Everything below stays available: components, your first model and the local chat check."
+                                       TextWrapping="Wrap" Style="{StaticResource PaRuXMicroTextStyle}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- First-install effort and bundled runtime overview -->
+                <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                    <TextBlock Text="INSTALLATION &amp; BUNDLED RUNTIME" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                    <Border x:Name="BundledRuntimeOverviewCard"
+                            AutomationProperties.AutomationId="Onboarding_BundledRuntimeOverview_Card"
+                            Style="{StaticResource PaRuXCardStyle}">
+                        <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                            <StackPanel Spacing="{StaticResource PaRuXSpaceXS}">
+                                <TextBlock x:Name="BundledRuntimeHeadlineText"
+                                           AutomationProperties.AutomationId="Onboarding_BundledRuntimeHeadlineText"
+                                           Text="The installer includes the baseline text runtime; download a model to start chatting."
+                                           Style="{StaticResource PaRuXBodyTextStyle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock x:Name="BundledRuntimeSubheadText"
+                                           AutomationProperties.AutomationId="Onboarding_BundledRuntimeSubheadText"
+                                           Text="PaRuX bundles the verified llama.cpp Vulkan text runtime and package tooling directly in the installer."
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <!-- What is already bundled (0 B download) -->
+                            <Border Background="{ThemeResource PaRuXSurfaceSubtleBrush}" CornerRadius="6" Padding="12,10">
+                                <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                                    <TextBlock Text="ALREADY BUNDLED (0 B DOWNLOAD REQUIRED)"
+                                               FontSize="11" FontWeight="Bold" Opacity="0.85" />
+                                    <StackPanel x:Name="BundledItemsList"
+                                                AutomationProperties.AutomationId="Onboarding_BundledItems_List"
+                                                Spacing="{StaticResource PaRuXSpaceS}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- What will be downloaded (with sizes) -->
+                            <Border Background="{ThemeResource PaRuXSurfaceSubtleBrush}" CornerRadius="6" Padding="12,10">
+                                <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                                    <TextBlock Text="DOWNLOADED ONLY WHEN CHOSEN (ESTIMATED SIZES)"
+                                               FontSize="11" FontWeight="Bold" Opacity="0.85" />
+                                    <StackPanel x:Name="DownloadableItemsList"
+                                                AutomationProperties.AutomationId="Onboarding_DownloadableItems_List"
+                                                Spacing="{StaticResource PaRuXSpaceS}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Installer Hash Guidance -->
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="InstallerHashGuidanceText"
+                                           AutomationProperties.AutomationId="Onboarding_InstallerHashGuidance_Text"
+                                           Text="Verify installer integrity: run 'Get-FileHash -Algorithm SHA256 .\PaRuX-*.msi' in PowerShell and compare with SHA256SUMS.txt. See docs/AI_LOCAL_SETUP.md."
+                                           Style="{StaticResource PaRuXMicroTextStyle}" TextWrapping="Wrap" Opacity="0.8" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                    <TextBlock Text="LOCAL AI RUNTIME LOCATION" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                    <Border Style="{StaticResource PaRuXCardStyle}">
+                        <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                            <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
+                                 Text="PaRuX-managed runtimes, models, config and logs live here. An existing LocalAI folder is reused when detected; choosing another existing folder never deletes the old one." />
+                            <TextBlock x:Name="LocalAiRootText" Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" Text="Checking…" />
+                            <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="LocalAiRootBox" Grid.Column="0" PlaceholderText="Local AI root folder" IsReadOnly="True" />
+                                <Button Grid.Column="1" Content="Browse…" Click="LocalAiRootBrowse_Click" />
+                                <Button Grid.Column="2" Content="Save" Click="LocalAiRootSave_Click" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                    <Grid ColumnSpacing="{StaticResource PaRuXSpaceS}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Text="COMPONENTS" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                            <TextBlock Text="Detect → Locate existing / Install with PaRuX / Skip. User-managed software is never silently updated or replaced."
+                                       TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Refresh" Click="RefreshComponents_Click" VerticalAlignment="Bottom" />
+                    </Grid>
+                    <Border Style="{StaticResource PaRuXCardStyle}">
+                        <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
+                            <TextBlock x:Name="ComponentsStatusText" Text="Detecting components…"
+                                       TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            <ProgressBar x:Name="ComponentsProgress" IsIndeterminate="True" Visibility="Collapsed" />
+                            <StackPanel x:Name="ComponentsList" Spacing="{StaticResource PaRuXSpaceM}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- The step that was missing. Onboarding used to end with a runtime installed, no
+                     model, and a sentence telling the user to go and find one in Model Hub - which
+                     only helps somebody who already knows what to search for. -->
+                <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                    <TextBlock Text="YOUR FIRST MODEL" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                    <Border Style="{StaticResource PaRuXCardStyle}">
+                        <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                            <TextBlock
+                                Text="Choose a starter for general chat. PaRuX estimates hardware fit, but fit alone does not prove answer quality or speed. Coding, vision, image/video work and an uncensored content preference can use different models; nothing downloads until you choose it."
+                                TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            <TextBlock x:Name="FirstModelHardwareText" Text="Checking your hardware…"
+                                       TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            <TextBlock x:Name="FirstModelHeadlineText"
+                                       AutomationProperties.AutomationId="FirstModelHeadlineText" Visibility="Collapsed"
+                                       TextWrapping="Wrap" Style="{StaticResource PaRuXBodyTextStyle}" />
+                            <TextBlock x:Name="FirstModelDetailText" Visibility="Collapsed"
+                                       AutomationProperties.AutomationId="FirstModelDetailText"
+                                       TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            <TextBlock x:Name="FirstModelStorageText" Visibility="Visible"
+                                       AutomationProperties.AutomationId="FirstModelStorageText"
+                                       Text="Checking model storage…" TextWrapping="Wrap"
+                                       Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            <StackPanel x:Name="FirstModelActions" Orientation="Horizontal"
+                                        Spacing="{StaticResource PaRuXSpaceS}" Visibility="Collapsed">
+                                <Button x:Name="FirstModelInstallButton" Content="Get this model"
+                                        AutomationProperties.AutomationId="FirstModelInstallButton"
+                                        Style="{StaticResource AccentButtonStyle}" Click="FirstModelInstall_Click" />
+                                <Button x:Name="FirstModelOtherButton"
+                                        AutomationProperties.AutomationId="FirstModelOtherButton"
+                                        Content="Choose by task" Click="FirstModelOther_Click" />
+                            </StackPanel>
+                            <TextBlock x:Name="FirstModelStatusText" Visibility="Collapsed"
+                                       TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                            <StackPanel Spacing="{StaticResource PaRuXSpaceXS}">
+                                <TextBlock Text="DOWNLOAD PROGRESS" Style="{StaticResource PaRuXSectionHeaderTextStyle}"
+                                           AutomationProperties.AutomationId="FirstModelDownloadProgress_Header" />
+                                <TextBlock x:Name="FirstModelDownloadStatusText"
+                                           AutomationProperties.AutomationId="FirstModelDownloadProgress_Status"
+                                           Text="Checking downloads…" TextWrapping="Wrap"
+                                           Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                <StackPanel x:Name="FirstModelDownloadRows" Spacing="{StaticResource PaRuXSpaceS}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <Border Style="{StaticResource PaRuXCardStyle}">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                        <TextBlock Text="READY CHECK" Style="{StaticResource PaRuXSectionHeaderTextStyle}" />
+                        <TextBlock x:Name="SetupSummaryText" Text="Checking text runtime and model availability…"
+                                   TextWrapping="Wrap" Style="{StaticResource PaRuXBodyTextStyle}" />
+                        <Button x:Name="VerifyLocalChatButton"
+                                AutomationProperties.AutomationId="Onboarding_VerifyLocalChat_Button"
+                                Content="Verify local chat"
+                                HorizontalAlignment="Left" Click="VerifyLocalChat_Click" />
+                        <TextBlock x:Name="VerifyLocalChatStatusText"
+                                   AutomationProperties.AutomationId="Onboarding_VerifyLocalChat_Status"
+                                   Text="After installing a model, verify it can answer a one-time challenge. Cloud responses do not count."
+                                   TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <TextBlock Text="Downloads and changes happen only when you choose them. You can manage everything later in Settings."
+                                   TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="UnprovenReadinessCard"
+                        AutomationProperties.AutomationId="UnprovenReadinessCard"
+                        AutomationProperties.Name="Unproven readiness summary"
+                        Background="{ThemeResource PaRuXCautionSubtleBrush}"
+                        BorderBrush="{ThemeResource PaRuXCautionBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                        Padding="16"
+                        Visibility="Collapsed">
+                    <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
+                        <TextBlock Text="UNPROVEN READINESS"
+                                   AutomationProperties.AutomationId="UnprovenReadinessHeader"
+                                   Style="{StaticResource PaRuXSectionHeaderTextStyle}"
+                                   Foreground="{ThemeResource PaRuXCautionTextBrush}" />
+                        <TextBlock Text="The following items have not been verified. Completing setup now will enter Chat with unproven readiness:"
+                                   TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <TextBlock x:Name="UnprovenReadinessText"
+                                   AutomationProperties.AutomationId="UnprovenReadinessText"
+                                   TextWrapping="Wrap" Style="{StaticResource PaRuXBodyTextStyle}" />
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Spacing="{StaticResource PaRuXSpaceXS}" HorizontalAlignment="Right">
+                    <Button x:Name="GetStartedButton" Content="Get Started"
+                        Style="{StaticResource AccentButtonStyle}" MinWidth="140"
+                        HorizontalAlignment="Right" Click="GetStarted_Click" />
+                    <TextBlock Text="You can revisit runtime and model setup from Settings at any time."
+                        Style="{StaticResource PaRuXMicroTextStyle}" HorizontalAlignment="Right" />
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

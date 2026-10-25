@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="PaRuX.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="using:PaRuX.Views"
+    xmlns:tb="using:H.NotifyIcon"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="RBG PaRuX AI Studio"
+    AutomationProperties.AutomationId="MainWindow">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootGrid" SizeChanged="RootGrid_SizeChanged">
+        <tb:TaskbarIcon
+            x:Name="TrayIcon"
+            ToolTipText="RBG PaRuX AI Studio"
+            IconSource="Assets/prx-orbit-tray.ico">
+            <tb:TaskbarIcon.ContextFlyout>
+                <MenuFlyout>
+                    <MenuFlyoutItem x:Name="TrayOpenItem" Text="Open PaRuX" />
+                    <MenuFlyoutItem x:Name="TrayQuickChatItem" Text="Quick Chat" />
+                    <MenuFlyoutItem x:Name="TrayHideBubbleItem" Text="Hide Bubble" />
+                    <MenuFlyoutSeparator />
+                    <MenuFlyoutItem x:Name="TrayAiAutoItem" Text="AI Auto" />
+                    <MenuFlyoutItem x:Name="TrayAiOnItem" Text="AI On" />
+                    <MenuFlyoutItem x:Name="TrayAiOffItem" Text="AI Off" />
+                    <MenuFlyoutSeparator />
+                    <MenuFlyoutItem x:Name="TraySettingsItem" Text="Settings" />
+                    <MenuFlyoutItem x:Name="TrayExitItem" Text="Exit" />
+                </MenuFlyout>
+            </tb:TaskbarIcon.ContextFlyout>
+        </tb:TaskbarIcon>
+
+        <NavigationView
+            x:Name="NavView"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            PaneDisplayMode="Left"
+            OpenPaneLength="288"
+            CompactPaneLength="52"
+            IsPaneOpen="True"
+            IsPaneToggleButtonVisible="True"
+            Loaded="NavView_Loaded"
+            ItemInvoked="NavView_ItemInvoked"
+            BackRequested="NavView_BackRequested">
+
+            <NavigationView.MenuItems>
+                <NavigationViewItemHeader x:Name="WorkspaceSectionHeader" Content="Workspaces" />
+                <NavigationViewItem x:Name="ChatNavItem" AutomationProperties.AutomationId="Navigation_Chat_Item" AutomationProperties.Name="Chat, home workspace" Content="Chat" Tag="__chat__" SelectsOnInvoked="True" ToolTipService.ToolTip="Chat (Home workspace) - Return to current conversation and draft">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8BD;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="CreateNavItem" AutomationProperties.AutomationId="Navigation_Create_Item" Content="Create" Tag="__create__" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8B9;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="ProjectsNavItem" AutomationProperties.AutomationId="Navigation_Projects_Item" Content="Projects" Tag="__projects__" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8F1;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="ModelHubNavItem" AutomationProperties.AutomationId="Navigation_ModelHub_Item" Content="Model Hub" Tag="__modelhub__" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8B7;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="ModelRoutingNavItem" AutomationProperties.AutomationId="Navigation_ModelRouting_Item" Content="Model Intelligence" Tag="__modelrouting__" Visibility="Collapsed" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE945;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="LifecycleNavItem" AutomationProperties.AutomationId="Navigation_Lifecycle_Item" Content="Lifecycle Lab" Tag="__lifecycle__" Visibility="Collapsed" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D9;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="WorkflowNavItem" AutomationProperties.AutomationId="Navigation_Workflows_Item" Content="Workflows" Tag="__workflows__" Visibility="Collapsed" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8F3;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="ToolsNavItem" AutomationProperties.AutomationId="Navigation_Tools_Item" Content="Tools &amp; Automations" Tag="__tools__" Visibility="Collapsed" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE90F;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="ObservabilityNavItem" AutomationProperties.AutomationId="Navigation_Observability_Item" Content="Observability" Tag="__observability__" Visibility="Collapsed" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D2;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="UpdatesNavItem" AutomationProperties.AutomationId="Navigation_Updates_Item" Content="Updates" Tag="__updates__" Visibility="Collapsed" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE895;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="RuntimeNavItem" AutomationProperties.AutomationId="Navigation_Runtime_Item" Content="Runtime" Tag="__runtime__" Visibility="Collapsed" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE950;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="SettingsNavItem" AutomationProperties.AutomationId="Navigation_Settings_Item" Content="Settings" Tag="__settings__" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE713;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="HelpNavItem" AutomationProperties.AutomationId="Navigation_Help_Item" Content="Help" Tag="__help__" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE897;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <NavigationView.PaneHeader>
+                <StackPanel Margin="0,0,12,4" Spacing="{StaticResource PaRuXSpaceXS}">
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="{StaticResource PaRuXSpaceS}"
+                        VerticalAlignment="Center">
+                        <ContentControl Width="24" Height="24" ContentTemplate="{StaticResource PrxOrbitMarkTemplate}" IsHitTestVisible="False" />
+                        <TextBlock
+                            Text="PaRuX"
+                            FontFamily="{StaticResource PaRuXDisplayFontFamily}"
+                            FontSize="{StaticResource PaRuXFontSizeSubtitle}"
+                            FontWeight="SemiBold"
+                            Foreground="{ThemeResource PaRuXTextPrimaryBrush}"
+                            VerticalAlignment="Center" />
+                    </StackPanel>
+                    <ToggleSwitch
+                        x:Name="StudioModeToggle"
+                        AutomationProperties.AutomationId="MainWindow_StudioMode_Toggle"
+                        Header="Interface"
+                        OffContent="Simple"
+                        OnContent="Advanced"
+                        Toggled="StudioModeToggle_Toggled"
+                        ToolTipService.ToolTip="Advanced adds the model routing, runtime, lab, workflow, tools, observability and update workspaces to this sidebar. It changes what you can see, not how PaRuX answers." />
+                </StackPanel>
+            </NavigationView.PaneHeader>
+
+            <NavigationView.AutoSuggestBox>
+                <AutoSuggestBox
+                    x:Name="SearchBox"
+                    AutomationProperties.AutomationId="MainWindow_ChatSearch_TextBox"
+                    QueryIcon="Find"
+                    PlaceholderText="Search chats"
+                    CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                    TextChanged="SearchBox_TextChanged" />
+            </NavigationView.AutoSuggestBox>
+
+            <NavigationView.PaneCustomContent>
+                <Grid Margin="12,8,12,12" ColumnSpacing="{StaticResource PaRuXSpaceXS}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button
+                        x:Name="NewChatButton"
+                        AutomationProperties.AutomationId="MainWindow_NewChat_Button"
+                        AutomationProperties.Name="New chat"
+                        Grid.Column="0"
+                        Click="NewChat_Click"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left"
+                        Height="36"
+                        Padding="12,0,12,0"
+                        CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                        Background="{ThemeResource PaRuXBrandSubtleBrush}"
+                        BorderBrush="{ThemeResource PaRuXBrandBorderBrush}"
+                        BorderThickness="1"
+                        Foreground="{ThemeResource PaRuXBrandTextBrush}"
+                        ToolTipService.ToolTip="Start a new conversation">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE710;" FontSize="14" />
+                            <TextBlock Text="New chat" FontSize="{StaticResource PaRuXFontSizeBody}" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        x:Name="NewIncognitoChatButton"
+                        AutomationProperties.AutomationId="MainWindow_NewIncognitoChat_Button"
+                        AutomationProperties.Name="New incognito chat"
+                        Grid.Column="1"
+                        Click="NewIncognitoChat_Click"
+                        Width="36"
+                        Height="36"
+                        Padding="0"
+                        CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                        Background="{ThemeResource PaRuXSurfaceSubtleBrush}"
+                        BorderBrush="{ThemeResource PaRuXStrokeBrush}"
+                        BorderThickness="1"
+                        Foreground="{ThemeResource PaRuXTextSecondaryBrush}"
+                        ToolTipService.ToolTip="New incognito chat - never saved, on this PC or synced anywhere">
+                        <FontIcon Glyph="&#xED1A;" FontSize="14" />
+                    </Button>
+                </Grid>
+            </NavigationView.PaneCustomContent>
+
+            <Border
+                Background="{ThemeResource PaRuXSurfaceAppBrush}"
+                BorderBrush="{ThemeResource PaRuXStrokeBrush}"
+                BorderThickness="1,1,0,0"
+                CornerRadius="12,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Spacing="{StaticResource PaRuXSpaceXS}">
+                        <ToggleSwitch
+                            x:Name="ContentStudioModeToggle"
+                            AutomationProperties.AutomationId="MainWindow_StudioMode_Content_Toggle"
+                            Header="Interface"
+                            OffContent="Simple"
+                            OnContent="Advanced"
+                            Toggled="StudioModeToggle_Toggled"
+                            ToolTipService.ToolTip="Advanced adds the model routing, runtime, lab, workflow, tools, observability and update workspaces to this sidebar. It changes what you can see, not how PaRuX answers."
+                            Visibility="Collapsed"
+                            Margin="12,4,12,0" />
+                        <InfoBar
+                            x:Name="OnboardingReturnBanner"
+                            AutomationProperties.AutomationId="MainWindow_OnboardingReturn_Banner"
+                            IsOpen="False"
+                            IsClosable="False"
+                            Severity="Informational"
+                            Title="First-run setup in progress"
+                            Message="Find and download your model in Model Hub, then return to complete onboarding.">
+                            <InfoBar.ActionButton>
+                                <Button
+                                    x:Name="ReturnToOnboardingButton"
+                                    AutomationProperties.AutomationId="MainWindow_ReturnToOnboarding_Button"
+                                    Content="Return to Setup"
+                                    Click="ReturnToOnboardingButton_Click" />
+                            </InfoBar.ActionButton>
+                        </InfoBar>
+                    </StackPanel>
+
+                    <Grid Grid.Row="1">
+                        <views:CreateWorkspaceView x:Name="CreatePage" Visibility="Collapsed" />
+                        <views:ProjectsWorkspaceView x:Name="ProjectsPage" Visibility="Collapsed" />
+                        <views:ModelHubView x:Name="ModelHubPage" Visibility="Collapsed" />
+                        <views:ModelRoutingPanel x:Name="ModelRoutingPage" Visibility="Collapsed" />
+                        <views:LifecycleLabView x:Name="LifecycleLabPage" Visibility="Collapsed" />
+                        <views:WorkflowWorkspaceView x:Name="WorkflowPage" Visibility="Collapsed" />
+                        <views:ToolsAutomationView x:Name="ToolsAutomationPage" Visibility="Collapsed" />
+                        <views:ObservabilityView x:Name="ObservabilityPage" Visibility="Collapsed" />
+                        <views:UpdateManagerView x:Name="UpdateManagerPage" Visibility="Collapsed" />
+                        <views:RuntimeManagerView x:Name="RuntimeManagerPage" Visibility="Collapsed" />
+                        <views:ChatView x:Name="ChatPage" />
+                        <views:SettingsView x:Name="SettingsPage" Visibility="Collapsed" />
+                        <views:OnboardingView x:Name="OnboardingPage" Visibility="Collapsed" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </NavigationView>
+    </Grid>
+</Window>

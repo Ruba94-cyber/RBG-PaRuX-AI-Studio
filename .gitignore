@@ -1,0 +1,69 @@
+# Build and IDE output
+**/bin/
+**/obj/
+.vs/
+.serena/
+*.user
+*.suo
+build.log
+publish.log
+
+# Local publish/install artifacts
+artifacts/
+publish/
+installer/output/
+
+# Runtime state and private machine configuration
+data/
+logs/
+backups/
+
+# Coding Agent worktrees (vNext Multi-Agent Orchestrator) - each is a full,
+# disposable per-task git worktree the desktop Coding Agent creates and
+# operates in; never the user's own working copy, never meant to be committed.
+.parux-agents/
+# Worktrees created before the rename; still ignored so an existing checkout stays clean.
+.parux-agents/
+*.local.json
+*.private.json
+*.secrets.json
+# Avatar Studio: local-only provider engines (e.g. Duix) and their configs must
+# never be bundled, committed, or required in the public repository - the
+# public repo ships the AvatarProvider interface and a "no engine installed"
+# state only. Defense-in-depth: the actual runtimes also live outside the repo
+# tree entirely (%LOCALAPPDATA%\PaRuX\ai-runtimes\), so these patterns are a
+# backstop, not the only guard.
+local-providers/
+avatar.local.json
+*.pfx
+*.p12
+*.key
+*.pem
+.env
+.env.*
+!.env.example
+*.db
+*.db-wal
+*.db-shm
+
+# Android build/IDE output not already covered by src/PaRuX.Android/.gitignore
+**/.kotlin/
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# The original handoff report contains machine-specific implementation notes.
+docs/PHASE1_STATUS.md
+
+# Python bytecode cache - can appear under llama-cpp-conversion/ if the vendored scripts are
+# ever executed directly from the repo tree instead of the copied build output.
+__pycache__/
+*.pyc
+
+
+# dotnet test artifacts (.trx logs / coverage). Build output, not source.
+TestResults/
+
+# Unsloth writes its compiled-kernel cache next to whatever CWD a training/benchmark run used.
+unsloth_compiled_cache/
