@@ -178,16 +178,20 @@ public sealed class RealCodingTaskTests
     }
 
     [RealCodingFact("PARUX_REAL_CODING_WORKSPACE"), Trait("Category", "HardwareE2E"), Trait("Category", "PaRuXDogfood"), Trait("Category", "FlaUI")]
-    public void Public_clone_large_command_output_preview_keeps_test_summary_and_applies_through_real_chat()
+    public void Public_clone_large_evidence_preview_keeps_test_summary_and_applies_through_real_chat()
     {
         const string workspaceVariable = "PARUX_REAL_CODING_WORKSPACE";
         const string goal =
-            "Fix how PaRuX presents oversized coding-tool output to its local agent. CodingAgentService currently " +
-            "keeps only the beginning of output when adding a preview for a persisted artifact, so the final xUnit " +
-            "failure or pass summary can be hidden and the agent may repeat read_artifact at offset 0. First add a " +
-            "focused regression test for a bounded head-and-tail preview that preserves the final summary and marks " +
-            "the omitted middle, then run it and confirm a real assertion failure before changing production code. " +
-            "Keep the full artifact intact and use the helper from the command-output preview path. Then make the " +
+            "Fix prefix-only truncation in CodingAgentService. In its read_file branch around line 1542 and " +
+            "AppendArtifactHint around line 2185, large source and command outputs keep only their beginnings; " +
+            "the relevant method or final xUnit summary can be hidden, making the local agent repeat reads of " +
+            "the same artifact. Add a focused regression test in CodingAgentArtifactStoreTests for a bounded " +
+            "head-and-tail preview that preserves both the beginning and final summary and marks the omitted " +
+            "middle. First run it and confirm a real assertion failure before changing production code. Keep the " +
+            "full artifact intact, add the preview helper to CodingAgentArtifactStore, and use it in both " +
+            "CodingAgentService branches. Use read_file_range only for the test block and these source locations: " +
+            "CodingAgentArtifactStore near its constants, CodingAgentService lines 1542-1552 and 2182-2196. " +
+            "Do not use batch_read, whole-file reads, or explore unrelated code. Then make the " +
             "smallest fix and run: dotnet test tests\\PaRuX.Server.Tests\\PaRuX.Server.Tests.csproj -c Release " +
             "--filter FullyQualifiedName~CodingAgentArtifactStoreTests -v:q -p:GitRepositoryConfigurationScope=local " +
             "-p:NuGetAudit=false -p:RunAnalyzers=false. A build or Git-config access error is not a valid red test; " +
