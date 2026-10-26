@@ -472,6 +472,19 @@ namespace PaRuX.Server.Tests
         }
 
         [Fact]
+        public async Task Picker_RejectsAFileFarSmallerThanTheModelItClaimsToQuantise()
+        {
+            // The fixture model is estimated at 4 GB; a 0.5 GB file under its name is not a quantisation of it.
+            var candidate = MakeAdvice("FitsOnGpu").Candidates[0];
+            var choices = new List<ModelQuantChoice> { Choice("Q4_0", Gb / 2), Choice("Q4_K_M", 4 * Gb) };
+
+            ModelQuantChoice? picked = await AutoSetupModelPicker.PickQuantAsync(choices, candidate,
+                b => Task.FromResult(AutoSetupFit.Fits));
+
+            Assert.Equal("Q4_K_M", picked!.Quantization);
+        }
+
+        [Fact]
         public void Picker_ExcludesUncensoredAndRuntimeBlockedCandidates()
         {
             FirstModelAdvice advice = MakeAdvice("FitsOnGpu");

@@ -12,6 +12,23 @@ namespace PaRuX.Server.Tests;
 public sealed class GgufFileNamingTests
 {
     [Theory]
+    [InlineData("MTP/mtp-Qwen3.8-27B-Q4_0.gguf", true)]
+    [InlineData("mtp-Qwen3.8-27B-Q4_0.gguf", true)]
+    [InlineData("Qwen3.8-27B-MTP-Q8_0.gguf", true)]
+    [InlineData("draft/Qwen3-0.6B-Q8_0.gguf", true)]
+    [InlineData("Qwen3-0.6B-draft-Q8_0.gguf", true)]
+    [InlineData("Qwen3-4B-Q4_K_M.gguf", false)]
+    [InlineData("Qwen3.8-27B-UD-IQ4_XS.gguf", false)]
+    [InlineData("gemma-3-27b-it-qat-Q4_0.gguf", false)]
+    [InlineData("UD-Q4_K_XL/Qwen3-30B-A3B-UD-Q4_K_XL.gguf", false)]
+    public void Auxiliary_speculative_heads_are_recognised_and_real_models_are_not(string path, bool expected)
+    {
+        // Real first run: the automatic setup picked "MTP/mtp-Qwen3.8-27B-Q4_0.gguf" (a 1.4 GB speculative
+        // head) as the 27B chat model, so the chat check could never pass.
+        Assert.Equal(expected, GgufFileNaming.IsAuxiliaryHead(path));
+    }
+
+    [Theory]
     [InlineData("Qwen3.8-27B-UD-IQ4_XS.gguf", "IQ4_XS")]
     [InlineData("model-IQ1_M.gguf", "IQ1_M")]
     [InlineData("model-IQ2_XXS.gguf", "IQ2_XXS")]

@@ -98,7 +98,8 @@ public static class ModelDownloadPlanner
         List<GgufSplitSetGrouper.Entry> models = entries
             .Where(entry => !string.IsNullOrWhiteSpace(entry.Path)
                 && entry.Path.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase)
-                && !GgufFileNaming.IsProjector(entry.Path))
+                && !GgufFileNaming.IsProjector(entry.Path)
+                && !GgufFileNaming.IsAuxiliaryHead(entry.Path))
             .ToList();
         var candidates = new List<GgufSplitSetGrouper.SetGroup>(GgufSplitSetGrouper.Group(models));
         foreach (GgufSplitSetGrouper.Entry single in models.Where(e => !GgufFileNaming.TryParseSplitPart(e.Path, out _)))

@@ -38,6 +38,26 @@ public static class GgufFileNaming
         @"(?<=^|[" + Separators + @"])mmproj(?=$|[" + Separators + "])",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    private static readonly Regex AuxiliaryHeadToken = new(
+        @"(?<=^|[" + Separators + @"])(?:mtp|draft)(?=$|[" + Separators + "])",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    /// <summary>
+    /// True for a speculative-decoding head published beside a model ("MTP/mtp-*.gguf", "*-draft-*.gguf").
+    /// It carries the model's name and often a real quantisation label but cannot chat on its own, so it
+    /// is never a model to download or route to.
+    /// </summary>
+    public static bool IsAuxiliaryHead(string fileNameOrPath)
+    {
+        if (string.IsNullOrWhiteSpace(fileNameOrPath)) return false;
+        string[] segments = fileNameOrPath.Replace((char)92, '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < segments.Length - 1; i++)
+            if (segments[i].Equals("mtp", StringComparison.OrdinalIgnoreCase)
+                || segments[i].Equals("draft", StringComparison.OrdinalIgnoreCase))
+                return true;
+        return AuxiliaryHeadToken.IsMatch(StripGgufExtension(BaseName(fileNameOrPath)));
+    }
+
     /// <summary>One split-part token read from a file name.</summary>
     /// <param name="SetKey">The name with the part token removed, extension kept off. Every part of
     /// one set has the same key. Compare it case-insensitively.</param>

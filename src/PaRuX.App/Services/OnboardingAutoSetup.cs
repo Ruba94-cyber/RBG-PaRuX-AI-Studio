@@ -223,6 +223,9 @@ namespace PaRuX.Services
             foreach (ModelQuantChoice choice in choices)
             {
                 if (!choice.Complete || choice.SizeBytes <= 0) continue;
+                // A real quantisation is never a small fraction of the model's estimated size; a file that is
+                // (an auxiliary head, a draft model) is not the chat model and must not be downloaded as one.
+                if (candidate.Model.EstimatedSizeBytes > 0 && choice.SizeBytes < candidate.Model.EstimatedSizeBytes * 0.30) continue;
                 AutoSetupFit fit = await estimateFit(choice.SizeBytes).ConfigureAwait(false);
                 int tier = fit switch { AutoSetupFit.Fits => 0, AutoSetupFit.Tight => 1, AutoSetupFit.Unknown => 2, _ => 3 };
                 if (tier == 3)
