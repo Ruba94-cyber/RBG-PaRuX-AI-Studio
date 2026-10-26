@@ -210,6 +210,96 @@ public sealed class CodeWorktreeApplyServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Lf_task_patch_applies_to_crlf_target_when_git_has_no_autocrlf_and_preserves_crlf()
+    {
+        // Live dogfood failure: the reviewed patch is built from LF blobs, the target holds CRLF working files
+        // and the Git that runs the preflight has no core.autocrlf, so `git apply --check` rejected the hunk.
+        string crlfRoot = Path.Combine(_root, "crlf");
+        string crlfRepo = Path.Combine(crlfRoot, "repo");
+        string crlfWorktree = Path.Combine(crlfRoot, "worktree");
+        Directory.CreateDirectory(crlfRepo);
+        Git(crlfRepo, "init");
+        Git(crlfRepo, "config", "user.name", "PaRuX Tests");
+        Git(crlfRepo, "config", "user.email", "tests@parux.invalid");
+        Git(crlfRepo, "config", "core.autocrlf", "false");
+        string lfBaseline = string.Join("\n", Enumerable.Range(1, 40).Select(i => "line " + i)) + "\n";
+        File.WriteAllText(Path.Combine(crlfRepo, "code.cs"), lfBaseline);
+        Git(crlfRepo, "add", "code.cs");
+        Git(crlfRepo, "commit", "-m", "baseline");
+        Git(crlfRepo, "worktree", "add", "-b", "parux-crlf", crlfWorktree, "HEAD");
+        File.WriteAllText(Path.Combine(crlfRepo, "code.cs"), lfBaseline.Replace("\n", "\r\n", StringComparison.Ordinal));
+        File.WriteAllText(Path.Combine(crlfWorktree, "code.cs"),
+            lfBaseline.Replace("line 20\n", "line 20 changed\nline 20b\n", StringComparison.Ordinal));
+
+        CodeApplyResult result = await CodeWorktreeApplyService.ApplyAsync(crlfRepo, crlfWorktree, CancellationToken.None);
+
+        Assert.True(result.Success, result.Message);
+        string applied = File.ReadAllText(Path.Combine(crlfRepo, "code.cs"));
+        Assert.Contains("line 20 changed", applied, StringComparison.Ordinal);
+        Assert.Contains("line 20b", applied, StringComparison.Ordinal);
+        Assert.DoesNotContain("\n", applied.Replace("\r\n", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
+        Assert.Equal("baseline", Git(crlfRepo, "log", "-1", "--pretty=%s").Trim());
+    }
+
+    [Fact]
+    public async Task Patch_context_with_non_ascii_text_and_non_utf8_bytes_is_applied_byte_for_byte()
+    {
+        // Live dogfood failure: the hunk context held "…" and "→"; the patch was decoded with the console code
+        // page and re-encoded, so the preflight failed at that hunk with "patch does not apply".
+        var utf8 = new System.Text.UTF8Encoding(false);
+        string baseline = string.Join("\n", Enumerable.Range(1, 30).Select(i => "line " + i)) + "\n"
+            + "    text = line.Length <= 2 ? line : line[..2] + \"…\"; // → arrow ≠\n"
+            + string.Join("\n", Enumerable.Range(31, 30).Select(i => "line " + i)) + "\n";
+        File.WriteAllText(Path.Combine(_repo, "unicode.cs"), baseline, utf8);
+        byte[] latin1 = { (byte)'a', 0xE9, 0xFF, (byte)'\n', (byte)'b', (byte)'\n' };
+        File.WriteAllBytes(Path.Combine(_repo, "legacy.txt"), latin1);
+        Git(_repo, "add", "unicode.cs", "legacy.txt");
+        Git(_repo, "commit", "-m", "unicode baseline");
+        Directory.Delete(_worktree, recursive: true);
+        Git(_repo, "worktree", "prune");
+        Git(_repo, "worktree", "add", "-b", "parux-unicode", _worktree, "HEAD");
+        File.WriteAllText(Path.Combine(_worktree, "unicode.cs"),
+            baseline.Replace("line 29\n", "line 29 changed\n", StringComparison.Ordinal), utf8);
+        File.WriteAllBytes(Path.Combine(_worktree, "legacy.txt"),
+            new byte[] { (byte)'a', 0xE9, 0xFF, (byte)'\n', (byte)'c', (byte)'\n' });
+
+        CodeApplyResult result = await CodeWorktreeApplyService.ApplyAsync(_repo, _worktree, CancellationToken.None);
+
+        Assert.True(result.Success, result.Message);
+        // Compare without CR: the host's own autocrlf setting may legitimately convert line endings on write.
+        Assert.Equal(WithoutCarriageReturns(Path.Combine(_worktree, "unicode.cs")), WithoutCarriageReturns(Path.Combine(_repo, "unicode.cs")));
+        Assert.Equal(WithoutCarriageReturns(Path.Combine(_worktree, "legacy.txt")), WithoutCarriageReturns(Path.Combine(_repo, "legacy.txt")));
+    }
+
+    [Fact]
+    public async Task Genuinely_conflicting_patch_is_still_refused_in_crlf_target()
+    {
+        string crlfRoot = Path.Combine(_root, "crlf2");
+        string crlfRepo = Path.Combine(crlfRoot, "repo");
+        string crlfWorktree = Path.Combine(crlfRoot, "worktree");
+        Directory.CreateDirectory(crlfRepo);
+        Git(crlfRepo, "init");
+        Git(crlfRepo, "config", "user.name", "PaRuX Tests");
+        Git(crlfRepo, "config", "user.email", "tests@parux.invalid");
+        Git(crlfRepo, "config", "core.autocrlf", "false");
+        string lfBaseline = string.Join("\n", Enumerable.Range(1, 40).Select(i => "line " + i)) + "\n";
+        File.WriteAllText(Path.Combine(crlfRepo, "code.cs"), lfBaseline);
+        Git(crlfRepo, "add", "code.cs");
+        Git(crlfRepo, "commit", "-m", "baseline");
+        Git(crlfRepo, "worktree", "add", "-b", "parux-crlf2", crlfWorktree, "HEAD");
+        File.WriteAllText(Path.Combine(crlfRepo, "code.cs"),
+            lfBaseline.Replace("line 20\n", "human edit\n", StringComparison.Ordinal).Replace("\n", "\r\n", StringComparison.Ordinal));
+        File.WriteAllText(Path.Combine(crlfWorktree, "code.cs"),
+            lfBaseline.Replace("line 20\n", "agent edit\n", StringComparison.Ordinal));
+
+        CodeApplyResult result = await CodeWorktreeApplyService.ApplyAsync(crlfRepo, crlfWorktree, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Contains("human edit", File.ReadAllText(Path.Combine(crlfRepo, "code.cs")), StringComparison.Ordinal);
+        Assert.DoesNotContain("agent edit", File.ReadAllText(Path.Combine(crlfRepo, "code.cs")), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Same_directory_is_rejected()
     {
         CodeApplyResult result = await CodeWorktreeApplyService.ApplyAsync(_repo, _repo, CancellationToken.None);
@@ -261,6 +351,9 @@ public sealed class CodeWorktreeApplyServiceTests : IDisposable
         if (process.ExitCode != 0) throw new InvalidOperationException("git " + string.Join(' ', args) + " failed: " + error);
         return output;
     }
+
+    private static byte[] WithoutCarriageReturns(string path) =>
+        File.ReadAllBytes(path).Where(value => value != (byte)0x0D).ToArray();
 
     private static string ReadNormalized(string path) =>
         File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);

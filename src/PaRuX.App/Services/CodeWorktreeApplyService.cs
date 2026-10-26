@@ -84,26 +84,29 @@ namespace PaRuX.Services
                     intentAdded.Add(relative);
                 }
 
-                var diffArgs = new List<string> { "diff", "--binary", "--no-ext-diff", "HEAD", "--" };
-                if (acceptedFiles != null && acceptedFiles.Count > 0)
-                {
-                    diffArgs.AddRange(acceptedFiles);
-                }
-                GitResult diff = await GitAsync(worktree, ct, diffArgs.ToArray()).ConfigureAwait(false);
-                if (!diff.Ok) return new CodeApplyResult(false, "Could not create the task patch: " + Bound(diff.Error, 600));
-                if (string.IsNullOrWhiteSpace(diff.Output))
-                    return new CodeApplyResult(false, "The PaRuX task worktree has no changes to apply.");
-
-                var statArgs = new List<string> { "diff", "--stat", "HEAD", "--" }; if (acceptedFiles != null) statArgs.AddRange(acceptedFiles); GitResult stat = await GitAsync(worktree, ct, statArgs.ToArray()).ConfigureAwait(false);
-                int changedFiles = CountChangedFiles(await GitAsync(worktree, ct, "status", "--porcelain=v1").ConfigureAwait(false));
-
                 AppPaths.EnsureCreated();
                 string patchDir = Path.Combine(AppPaths.CodingAgentStateDir, "apply-patches");
                 Directory.CreateDirectory(patchDir);
                 string patch = Path.Combine(patchDir, "apply-" + Guid.NewGuid().ToString("N") + ".patch");
-                await File.WriteAllTextAsync(patch, diff.Output, new UTF8Encoding(false), ct).ConfigureAwait(false);
+                int changedFiles = 0;
+                GitResult stat = new(0, string.Empty, string.Empty);
                 try
                 {
+                    // Git writes the patch bytes itself: decoding stdout with the console code page and
+                    // re-encoding it corrupted non-ASCII hunk context and made the preflight fail.
+                    var diffArgs = new List<string> { "diff", "--binary", "--no-ext-diff", "--output", patch, "HEAD", "--" };
+                    if (acceptedFiles != null && acceptedFiles.Count > 0)
+                    {
+                        diffArgs.AddRange(acceptedFiles);
+                    }
+                    GitResult diff = await GitAsync(worktree, ct, diffArgs.ToArray()).ConfigureAwait(false);
+                    if (!diff.Ok) return new CodeApplyResult(false, "Could not create the task patch: " + Bound(diff.Error, 600));
+                    if (!File.Exists(patch) || new FileInfo(patch).Length == 0)
+                        return new CodeApplyResult(false, "The PaRuX task worktree has no changes to apply.");
+
+                    var statArgs = new List<string> { "diff", "--stat", "HEAD", "--" }; if (acceptedFiles != null) statArgs.AddRange(acceptedFiles); stat = await GitAsync(worktree, ct, statArgs.ToArray()).ConfigureAwait(false);
+                    changedFiles = CountChangedFiles(await GitAsync(worktree, ct, "status", "--porcelain=v1").ConfigureAwait(false));
+
                     if (approvedWorkspaceFingerprint != null)
                     {
                         // git add -N is needed to construct the full binary
@@ -128,13 +131,29 @@ namespace PaRuX.Services
                     }
                     GitResult check = await GitAsync(repository, ct,
                         "apply", "--check", "--binary", "--whitespace=nowarn", patch).ConfigureAwait(false);
+                    // The reviewed patch is built from LF blobs. A target whose working files are CRLF while
+                    // its Git has no core.autocrlf (isolated or sandboxed Git environments) rejects every
+                    // hunk although nothing conflicts. Retry the same preflight with Git's own line-ending
+                    // normalization; the patch must still apply cleanly, so real conflicts stay refused.
+                    bool normalizeLineEndings = false;
+                    if (!check.Ok && !check.TimedOut)
+                    {
+                        GitResult normalized = await GitAsync(repository, ct, NormalizedApplyArguments(
+                            "apply", "--check", "--binary", "--whitespace=nowarn", patch)).ConfigureAwait(false);
+                        if (normalized.Ok)
+                        {
+                            check = normalized;
+                            normalizeLineEndings = true;
+                        }
+                    }
                     if (check.TimedOut)
                         return new CodeApplyResult(false,
                             "Git apply preflight timed out before changing the target repository. Retry after checking that Git is responsive.",
                             changedFiles, Bound(stat.Output.Trim(), 2_000));
                     // Live Chat check: a second "Apply" click reported "patch does not apply" although
                     // the reviewed changes were exactly what the repository already contained.
-                    if (!check.Ok && await IsPatchAppliedAsync(repository, patch).ConfigureAwait(false))
+                    if (!check.Ok && (await IsPatchAppliedAsync(repository, patch).ConfigureAwait(false)
+                        || await IsPatchAppliedAsync(repository, patch, normalizeLineEndings: true).ConfigureAwait(false)))
                         return new CodeApplyResult(true,
                             "The reviewed changes are already present in the repository. Nothing was changed.",
                             changedFiles, Bound(stat.Output.Trim(), 2_000));
@@ -143,8 +162,9 @@ namespace PaRuX.Services
                             "The task patch does not apply cleanly to the current repository. Nothing was changed. " + Bound(check.Error, 900),
                             changedFiles, Bound(stat.Output.Trim(), 2_000));
 
-                    GitResult apply = await GitAsync(repository, ct,
-                        "apply", "--binary", "--whitespace=nowarn", patch).ConfigureAwait(false);
+                    GitResult apply = await GitAsync(repository, ct, normalizeLineEndings
+                        ? NormalizedApplyArguments("apply", "--binary", "--whitespace=nowarn", patch)
+                        : new[] { "apply", "--binary", "--whitespace=nowarn", patch }).ConfigureAwait(false);
                     if (apply.TimedOut)
                         return new CodeApplyResult(false,
                             "git apply timed out and was stopped after the successful preflight check. The repository may be partially changed; "
@@ -157,7 +177,7 @@ namespace PaRuX.Services
 
                     // The target may already carry unrelated local changes, so a non-empty status
                     // proves nothing. Confirm the exact patch is present by checking it reverses.
-                    if (!await IsPatchAppliedAsync(repository, patch).ConfigureAwait(false))
+                    if (!await IsPatchAppliedAsync(repository, patch, normalizeLineEndings).ConfigureAwait(false))
                         return new CodeApplyResult(false,
                             "The patch command returned success but PaRuX could not verify the exact task changes in the target. Do not assume integration succeeded.",
                             changedFiles, Bound(stat.Output.Trim(), 2_000));
@@ -185,12 +205,17 @@ namespace PaRuX.Services
         /// True only when the exact patch is present in <paramref name="repository"/>: it must
         /// reverse cleanly. Runs uncancellable because it follows a write to the user's tree.
         /// </summary>
-        internal static async Task<bool> IsPatchAppliedAsync(string repository, string patch)
+        internal static async Task<bool> IsPatchAppliedAsync(string repository, string patch, bool normalizeLineEndings = false)
         {
-            GitResult reverseCheck = await GitAsync(repository, CancellationToken.None,
-                "apply", "--reverse", "--check", "--binary", "--whitespace=nowarn", patch).ConfigureAwait(false);
+            string[] arguments = normalizeLineEndings
+                ? NormalizedApplyArguments("apply", "--reverse", "--check", "--binary", "--whitespace=nowarn", patch)
+                : new[] { "apply", "--reverse", "--check", "--binary", "--whitespace=nowarn", patch };
+            GitResult reverseCheck = await GitAsync(repository, CancellationToken.None, arguments).ConfigureAwait(false);
             return reverseCheck.Ok && !reverseCheck.TimedOut;
         }
+
+        private static string[] NormalizedApplyArguments(params string[] arguments) =>
+            new[] { "-c", "core.autocrlf=true" }.Concat(arguments).ToArray();
 
         private static List<string> ParseUntracked(GitResult status)
         {
