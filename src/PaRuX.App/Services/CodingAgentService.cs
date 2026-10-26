@@ -16,6 +16,8 @@ namespace PaRuX.Services
     {
         public bool GoalReported { get; set; }
         public bool InfrastructureBlocked { get; set; }
+        /// <summary>Specific reason the attempt stopped (see <see cref="CodingAgentStopReason"/>); empty when not applicable.</summary>
+        public string StopKind { get; set; } = CodingAgentStopReason.None;
         /// <summary>
         /// A paused attempt still needs deterministic verification or a trusted completion
         /// authority. It must not be handed to the verifier as a candidate result.
@@ -259,6 +261,7 @@ namespace PaRuX.Services
             bool structuredFallbackReported = false;
             bool contextBudgetReported = false;
             bool contextTooSmallReported = false;
+            bool contextRaiseAttempted = false;
             bool exactTokenProbeReported = false;
             int consecutiveNarrationResponses = 0;
             bool verificationRequired = checkpoint.VerificationRequired;
@@ -555,6 +558,23 @@ namespace PaRuX.Services
                             break;
                         }
 
+                        if (!recovered && !contextRaiseAttempted)
+                        {
+                            // Failing is the last resort: widen the model window once (cheapest launchable
+                            // configuration), reload, and retry this very step with the larger window.
+                            contextRaiseAttempted = true;
+                            onStep?.Invoke("Step " + step + ": the " + contextBudget.ContextTokens
+                                + "-token context cannot hold this request even after compaction; trying to raise it automatically.");
+                            CodingContextRemedy.Outcome remedy = await CodingContextRemedy
+                                .TryRaiseAsync(contextBudget.ContextTokens, ct).ConfigureAwait(false);
+                            onStep?.Invoke(remedy.Message);
+                            if (remedy.Raised)
+                            {
+                                step--;
+                                continue;
+                            }
+                        }
+
                         if (!recovered)
                         {
                             // Keep the previous completed step, so resume does not skip a model
@@ -563,13 +583,15 @@ namespace PaRuX.Services
                             string reason = "Coding paused before inference: the selected model's "
                                 + contextBudget.ContextTokens + "-token context cannot hold the "
                                 + "task, action protocol and generation reserve, even after bounded "
-                                + "evidence compaction. The checkpoint and artifacts are preserved. "
+                                + "evidence compaction and an automatic context increase attempt. "
+                                + "The checkpoint and artifacts are preserved. "
                                 + "Use a larger usable context or reduce/split the task.";
                             onStep?.Invoke(reason);
                             return Finish(new CodingAgentResult
                             {
                                 StepsTaken = step - 1,
                                 InfrastructureBlocked = true,
+                                StopKind = CodingAgentStopReason.ContextTooSmall,
                                 VerificationPending = verificationRequired && !verificationSatisfied,
                                 Summary = reason
                             });
@@ -638,6 +660,7 @@ namespace PaRuX.Services
                             return Finish(new CodingAgentResult
                             {
                                 InfrastructureBlocked = true,
+                                StopKind = CodingAgentStopReason.ContextTooSmall,
                                 StepsTaken = step - 1,
                                 VerificationPending = verificationRequired && !verificationSatisfied,
                                 Summary = reason
@@ -668,6 +691,7 @@ namespace PaRuX.Services
                             return Finish(new CodingAgentResult
                             {
                                 InfrastructureBlocked = true,
+                                StopKind = CodingAgentStopReason.ContextTooSmall,
                                 StepsTaken = step - 1,
                                 VerificationPending = verificationRequired && !verificationSatisfied,
                                 Summary = reason
@@ -1059,6 +1083,7 @@ namespace PaRuX.Services
                         return Finish(new CodingAgentResult
                         {
                             StepsTaken = step,
+                            StopKind = CodingAgentStopReason.RepeatedAction,
                             VerificationPending = verificationRequired && !verificationSatisfied,
                             Summary = "Stopped after a third identical read-only action in workspace epoch "
                                 + repeatGuard.Epoch + ". The checkpoint and workspace were preserved."
@@ -1075,6 +1100,7 @@ namespace PaRuX.Services
                         SaveCheckpoint(step);
                         if (suppressedRepeats >= 8 || consecutiveNonProgress >= ProgressStopSteps)
                             return Finish(new CodingAgentResult { StepsTaken = step,
+                                StopKind = CodingAgentStopReason.NoProgress,
                                 VerificationPending = verificationRequired && !verificationSatisfied,
                                 Summary = "Paused after the exploration budget was exhausted without a code change. The checkpoint and repository are preserved for diagnosis." });
                         continue;
@@ -1309,6 +1335,7 @@ namespace PaRuX.Services
                         {
                             StepsTaken = step,
                             InfrastructureBlocked = true,
+                            StopKind = CodingAgentStopReason.Sandbox,
                             Summary = "Coding sandbox unavailable before command execution: "
                                 + Truncate(outcome.Observation, 500)
                                 + ". The checkpoint and worktree are preserved for diagnosis."

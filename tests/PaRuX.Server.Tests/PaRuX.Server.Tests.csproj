@@ -97,6 +97,8 @@
     <Compile Include="..\..\src\PaRuX.App\Services\CodingContextCompiler.cs" Link="CodingAgent\CodingContextCompiler.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CodingContextBudgetPolicy.cs" Link="CodingAgent\CodingContextBudgetPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentPromptBudgetPolicy.cs" Link="CodingAgent\CodingAgentPromptBudgetPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentStopReason.cs" Link="CodingAgent\CodingAgentStopReason.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingContextRemedyPolicy.cs" Link="CodingAgent\CodingContextRemedyPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentPromptBuilder.cs" Link="CodingAgent\CodingAgentPromptBuilder.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentMcpToolPolicy.cs" Link="CodingAgent\CodingAgentMcpToolPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentActionJsonRepair.cs" Link="CodingAgent\CodingAgentActionJsonRepair.cs" />
