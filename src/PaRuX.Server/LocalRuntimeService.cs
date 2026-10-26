@@ -299,7 +299,8 @@ public sealed class LocalRuntimeService
 
         LocalAiProcessManager.RuntimeResult started = await _process.StartMediaAsync(cancellationToken).ConfigureAwait(false);
         if (!started.Success)
-            throw new InvalidOperationException("Could not start the local media runtime for resource admission: " + started.Message);
+            throw new InvalidOperationException("Generation did not start: the local media-assistant runtime is missing or failed to start ("
+                + started.Message + "). Open Runtime Manager to repair or reinstall it, then try again. No media was generated.");
     }
 
     /// <summary>

@@ -884,7 +884,7 @@ namespace PaRuX.Views
                 _mediaCatalogue = mediaCatalogueTask.Result ?? _mediaCatalogue;
                 RenderMedia(mediaTask.Result, mediaRecommendedTask.Result, downloadsTask.Result);
                 RenderDiscoveryRefreshStatus();
-                _status.Text = installedTask.Result.Count + " installed GGUF model(s) · "
+                _status.Text = installedTask.Result.Count + " PaRuX-managed GGUF model(s) (models you linked from elsewhere are listed in Settings > Models) · "
                     + mediaTask.Result.Count + " media role(s) · " + downloadsTask.Result.Count + " download job(s) · "
                     + (_discoveryCatalog?.Candidates.Count ?? 0) + " discovered Candidate(s).";
                 if (_catalogStale) _status.Text += " · " + StaleCatalogMessage;

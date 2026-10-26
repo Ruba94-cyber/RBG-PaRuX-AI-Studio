@@ -163,7 +163,11 @@ namespace PaRuX.Views
         private async Task CreateProjectAsync()
         {
             string goal = (_goal.Text ?? string.Empty).Trim();
-            if (goal.Length == 0) return;
+            if (goal.Length == 0)
+            {
+                _status.Text = "Write a goal for the new Project first.";
+                return;
+            }
             try
             {
                 string? repositoryRoot = _newProjectRepositoryRoot;
@@ -172,7 +176,8 @@ namespace PaRuX.Views
                 ProjectWorkspaceSession.Current.Select(created.Id, created.Goal);
                 SetNewProjectRepository(null);
                 if (repositoryRoot != null) ProjectWorkspaceSession.Current.SetRepositoryRoot(repositoryRoot);
-                _status.Text = "Created and selected Project " + created.Id
+                _status.Text = "Created and selected Project \"" + (created.Goal.Length > 60 ? created.Goal[..60] + "..." : created.Goal)
+                    + "\". PaRuX planned its tasks; they are listed as queued in Settings > Agents"
                     + (repositoryRoot == null
                         ? ". Choose its repository if the generated DAG contains coding/binary work or repository-aware specialist tasks."
                         : ". Its repository authority was saved before the generated tasks were scheduled.");

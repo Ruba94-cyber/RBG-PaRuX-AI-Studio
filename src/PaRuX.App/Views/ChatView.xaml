@@ -550,7 +550,7 @@
                 x:Name="ComposerFooterScrollViewer"
                 AutomationProperties.AutomationId="Chat_ComposerFooter_ScrollViewer"
                 Grid.Row="3"
-                HorizontalScrollBarVisibility="Hidden"
+                HorizontalScrollBarVisibility="Visible"
                 HorizontalScrollMode="Enabled"
                 VerticalScrollBarVisibility="Disabled"
                 VerticalScrollMode="Disabled">

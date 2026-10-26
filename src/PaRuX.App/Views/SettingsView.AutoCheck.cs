@@ -11,7 +11,9 @@ namespace PaRuX.Views
     /// <summary>"Automatic checks" Settings section, bound to /api/v1/maintenance/settings, /status and /run-now.</summary>
     public sealed partial class SettingsView
     {
-        private bool _autoCheckLoading;
+        // True until the first status read has populated the controls: XAML initialisation raises
+        // Toggled/ValueChanged before every control exists, which used to throw (and would have saved defaults).
+        private bool _autoCheckLoading = true;
         private bool _autoCheckBusy;
 
         public async Task RefreshAutoCheckAsync(CancellationToken ct = default)
@@ -26,6 +28,7 @@ namespace PaRuX.Views
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 Log.Write("RefreshAutoCheckAsync failed: " + ex.Message);
+                _autoCheckLoading = false;
                 if (Settings_AutoCheck_Status_Text != null)
                     Settings_AutoCheck_Status_Text.Text = "Automatic checks could not be read: " + ex.Message;
             }
@@ -145,6 +148,9 @@ namespace PaRuX.Views
 
         private async Task SaveAutoCheckAsync()
         {
+            if (Settings_AutoCheck_Enabled_Toggle == null || Settings_AutoCheck_Interval_Box == null
+                || Settings_AutoCheck_RuntimeUpdate_Toggle == null || Settings_AutoCheck_MediaOptimize_Toggle == null)
+                return;
             bool enabled = Settings_AutoCheck_Enabled_Toggle.IsOn;
             double hours = Settings_AutoCheck_Interval_Box.Value;
             bool keepRuntimes = Settings_AutoCheck_RuntimeUpdate_Toggle.IsOn;
