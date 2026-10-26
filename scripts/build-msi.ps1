@@ -183,6 +183,7 @@ if (-not $SkipPublish) {
     if ($LASTEXITCODE -ne 0) { throw "PaRuX Update Helper dotnet publish failed with exit code $LASTEXITCODE." }
 
     Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE") -Destination (Join-Path $publishDir "LICENSE.txt") -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot "NVIDIA_CUDA_NOTICE.txt") -Destination (Join-Path $publishDir "NVIDIA_CUDA_NOTICE.txt") -Force
     if (Test-Path -LiteralPath (Join-Path $repoRoot "THIRD_PARTY_NOTICES.md")) {
         Copy-Item -LiteralPath (Join-Path $repoRoot "THIRD_PARTY_NOTICES.md") -Destination (Join-Path $publishDir "THIRD_PARTY_NOTICES.md") -Force
     }
@@ -204,7 +205,8 @@ $requiredPublishFiles = @(
     $cliExe,
     $updateHelperExe,
     (Join-Path $publishDir "LICENSE.txt"),
-    (Join-Path $publishDir "THIRD_PARTY_NOTICES.md")
+    (Join-Path $publishDir "THIRD_PARTY_NOTICES.md"),
+    (Join-Path $publishDir "NVIDIA_CUDA_NOTICE.txt")
 )
 foreach ($required in $requiredPublishFiles) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {

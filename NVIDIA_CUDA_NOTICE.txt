@@ -1,0 +1,21 @@
+NVIDIA CUDA Runtime Redistribution Notice
+
+PaRuX includes these NVIDIA CUDA Toolkit redistributable DLLs in its bundled
+llama.cpp CUDA 13.4 runtime:
+
+  cudart64_13.dll
+  cublas64_13.dll
+  cublasLt64_13.dll
+
+They are distributed in object-code form as parts of PaRuX, which provides
+material application functionality beyond the CUDA Toolkit. They are used by
+the bundled PaRuX llama-server runtime and are not offered as a standalone
+CUDA package. No NVIDIA display driver is included.
+
+The listed DLLs are version-specific Windows filename variants of the CUDA
+Runtime and CUDA BLAS redistributable files in Attachment A of NVIDIA's CUDA
+Toolkit End User License Agreement. NVIDIA's current agreement is available at:
+https://docs.nvidia.com/cuda/eula/index.html
+
+The NVIDIA software remains subject to that agreement. NVIDIA does not sponsor
+or endorse PaRuX. All rights not expressly granted by NVIDIA are reserved.

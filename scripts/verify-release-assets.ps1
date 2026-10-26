@@ -189,6 +189,89 @@ function Test-EmbeddedCommit([string]$payloadRoot) {
     return $report
 }
 
+function Assert-BundledCuda13Payload([string]$payloadRoot) {
+    $serverRoot = Join-Path $payloadRoot "PaRuX.Server"
+    $baselineRoot = Join-Path $serverRoot "runtime-baseline"
+    $lockPath = Join-Path $baselineRoot "baseline-lock.json"
+    $stagingManifestPath = Join-Path $baselineRoot "staging-manifest.json"
+    if (-not (Test-Path -LiteralPath $lockPath -PathType Leaf)) {
+        throw "MSI baseline runtime lock is missing."
+    }
+    if (-not (Test-Path -LiteralPath $stagingManifestPath -PathType Leaf)) {
+        throw "MSI baseline runtime staging manifest is missing."
+    }
+
+    $lock = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json
+    $artifacts = @($lock.artifacts)
+    $cudaServer = @($artifacts | Where-Object { [string]$_.id -ceq "llama.cpp-cuda13" })
+    $cudaRuntime = @($artifacts | Where-Object { [string]$_.id -ceq "cuda-runtime-13.4" })
+    if ($cudaServer.Count -ne 1 -or $cudaRuntime.Count -ne 1) {
+        throw "MSI runtime lock must contain exactly one CUDA 13.4 server and CUDA Runtime archive."
+    }
+    $cudaServer = $cudaServer[0]
+    $cudaRuntime = $cudaRuntime[0]
+    if ([string]$cudaServer.version -cne "b11871" -or [string]$cudaRuntime.version -cne "13.4") {
+        throw "MSI baseline CUDA runtime version does not match the accepted 1.9.7 payload."
+    }
+    if ([string]$cudaServer.destination -cne [string]$cudaRuntime.destination) {
+        throw "CUDA server and dependency archives must be co-staged into one runtime directory."
+    }
+    foreach ($artifact in @($cudaServer, $cudaRuntime)) {
+        if ([string]$artifact.sha256 -notmatch '^[0-9a-fA-F]{64}$' -or [int64]$artifact.sizeBytes -le 0) {
+            throw "CUDA runtime lock entry $($artifact.id) is missing its archive size or SHA-256 lock."
+        }
+    }
+    if ([string]$cudaRuntime.license -cne "NVIDIA CUDA Toolkit EULA" -or
+        [string]$cudaRuntime.licenseUrl -cne "https://docs.nvidia.com/cuda/eula/index.html") {
+        throw "CUDA runtime lock does not identify NVIDIA's CUDA Toolkit EULA."
+    }
+
+    $expectedDlls = @("cudart64_13.dll", "cublas64_13.dll", "cublasLt64_13.dll")
+    $requiredDlls = @($cudaRuntime.requiredFiles | ForEach-Object { [string]$_ } | Sort-Object -Unique)
+    $redistributableDlls = @($cudaRuntime.redistributableFiles | ForEach-Object { [string]$_ } | Sort-Object -Unique)
+    if (($requiredDlls -join "|") -cne (($expectedDlls | Sort-Object -Unique) -join "|") -or
+        ($redistributableDlls -join "|") -cne (($expectedDlls | Sort-Object -Unique) -join "|")) {
+        throw "CUDA runtime files differ from the explicitly reviewed EULA Attachment A list."
+    }
+    if (-not (@($cudaServer.requiredFiles | ForEach-Object { [string]$_ }) -contains "llama-server.exe")) {
+        throw "CUDA server lock does not require llama-server.exe."
+    }
+
+    $destination = [string]$cudaServer.destination
+    $serverPrefix = "PaRuX.Server/"
+    if (-not $destination.StartsWith($serverPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "CUDA runtime destination is outside the MSI PaRuX.Server payload."
+    }
+    $runtimeRelative = $destination.Substring($serverPrefix.Length).Replace('/', '\')
+    $cudaRoot = [IO.Path]::GetFullPath((Join-Path $serverRoot $runtimeRelative))
+    $serverPathPrefix = [IO.Path]::GetFullPath($serverRoot).TrimEnd('\') + '\'
+    if (-not $cudaRoot.StartsWith($serverPathPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "CUDA runtime destination escaped the MSI PaRuX.Server payload."
+    }
+    foreach ($file in @("llama-server.exe") + $expectedDlls) {
+        if (-not (Test-Path -LiteralPath (Join-Path $cudaRoot $file) -PathType Leaf)) {
+            throw "MSI CUDA 13.4 baseline is missing required file $file."
+        }
+    }
+
+    $manifest = Get-Content -LiteralPath $stagingManifestPath -Raw | ConvertFrom-Json
+    if ([int]$manifest.schemaVersion -ne 1) { throw "Unsupported MSI runtime staging-manifest schema." }
+    $manifestPaths = @($manifest.files | ForEach-Object { [string]$_.path })
+    foreach ($file in @("llama-server.exe") + $expectedDlls) {
+        $manifestPath = ($destination.Substring($serverPrefix.Length).Replace('\', '/') + "/" + $file)
+        if (-not ($manifestPaths | Where-Object { $_ -ieq $manifestPath })) {
+            throw "MSI runtime staging manifest does not hash the required CUDA payload file $file."
+        }
+    }
+
+    $noticePath = Join-Path $payloadRoot "NVIDIA_CUDA_NOTICE.txt"
+    if (-not (Test-Path -LiteralPath $noticePath -PathType Leaf)) { throw "NVIDIA CUDA redistribution notice is missing from the MSI." }
+    $notice = Get-Content -LiteralPath $noticePath -Raw
+    foreach ($token in @("Attachment A", "https://docs.nvidia.com/cuda/eula/index.html") + $expectedDlls) {
+        if (-not $notice.Contains($token)) { throw "NVIDIA CUDA notice is missing required text: $token" }
+    }
+}
+
 $msiexec = Get-Command msiexec -ErrorAction SilentlyContinue
 if (-not $msiexec) { throw "msiexec is required to extract the MSI payload for verification (administrative image; nothing is installed)." }
 $extractRoot = Join-Path ([IO.Path]::GetTempPath()) ("parux-msi-payload-" + [Guid]::NewGuid().ToString('N'))
@@ -202,6 +285,8 @@ try {
     $payloadRoot = $primaryHits[0].DirectoryName
     Assert-TreeMatchesProvenance (Get-TreeHashes $payloadRoot) "MSI payload"
     Write-Host "[release verify] MSI payload ($($expectedPayload.Count) files) equals provenance: PASS"
+    Assert-BundledCuda13Payload $payloadRoot
+    Write-Host "[release verify] NVIDIA CUDA 13.4 baseline assets and notice: PASS"
     $embeddedCommitReport = Test-EmbeddedCommit $payloadRoot
     Write-Host "[release verify] embedded source commit in $($primaryBinaries.Count) primary binaries of the MSI: PASS"
 }

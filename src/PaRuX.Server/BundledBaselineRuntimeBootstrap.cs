@@ -1,8 +1,16 @@
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using PaRuX.Contracts;
 
 namespace PaRuX.Server;
+
+internal enum BundledBaselineRuntimeKind
+{
+    None,
+    Vulkan,
+    Cuda13
+}
 
 /// <summary>
 /// Makes the baseline llama.cpp build harvested into the MSI usable by the existing mutable
@@ -13,43 +21,93 @@ namespace PaRuX.Server;
 /// </summary>
 internal static class BundledBaselineRuntimeBootstrap
 {
-    private const string RuntimeFolder = "llama.cpp-b10549-vulkan";
     private const string ManifestRelative = "runtime-baseline/staging-manifest.json";
-    private const string PayloadRelative = "runtime-baseline/llama.cpp-b10549-vulkan";
+    private const string VulkanRuntimeFolder = "llama.cpp-b10549-vulkan";
+    private const string VulkanPayloadRelative = "runtime-baseline/llama.cpp-b10549-vulkan";
+    private const string CudaRuntimeFolder = "llama.cpp-b11871-cuda13.4";
+    private const string CudaPayloadRelative = "runtime-baseline/llama.cpp-b11871-cuda13.4";
+    private const string CudaBuildTag = "b11871";
+    private const string CudaToolkit = "13.4";
 
     [ModuleInitializer]
     internal static void Initialize()
     {
         if (!OperatingSystem.IsWindows()) return;
 
-        string source = Path.Combine(AppContext.BaseDirectory, PayloadRelative.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(Path.Combine(source, LocalAiPaths.LlamaServerExecutable))) return; // dev build / no MSI staging
-
-        string root = ResolveLocalAiRoot();
-        string target = Path.Combine(root, "runtime", RuntimeFolder);
-        if (File.Exists(Path.Combine(target, LocalAiPaths.LlamaServerExecutable))) return;
-
         try
         {
-            VerifyBundledPayload(source);
-            string parent = Path.GetDirectoryName(target)!;
-            Directory.CreateDirectory(parent);
-            string temp = Path.Combine(parent, "." + RuntimeFolder + ".installing-" + Guid.NewGuid().ToString("N"));
-            try
+            // Keep developer/test launches cheap. MSI staging creates this manifest beside the
+            // Server; only then is there a bundled baseline worth selecting or probing for.
+            string manifestPath = Path.Combine(
+                AppContext.BaseDirectory, ManifestRelative.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(manifestPath)) return;
+
+            BundledBaselineRuntimeKind kind = DetectRuntimeTarget();
+            string? runtimeFolder = kind switch
             {
-                CopyDirectory(source, temp);
-                if (File.Exists(Path.Combine(target, LocalAiPaths.LlamaServerExecutable)))
+                BundledBaselineRuntimeKind.Vulkan => VulkanRuntimeFolder,
+                BundledBaselineRuntimeKind.Cuda13 => CudaRuntimeFolder,
+                _ => null
+            };
+            string? payloadRelative = kind switch
+            {
+                BundledBaselineRuntimeKind.Vulkan => VulkanPayloadRelative,
+                BundledBaselineRuntimeKind.Cuda13 => CudaPayloadRelative,
+                _ => null
+            };
+            if (runtimeFolder is null || payloadRelative is null) return;
+
+            // Do not replace a selected or legacy CUDA installation. Older NVIDIA drivers keep
+            // the existing CUDA 12.4 on-demand path; they must not be routed to bundled Vulkan.
+            if (kind == BundledBaselineRuntimeKind.Cuda13 &&
+                (LocalAiPaths.GetActiveRuntimeBuildTag("text-cuda") is not null ||
+                 File.Exists(Path.Combine(LocalAiPaths.RuntimeCudaPath, LocalAiPaths.LlamaServerExecutable))))
+                return;
+
+            string source = Path.Combine(AppContext.BaseDirectory, payloadRelative.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(Path.Combine(source, LocalAiPaths.LlamaServerExecutable))) return; // dev build / no MSI staging
+
+            string root = ResolveLocalAiRoot();
+            string target = Path.Combine(root, "runtime", runtimeFolder);
+            bool installedByThisBootstrap = false;
+            if (!File.Exists(Path.Combine(target, LocalAiPaths.LlamaServerExecutable)))
+            {
+                // A pre-existing incomplete directory may belong to the user. Preserve it and let
+                // the runtime status surface the missing baseline rather than replacing its files.
+                if (Directory.Exists(target)) return;
+
+                string[] requiredFiles = kind == BundledBaselineRuntimeKind.Cuda13
+                    ? new[] { LocalAiPaths.LlamaServerExecutable, "cudart64_13.dll", "cublas64_13.dll", "cublasLt64_13.dll" }
+                    : new[] { LocalAiPaths.LlamaServerExecutable };
+                VerifyBundledPayload(source, payloadRelative, requiredFiles);
+                string parent = Path.GetDirectoryName(target)!;
+                Directory.CreateDirectory(parent);
+                string temp = Path.Combine(parent, "." + runtimeFolder + ".installing-" + Guid.NewGuid().ToString("N"));
+                try
                 {
-                    Directory.Delete(temp, recursive: true);
-                    return;
+                    CopyDirectory(source, temp);
+                    if (File.Exists(Path.Combine(target, LocalAiPaths.LlamaServerExecutable)))
+                    {
+                        Directory.Delete(temp, recursive: true);
+                    }
+                    else
+                    {
+                        Directory.Move(temp, target);
+                    }
+                    installedByThisBootstrap = true;
                 }
-                Directory.Move(temp, target);
+                catch
+                {
+                    try { if (Directory.Exists(temp)) Directory.Delete(temp, recursive: true); } catch { }
+                    if (!File.Exists(Path.Combine(target, LocalAiPaths.LlamaServerExecutable))) throw;
+                }
             }
-            catch
-            {
-                try { if (Directory.Exists(temp)) Directory.Delete(temp, recursive: true); } catch { }
-                if (!File.Exists(Path.Combine(target, LocalAiPaths.LlamaServerExecutable))) throw;
-            }
+
+            // The CUDA baseline has a distinct version/toolkit folder. Select it only when this
+            // bootstrap just installed it and no user-selected build already existed.
+            if (kind == BundledBaselineRuntimeKind.Cuda13 && installedByThisBootstrap &&
+                LocalAiPaths.GetActiveRuntimeBuildTag("text-cuda") is null)
+                LocalAiPaths.SetActiveRuntimeBuildTag("text-cuda", CudaBuildTag, CudaToolkit);
 
             string errorMarker = Path.Combine(
                 PaRuX.Contracts.PaRuXDataRoot.Path, "baseline-bootstrap.error.txt");
@@ -71,7 +129,38 @@ internal static class BundledBaselineRuntimeBootstrap
         }
     }
 
-    private static void VerifyBundledPayload(string source)
+    internal static BundledBaselineRuntimeKind SelectRuntimeTarget(
+        bool inventoryAvailable,
+        bool hasNvidiaAdapter,
+        double? computeCapability,
+        string? driverVersion)
+    {
+        if (!inventoryAvailable) return BundledBaselineRuntimeKind.None;
+        if (!hasNvidiaAdapter) return BundledBaselineRuntimeKind.Vulkan;
+        return RuntimeBuildCatalog.PreferredCudaMajor(computeCapability, driverVersion) == 13
+            ? BundledBaselineRuntimeKind.Cuda13
+            : BundledBaselineRuntimeKind.None;
+    }
+
+    private static BundledBaselineRuntimeKind DetectRuntimeTarget()
+    {
+        GpuInventoryStatus inventory = new GpuInventoryService().GetStatus();
+        GpuAdapterStatus? nvidia = inventory.Adapters
+            .Where(adapter => adapter.VendorId == RuntimeBackendAdvisor.NvidiaVendor && !adapter.IsSoftware)
+            .OrderByDescending(adapter => adapter.DedicatedVideoMemoryBytes)
+            .FirstOrDefault();
+        if (nvidia is null)
+            return SelectRuntimeTarget(inventory.Available, hasNvidiaAdapter: false, null, null);
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        List<GpuPerformanceTelemetryDto> telemetry = new GpuPerformanceTelemetryService()
+            .QueryAsync(timeout.Token).GetAwaiter().GetResult();
+        double? computeCapability = telemetry.FirstOrDefault(device => device.ComputeCapability is not null &&
+            nvidia.Name.Contains(device.Name, StringComparison.OrdinalIgnoreCase))?.ComputeCapability;
+        return SelectRuntimeTarget(inventory.Available, hasNvidiaAdapter: true, computeCapability, nvidia.DriverVersion);
+    }
+
+    private static void VerifyBundledPayload(string source, string payloadRelative, IReadOnlyCollection<string> requiredFiles)
     {
         string manifestPath = Path.Combine(
             AppContext.BaseDirectory, ManifestRelative.Replace('/', Path.DirectorySeparatorChar));
@@ -84,9 +173,9 @@ internal static class BundledBaselineRuntimeBootstrap
         if (!document.RootElement.TryGetProperty("files", out JsonElement files) || files.ValueKind != JsonValueKind.Array)
             throw new InvalidDataException("The MSI baseline runtime manifest has no file inventory.");
 
-        string prefix = PayloadRelative + "/";
+        string prefix = payloadRelative + "/";
         int verified = 0;
-        bool serverVerified = false;
+        var verifiedRequired = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (JsonElement entry in files.EnumerateArray())
         {
             string? relative = entry.TryGetProperty("path", out JsonElement pathElement) ? pathElement.GetString() : null;
@@ -109,12 +198,12 @@ internal static class BundledBaselineRuntimeBootstrap
             if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("Bundled runtime SHA-256 verification failed: " + relative);
             verified++;
-            if (string.Equals(insidePayload, LocalAiPaths.LlamaServerExecutable, StringComparison.OrdinalIgnoreCase))
-                serverVerified = true;
+            if (requiredFiles.Contains(insidePayload, StringComparer.OrdinalIgnoreCase))
+                verifiedRequired.Add(insidePayload);
         }
 
-        if (verified == 0 || !serverVerified)
-            throw new InvalidDataException("The MSI baseline runtime manifest did not verify llama-server.exe.");
+        if (verified == 0 || requiredFiles.Any(required => !verifiedRequired.Contains(required)))
+            throw new InvalidDataException("The MSI baseline runtime manifest did not verify every required file.");
     }
 
     private static void CopyDirectory(string source, string target)

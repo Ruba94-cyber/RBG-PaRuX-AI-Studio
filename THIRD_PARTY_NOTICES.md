@@ -1,6 +1,6 @@
 # PaRuX Third-Party Notices
 
-PaRuX's own source code is licensed under the Functional Source License 1.1, MIT Future License (FSL-1.1-MIT; see [LICENSE](LICENSE)) - source-available, with each version converting to MIT two years after release. This operational notice separates software that is **redistributed in PaRuX build artifacts** from runtimes, tools and model weights that PaRuX can discover or download/install on explicit user request.
+PaRuX's own source code is licensed under the Functional Source License 1.1, MIT Future License (FSL-1.1-MIT; see [LICENSE](LICENSE)) - source-available, with each version converting to MIT two years after release. This operational notice records software **redistributed in PaRuX build artifacts** and distinguishes it from tools and model weights that PaRuX can discover or download/install on explicit user request.
 
 The repository pins concrete dependency versions in its project files. Upstream license files and package metadata remain the authoritative terms for each dependency; this notice is maintained so a GitHub MSI/APK release does not obscure what is actually being redistributed.
 
@@ -25,8 +25,11 @@ The GitHub MSI includes the self-contained WinUI desktop application, self-conta
 | Parquet.Net | MIT | Server | Dataset Hub Parquet reading/writing |
 | SharpCompress | MIT | Server | Safe extraction support for managed runtime archives; retain any notices present in the upstream package/distribution |
 | llama.cpp `convert_lora_to_gguf.py` + conversion package | MIT (llama.cpp) | Server | Vendored adapter conversion scripts under `llama-cpp-conversion/`; exact upstream text is in `llama-cpp-conversion/LICENSE-llama.cpp` |
+| llama.cpp / llama-server baseline archives | MIT | Server | The MSI includes a hash-locked b10549 Vulkan build and b11871 CUDA 13.4 build. The builds remain separate PaRuX-managed runtimes after first-run bootstrap. |
+| NVIDIA CUDA Runtime and cuBLAS DLLs | NVIDIA CUDA Toolkit EULA, Attachment A | Server | The CUDA baseline includes `cudart64_13.dll`, `cublas64_13.dll` and `cublasLt64_13.dll`; see [NVIDIA_CUDA_NOTICE.txt](NVIDIA_CUDA_NOTICE.txt) for the redistribution boundary and current EULA link. |
+| uv (Astral) | MIT OR Apache-2.0 | Server | Hash-locked `uv 0.12.1` is shipped in `runtime-tools/uv` for PaRuX-managed Python environments. |
 
-The MSI build copies this notice, the PaRuX FSL-1.1-MIT license and `OPEN_SOURCE_PROVENANCE.md` beside the installed binaries. It does **not** intentionally bundle ComfyUI, llama.cpp runtime binaries, model weights, Unsloth, TRELLIS or other large AI engines listed below.
+The MSI build copies this notice, the NVIDIA CUDA notice, the PaRuX FSL-1.1-MIT license and `OPEN_SOURCE_PROVENANCE.md` beside the installed binaries. It does **not** bundle model weights, ComfyUI, Unsloth, TRELLIS or other large AI engines listed below.
 
 ## Agent Platform V2 interoperability — not redistributed
 
@@ -71,8 +74,8 @@ PaRuX can either **locate an existing USER_MANAGED installation** or create an i
 
 | Component | Upstream license / terms | Role | PaRuX relationship |
 |---|---|---|---|
-| llama.cpp / llama-server | MIT | Local LLM serving | Existing installation may be located, or verified builds may be downloaded as a PaRuX-managed runtime. Not embedded in the MSI. |
-| uv (Astral) | MIT OR Apache-2.0 | Python environment/dependency manager for every PaRuX-owned Python runtime | Downloaded as a PaRuX-managed tool (`packaging/windows-baseline-runtime.lock.json`, pinned by version and SHA-256) into `runtime-tools/uv`. Not embedded in the MSI. **Added 2026-09-02:** uv was already being downloaded and pinned by the baseline runtime lock but had no entry in this file, so it was absent from the SBOM's licence data; the terms here are uv's own upstream dual licence and should be re-confirmed on each version bump. |
+| llama.cpp / llama-server | MIT | Local LLM serving | Existing installations may be located; the MSI also ships hash-locked baseline Vulkan and CUDA builds. Later managed builds are downloaded on request. |
+| NVIDIA CUDA Runtime and cuBLAS DLLs | NVIDIA CUDA Toolkit EULA, Attachment A | CUDA runtime dependencies | The MSI includes only the three DLLs listed above, alongside PaRuX's bundled CUDA llama.cpp application; see `NVIDIA_CUDA_NOTICE.txt`. |
 | ComfyUI | GPL-3.0 | Local image/video generation backend | Separate local process reached over HTTP. PaRuX may install/manage a copy on explicit request but does not link its GPL code into PaRuX binaries. ComfyUI remains governed by GPL-3.0. |
 | TRELLIS / compatible Windows runtime | Verify the exact selected upstream/fork revision; Microsoft's TRELLIS core is MIT | 3D generation | Separate local runtime, downloaded/cloned on request; not in MSI. |
 | Unsloth | Apache-2.0 | LoRA/QLoRA training | Installed into an isolated local Python environment on request. |

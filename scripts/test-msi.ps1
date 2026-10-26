@@ -44,6 +44,14 @@ $updateHelperExe = Join-Path $installDir "UpdateHelper\PaRuX.UpdateHelper.exe"
 $cliPath = Join-Path $installDir "Cli"
 $licenseFile = Join-Path $installDir "LICENSE.txt"
 $noticesFile = Join-Path $installDir "THIRD_PARTY_NOTICES.md"
+$cudaNoticeFile = Join-Path $installDir "NVIDIA_CUDA_NOTICE.txt"
+$cudaBaselineDir = Join-Path $installDir "PaRuX.Server\runtime-baseline\llama.cpp-b11871-cuda13.4"
+$cudaBaselineFiles = @(
+    (Join-Path $cudaBaselineDir "llama-server.exe"),
+    (Join-Path $cudaBaselineDir "cudart64_13.dll"),
+    (Join-Path $cudaBaselineDir "cublas64_13.dll"),
+    (Join-Path $cudaBaselineDir "cublasLt64_13.dll")
+)
 $startMenuShortcut = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\PaRuX\PaRuX.lnk"
 $systemEnvironmentKey = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
 
@@ -106,8 +114,12 @@ function Assert-Installed([bool]$RequireUpdateHelper = $true) {
         @{ Path = $cliExe; Label = "CLI executable" },
         @{ Path = $licenseFile; Label = "license" },
         @{ Path = $noticesFile; Label = "third-party notices" },
+        @{ Path = $cudaNoticeFile; Label = "NVIDIA CUDA notice" },
         @{ Path = $startMenuShortcut; Label = "machine Start Menu shortcut" }
     )
+    foreach ($path in $cudaBaselineFiles) {
+        $required += @{ Path = $path; Label = "bundled CUDA 13.4 baseline payload" }
+    }
     if ($RequireUpdateHelper) {
         $required += @{ Path = $updateHelperExe; Label = "protected Update Helper executable" }
     }
@@ -121,7 +133,7 @@ function Assert-Installed([bool]$RequireUpdateHelper = $true) {
 }
 
 function Assert-Uninstalled {
-    $removed = @($appExe, $serverExe, $serverDll, $cliExe, $updateHelperExe, $startMenuShortcut)
+    $removed = @($appExe, $serverExe, $serverDll, $cliExe, $updateHelperExe, $cudaNoticeFile, $startMenuShortcut) + $cudaBaselineFiles
     foreach ($path in $removed) {
         if (Test-Path -LiteralPath $path -PathType Leaf) {
             throw "MSI-owned PaRuX file remains after uninstall: $path"

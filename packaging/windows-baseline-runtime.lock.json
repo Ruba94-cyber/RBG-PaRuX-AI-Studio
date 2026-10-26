@@ -14,6 +14,30 @@
       "requiredFiles": ["llama-server.exe"]
     },
     {
+      "id": "llama.cpp-cuda13",
+      "version": "b11871",
+      "license": "MIT",
+      "archiveName": "llama-b11871-bin-win-cuda-13.4-x64.zip",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11871/llama-b11871-bin-win-cuda-13.4-x64.zip",
+      "sizeBytes": 160060670,
+      "sha256": "844f1da6c43b16d8cac1d2b7dcb79645ce2925f6102c3470f75e348c3c1b9175",
+      "destination": "PaRuX.Server/runtime-baseline/llama.cpp-b11871-cuda13.4",
+      "requiredFiles": ["llama-server.exe"]
+    },
+    {
+      "id": "cuda-runtime-13.4",
+      "version": "13.4",
+      "license": "NVIDIA CUDA Toolkit EULA",
+      "licenseUrl": "https://docs.nvidia.com/cuda/eula/index.html",
+      "archiveName": "cudart-llama-bin-win-cuda-13.4-x64.zip",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11871/cudart-llama-bin-win-cuda-13.4-x64.zip",
+      "sizeBytes": 423535356,
+      "sha256": "738f8c251ac22b70c3ae6f83a10cf222725df0395246a2cf58f32bdb85fbe668",
+      "destination": "PaRuX.Server/runtime-baseline/llama.cpp-b11871-cuda13.4",
+      "requiredFiles": ["cudart64_13.dll", "cublas64_13.dll", "cublasLt64_13.dll"],
+      "redistributableFiles": ["cudart64_13.dll", "cublas64_13.dll", "cublasLt64_13.dll"]
+    },
+    {
       "id": "uv",
       "version": "0.12.1",
       "license": "MIT OR Apache-2.0",
