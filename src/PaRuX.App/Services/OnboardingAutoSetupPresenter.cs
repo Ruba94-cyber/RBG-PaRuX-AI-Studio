@@ -35,7 +35,7 @@ namespace PaRuX.Services
                     "Downloading " + (state.ModelTitle ?? "the model"),
                     message + runtime, "Setting up...", false, true, false, false, true),
                 AutoSetupPhase.Ready => new AutoSetupViewModel(
-                    "PaRuX is ready", message, "Set up again", true, false, false, false, false),
+                    "PaRuX is ready", message, "Start chatting", true, false, false, false, false),
                 AutoSetupPhase.NoModelFits => new AutoSetupViewModel(
                     "No recommended model fits this PC", message, "Try again", true, false, false, true, false),
                 AutoSetupPhase.Failed => new AutoSetupViewModel(

@@ -76,6 +76,9 @@ namespace PaRuX.Services
             FirstModelAdvice? modelAdvice = null)
         {
             bool vulkanDetected = IsComponentDetected(components, BundledVulkanId);
+            // On NVIDIA GPUs that support it the MSI bootstraps the bundled CUDA 13.4 build instead of Vulkan, so a
+            // detected CUDA text engine is just as much "the included engine" as Vulkan.
+            bool cudaDetected = IsComponentDetected(components, DownloadableCudaId);
             bool uvDetected = IsComponentDetected(components, BundledUvId);
 
             // Bundled items in the signed installer
@@ -169,7 +172,7 @@ namespace PaRuX.Services
                 }
             };
 
-            bool hasWorkingTextPath = vulkanDetected;
+            bool hasWorkingTextPath = vulkanDetected || cudaDetected;
             string headline = hasWorkingTextPath
                 ? "Included text engine detected — download a chat model next"
                 : components == null
@@ -177,7 +180,9 @@ namespace PaRuX.Services
                     : "Text engine not detected — review Components to set it up";
 
             string subhead = hasWorkingTextPath
-                ? "The included Vulkan runtime is detected. Download a chat model, then verify a real local answer before entering Chat."
+                ? (cudaDetected && !vulkanDetected
+                    ? "The included CUDA 13.4 runtime is detected. Download a chat model, then verify a real local answer before entering Chat."
+                    : "The included Vulkan runtime is detected. Download a chat model, then verify a real local answer before entering Chat.")
                 : "The installer is designed to include the Vulkan engine, a CUDA 13.4 engine for supported NVIDIA GPUs, and package tooling. If detection fails, repair or locate the runtime in Components.";
 
             string guidance = $"Verify installer integrity: run '{PowerShellVerificationCommand}' in PowerShell and compare with SHA256SUMS.txt. See {DocumentationPath} for details.";

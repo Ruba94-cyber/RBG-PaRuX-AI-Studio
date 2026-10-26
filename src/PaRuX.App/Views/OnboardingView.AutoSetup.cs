@@ -71,7 +71,12 @@ namespace PaRuX.Views
         private async void AutoSetupStart_Click(object sender, RoutedEventArgs e)
         {
             if (_autoSetup == null || _autoSetupCts != null) return;
-            if (_autoSetup.State.Phase == AutoSetupPhase.Ready) _autoSetup.Reset();
+            if (_autoSetup.State.Phase == AutoSetupPhase.Ready)
+            {
+                // Setup is verified: the card's button now takes the user into Chat instead of offering to redo it.
+                GetStarted_Click(sender, e);
+                return;
+            }
             _autoSetup.Start();
             await RunAutoSetupAsync();
         }

@@ -254,5 +254,25 @@ namespace PaRuX.Server.Tests
             Assert.Contains("No text runtime", result.FailureReason);
             Assert.Contains("bundles the Vulkan runtime in the installer", result.NextAction);
         }
+
+        [Fact]
+        public void BuildOverview_BundledCudaEngineAloneCountsAsADetectedTextEngine()
+        {
+            // Real clean install on an RTX 5080: only the bundled CUDA 13.4 build is installed, and the page said
+            // "Text engine not detected" because it only looked for Vulkan, right under "PaRuX is ready".
+            var components = new List<ComponentStatus>
+            {
+                new() { Id = "llama-server-cuda", DisplayName = "llama.cpp CUDA", Detected = true, Health = "healthy",
+                    Ownership = ComponentOwnership.PARUX_MANAGED },
+                new() { Id = "uv", DisplayName = "uv", Detected = true, Health = "healthy",
+                    Ownership = ComponentOwnership.PARUX_MANAGED }
+            };
+
+            FirstInstallEffortOverview overview = BundledRuntimeOverviewPresenter.BuildOverview(components, null);
+
+            Assert.True(overview.HasWorkingTextPathWithoutDownload);
+            Assert.Contains("Included text engine detected", overview.Headline);
+            Assert.Contains("CUDA", overview.Subhead);
+        }
     }
 }

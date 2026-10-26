@@ -241,6 +241,16 @@ namespace PaRuX.Server.Tests
         }
 
         [Fact]
+        public void Ready_state_offers_start_chatting_not_set_up_again()
+        {
+            AutoSetupViewModel vm = OnboardingAutoSetupPresenter.Present(
+                new AutoSetupState { Phase = AutoSetupPhase.Ready, Message = "ok" });
+
+            Assert.Equal("Start chatting", vm.PrimaryLabel);
+            Assert.True(vm.PrimaryEnabled);
+        }
+
+        [Fact]
         public async Task Verification_is_retried_when_the_runtime_changed_while_it_ran()
         {
             // Real first run: the managed runtime updater switched the runtime during the chat check, the check
