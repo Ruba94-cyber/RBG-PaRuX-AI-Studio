@@ -182,22 +182,28 @@ public sealed class RealCodingTaskTests
     {
         const string workspaceVariable = "PARUX_REAL_CODING_WORKSPACE";
         const string goal =
-            "Fix how the local coding agent searches persisted tool-output artifacts. The real dogfood log shows " +
-            "it calling search_artifact with OR-style terms such as Failed|Passed|error while regex is false or " +
-            "omitted; CodingAgentArtifactStore.SearchFromDirectory treats that as one literal string and returns " +
-            "no matches, so the agent repeats reads. First add a focused test in CodingAgentArtifactStoreTests: " +
-            "when a literal search containing | has no matches, split a bounded list of trimmed, nonempty terms " +
-            "and return matching lines with case-insensitive literal OR semantics; each line should appear once. " +
-            "Do not run arbitrary regex as an implicit fallback. Preserve literal matches when they exist, explicit " +
-            "regex behavior and timeout, and the match limit. " +
-            "Run the focused test and confirm a real assertion failure before changing production code. Then make " +
-            "the smallest fix in CodingAgentArtifactStore and run: dotnet test " +
+            "Fix literal searches that use | in CodingAgentArtifactStore.SearchFromDirectory. With regex=false, " +
+            "first return any exact case-insensitive literal matches across the whole artifact. Only when there " +
+            "are no exact matches, split a query containing | into at most 16 trimmed, nonempty terms and return " +
+            "each line matching any term once, up to maxMatches. Do not run arbitrary regex as an implicit fallback. " +
+            "Preserve explicit regex behavior and timeout. " +
+            "First add two tests in CodingAgentArtifactStoreTests: one proving literal OR fallback returns each " +
+            "matching line once when there is no exact match, and one proving an exact literal match anywhere in " +
+            "the artifact suppresses OR fallback matches on other lines. Run the new fallback test with a focused " +
+            "filter and confirm a real assertion failure before changing production code. Then implement the smallest " +
+            "fix in the store, run all CodingAgentArtifactStoreTests with: dotnet test " +
             "tests\\PaRuX.Server.Tests\\PaRuX.Server.Tests.csproj -c Release --filter " +
             "FullyQualifiedName~CodingAgentArtifactStoreTests -v:q -p:GitRepositoryConfigurationScope=local " +
-            "-p:NuGetAudit=false -p:RunAnalyzers=false. Use read_file_range only for " +
-            "SearchFromDirectory and the existing artifact-search tests; do not use batch_read, whole-file reads, " +
-            "or explore unrelated code. A build or Git-config access error is not a valid red test; resolve the " +
-            "command issue and rerun until the focused assertion fails. Modify only the store and its focused tests.";
+            "-p:NuGetAudit=false -p:RunAnalyzers=false. This machine localizes the VSTest summary in Italian " +
+            "(Superato, Superati, Non superati, Totale); after list_artifacts, read the final 3000 characters " +
+            "using offset max(0, Characters-3000) when needed. Do not repeat the same read_artifact offset or rerun " +
+            "the command just to recover its output. " +
+            "The filtered tests prove the behavior but are not an accepted completion receipt. After they pass, " +
+            "run the unfiltered scoped verifier: dotnet build src\\PaRuX.App\\PaRuX.App.csproj -c Release " +
+            "--no-restore -m:1 -p:GitRepositoryConfigurationScope=local -p:NuGetAudit=false -p:RunAnalyzers=false. " +
+            "Do not run the full Server suite or root-level dotnet test/build. Use read_file_range only for " +
+            "SearchFromDirectory and the artifact-search tests; do not use batch_read, whole-file reads, or explore " +
+            "unrelated code. Modify only CodingAgentArtifactStore.cs and CodingAgentArtifactStoreTests.cs.";
         string workspace = Path.GetFullPath(RealCodingProduct.RequireVariable(workspaceVariable));
         string artifactsRoot = RealCodingProduct.RequireVariable(RealCodingProduct.ArtifactsVariable);
         string runDirectory = Path.Combine(artifactsRoot, "parux-run-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
@@ -315,8 +321,11 @@ public sealed class RealCodingTaskTests
             Assert.Contains(logs, line => line.StartsWith("Coding model:", StringComparison.Ordinal));
             Assert.Contains(logs, line => line.StartsWith("Step 1:", StringComparison.Ordinal));
             Assert.Contains(seen, activity => activity.Contains("Step ", StringComparison.Ordinal));
-            Assert.Contains(logs, line => line.Contains("CodingAgentArtifactStoreTests", StringComparison.Ordinal));
-            Assert.Contains(logs, line => line.Contains("run_command", StringComparison.Ordinal)
+            Assert.Contains(logs, line => line.Contains("CodingAgentArtifactStoreTests", StringComparison.Ordinal)
+                && line.Contains("run_command", StringComparison.Ordinal)
+                && line.Contains("(exit 0)", StringComparison.Ordinal));
+            Assert.Contains(logs, line => line.Contains("PaRuX.App.csproj", StringComparison.Ordinal)
+                && line.Contains("run_command", StringComparison.Ordinal)
                 && line.Contains("(exit 0)", StringComparison.Ordinal));
             Assert.Contains(logs, line => line.StartsWith("Verifier pass", StringComparison.Ordinal)
                 && line.Contains("PASS", StringComparison.Ordinal));
