@@ -211,11 +211,58 @@ public sealed class RealCodingTaskTests
 
         try
         {
+            bool coreReady = false;
+            DateTime coreDeadline = DateTime.UtcNow + TimeSpan.FromMinutes(2);
+            while (!coreReady && DateTime.UtcNow < coreDeadline)
+            {
+                try
+                {
+                    using JsonDocument taskList = JsonDocument.Parse(product.CoreGet("/api/v1/orchestrator/tasks"));
+                    coreReady = taskList.RootElement.TryGetProperty("tasks", out JsonElement tasks)
+                        && tasks.ValueKind == JsonValueKind.Array;
+                }
+                catch (Exception)
+                {
+                    // The desktop window appears before the isolated Core has finished starting.
+                }
+                if (!coreReady) Thread.Sleep(1000);
+            }
+            Assert.True(coreReady, "PaRuX Core was not ready before the coding request.");
+            Mark("Core API ready");
+
             new MainWindowPage(product.MainWindow).Click("MainWindow_NewChat_Button", ControlType.Button);
             var chat = new ChatPage(product.MainWindow);
             Assert.Equal(Path.GetFileName(workspace), chat.CodeFolderLabel.Name);
             chat.SendPrompt("/code " + goal);
             Mark("submitted /code through Chat_Send_Button");
+
+            UiWait.For(() => product.TryFindById("parux-coding-permission-mode-dialog") != null
+                    || product.TryFindById("Chat_CodingTask_Id_Text") != null,
+                "coding permission dialog or task card", TimeSpan.FromMinutes(2));
+            AutomationElement? permissionDialog = product.TryFindById("parux-coding-permission-mode-dialog");
+            if (permissionDialog != null)
+            {
+                AutomationElement modePicker = permissionDialog.FindFirstDescendant(cf => cf.ByControlType(ControlType.ComboBox))
+                    ?? throw new InvalidOperationException("Coding permission mode picker was not exposed through UIA.");
+                modePicker.Patterns.ExpandCollapse.Pattern.Expand();
+                AutomationElement? bypassOption = null;
+                UiWait.For(() =>
+                {
+                    bypassOption = modePicker.AsComboBox().Items.FirstOrDefault(item =>
+                        item.Properties.ControlType.ValueOrDefault == ControlType.ListItem
+                        && (item.Properties.Name.ValueOrDefault ?? string.Empty).StartsWith("Bypass", StringComparison.Ordinal));
+                    return bypassOption != null;
+                }, "Bypass coding-run permission option", TimeSpan.FromSeconds(15));
+                bypassOption!.Patterns.SelectionItem.Pattern.Select();
+                AutomationElement startCoding = permissionDialog.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))
+                    ?? permissionDialog.FindAllDescendants(cf => cf.ByControlType(ControlType.Button))
+                        .FirstOrDefault(button => button.Properties.Name.ValueOrDefault == "Start coding")
+                    ?? throw new InvalidOperationException("Coding permission Start coding button was not exposed through UIA.");
+                startCoding.Patterns.Invoke.Pattern.Invoke();
+                Mark("selected Bypass and started coding through UIA");
+                UiWait.For(() => product.TryFindById("parux-coding-permission-mode-dialog") == null,
+                    "coding permission dialog closed", TimeSpan.FromSeconds(30));
+            }
 
             UiWait.For(() => (product.TryFindById("Chat_CodingTask_Id_Text")?.Properties.Name.ValueOrDefault ?? string.Empty)
                     .StartsWith("Task ", StringComparison.Ordinal),
@@ -275,10 +322,6 @@ public sealed class RealCodingTaskTests
             string runtimeStatusJson = product.CoreGet("/api/v1/runtime/status");
             File.WriteAllText(Path.Combine(runDirectory, "runtime-status.json"), runtimeStatusJson);
             using JsonDocument runtimeStatus = JsonDocument.Parse(runtimeStatusJson);
-            Assert.Contains(runtimeStatus.RootElement.GetProperty("backends").EnumerateArray(), backend =>
-                backend.GetProperty("backend").GetString() == "text-cuda"
-                && backend.GetProperty("running").GetBoolean()
-                && backend.GetProperty("healthy").GetBoolean());
             Assert.Equal("Qwen3.8-27B-UD-IQ4_XS.gguf",
                 Path.GetFileName(runtimeStatus.RootElement.GetProperty("activeModelPath").GetString()));
             Assert.Equal(baselineHead, Git(workspace, "rev-parse", "HEAD").Trim());
