@@ -190,7 +190,7 @@ public sealed class RealCodingTaskTests
             "non-progress safety bound. First add or update the focused regression test and run it to confirm it fails " +
             "before changing production code. Then make the smallest fix and run: " +
             "dotnet test tests\\PaRuX.Server.Tests\\PaRuX.Server.Tests.csproj -c Release --filter " +
-            "FullyQualifiedName~CodingAgentRepeatGuardTests. Do not modify unrelated files.";
+            "FullyQualifiedName~CodingAgentRepeatGuardTests -p:GitRepositoryConfigurationScope=local. In this offline sandbox, a build or Git-config access error is not a valid red test; resolve the command issue and rerun until the focused assertion fails before changing production code. Do not modify unrelated files.";
         string workspace = Path.GetFullPath(RealCodingProduct.RequireVariable(workspaceVariable));
         string artifactsRoot = RealCodingProduct.RequireVariable(RealCodingProduct.ArtifactsVariable);
         string runDirectory = Path.Combine(artifactsRoot, "parux-run-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
