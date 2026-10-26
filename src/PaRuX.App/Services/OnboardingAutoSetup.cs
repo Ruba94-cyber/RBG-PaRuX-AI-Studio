@@ -223,6 +223,7 @@ namespace PaRuX.Services
             foreach (ModelQuantChoice choice in choices)
             {
                 if (!choice.Complete || choice.SizeBytes <= 0) continue;
+                if (IsBelowThreeBits(choice.Quantization)) continue;
                 // A real quantisation is never a small fraction of the model's estimated size; a file that is
                 // (an auxiliary head, a draft model) is not the chat model and must not be downloaded as one.
                 if (candidate.Model.EstimatedSizeBytes > 0 && choice.SizeBytes < candidate.Model.EstimatedSizeBytes * 0.30) continue;
@@ -248,6 +249,16 @@ namespace PaRuX.Services
                 .FirstOrDefault();
         }
 
+        /// <summary>1-2 bit quantisations (IQ1_*, IQ2_*, Q2_K, TQ*) are not a usable first model; the automatic
+        /// setup prefers a smaller model at a sound quantisation over a big one squeezed this far.</summary>
+        internal static bool IsBelowThreeBits(string? quant)
+        {
+            if (string.IsNullOrWhiteSpace(quant)) return false;
+            string q = quant.Trim().ToUpperInvariant();
+            return q.StartsWith("IQ1", StringComparison.Ordinal) || q.StartsWith("IQ2", StringComparison.Ordinal)
+                || q.StartsWith("Q2", StringComparison.Ordinal) || q.StartsWith("TQ", StringComparison.Ordinal);
+        }
+
         private static int PreferenceOf(string quant)
         {
             int index = Array.FindIndex(PreferredQuants,
@@ -265,6 +276,8 @@ namespace PaRuX.Services
     public sealed class OnboardingAutoSetupService
     {
         public const int MaxRetriesPerPhase = 3;
+        /// <summary>Text the chat check reports when the model or runtime changed while it ran.</summary>
+        public const string TransientVerificationMarker = "changed during verification";
         public const int MaxConsecutivePollFailures = 8;
         public const int MaxModelRestarts = 2;
 
@@ -607,7 +620,17 @@ namespace PaRuX.Services
 
         private async Task VerifyAsync(CancellationToken ct)
         {
-            string? failure = await _host.VerifyChatAsync(ct).ConfigureAwait(false);
+            // The managed runtime updater (or a role change) can legitimately switch the configuration while
+            // the one-time-code check runs; that is transient, so the check is repeated a few times instead of
+            // stopping the whole setup. A wrong answer or a missing model is a real failure and is not retried.
+            const int MaxTransientVerifyAttempts = 3;
+            string? failure = null;
+            for (int attempt = 1; attempt <= MaxTransientVerifyAttempts; attempt++)
+            {
+                failure = await _host.VerifyChatAsync(ct).ConfigureAwait(false);
+                if (failure == null || !failure.Contains(TransientVerificationMarker, StringComparison.Ordinal)) break;
+                await _delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
+            }
             if (failure != null) throw new InvalidOperationException(failure);
             _state.Phase = AutoSetupPhase.Ready;
             _state.Message = "Verified: a local model answered the one-time code. PaRuX is ready.";
