@@ -308,7 +308,7 @@ namespace PaRuX.Services
             }
 
             (int exit, string outp, string err) status = await RunGitAsync(workspacePath, "status --porcelain");
-            (int exit, string outp, string err) diffStat = await RunGitAsync(workspacePath, "diff --stat HEAD");
+            (int exit, string outp, string err) diffStat = await RunGitAsync(workspacePath, "diff --stat=4096,4000 HEAD"); // never abbreviate paths: the review list feeds apply
             (int exit, string outp, string err) untracked = await RunGitAsync(workspacePath,
                 "ls-files --others --exclude-standard -z");
 

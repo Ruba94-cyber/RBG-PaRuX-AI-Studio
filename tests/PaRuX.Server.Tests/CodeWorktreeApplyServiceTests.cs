@@ -300,6 +300,39 @@ public sealed class CodeWorktreeApplyServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Accepted_file_that_matches_no_task_change_refuses_the_whole_apply()
+    {
+        // Live dogfood defect: the review list held an abbreviated ".../File.cs" path from `git diff --stat`;
+        // it matched nothing, so one of two files was silently dropped while the apply reported success.
+        File.WriteAllText(Path.Combine(_worktree, "tracked.txt"), "after\n");
+        File.WriteAllText(Path.Combine(_worktree, "unstaged.txt"), "after-unstaged\n");
+
+        CodeApplyResult result = await CodeWorktreeApplyService.ApplyAsync(
+            _repo, _worktree, CancellationToken.None,
+            acceptedFiles: new[] { "tracked.txt", ".../unstaged.txt" });
+
+        Assert.False(result.Success);
+        Assert.Contains(".../unstaged.txt", result.Message, StringComparison.Ordinal);
+        Assert.Contains("Nothing was applied", result.Message, StringComparison.Ordinal);
+        Assert.Equal("before", ReadNormalized(Path.Combine(_repo, "tracked.txt")).Trim());
+    }
+
+    [Fact]
+    public async Task Every_accepted_file_that_really_changed_is_applied()
+    {
+        File.WriteAllText(Path.Combine(_worktree, "tracked.txt"), "after\n");
+        File.WriteAllText(Path.Combine(_worktree, "unstaged.txt"), "after-unstaged\n");
+
+        CodeApplyResult result = await CodeWorktreeApplyService.ApplyAsync(
+            _repo, _worktree, CancellationToken.None,
+            acceptedFiles: new[] { "tracked.txt", "unstaged.txt" });
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal("after", ReadNormalized(Path.Combine(_repo, "tracked.txt")).Trim());
+        Assert.Equal("after-unstaged", ReadNormalized(Path.Combine(_repo, "unstaged.txt")).Trim());
+    }
+
+    [Fact]
     public async Task Same_directory_is_rejected()
     {
         CodeApplyResult result = await CodeWorktreeApplyService.ApplyAsync(_repo, _repo, CancellationToken.None);

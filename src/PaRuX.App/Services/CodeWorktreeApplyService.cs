@@ -84,6 +84,25 @@ namespace PaRuX.Services
                     intentAdded.Add(relative);
                 }
 
+                if (acceptedFiles != null && acceptedFiles.Count > 0)
+                {
+                    // Every accepted entry must be a real changed path. A display-only or abbreviated
+                    // name (for example ".../File.cs" from `git diff --stat`) is not a Git pathspec;
+                    // it would match nothing and silently drop that file while the apply reported success.
+                    GitResult changed = await GitAsync(worktree, ct, "diff", "--name-only", "-z", "HEAD", "--").ConfigureAwait(false);
+                    if (!changed.Ok)
+                        return new CodeApplyResult(false, "Could not list the task's changed files: " + Bound(changed.Error, 600));
+                    var changedPaths = new HashSet<string>(
+                        changed.Output.Split('\0', StringSplitOptions.RemoveEmptyEntries), StringComparer.OrdinalIgnoreCase);
+                    List<string> unknown = acceptedFiles
+                        .Where(file => !changedPaths.Contains(file.Replace('\\', '/')))
+                        .ToList();
+                    if (unknown.Count > 0)
+                        return new CodeApplyResult(false,
+                            "These accepted files are not part of the task's changes: " + string.Join(", ", unknown)
+                            + ". Nothing was applied; re-open the review and apply again.");
+                }
+
                 AppPaths.EnsureCreated();
                 string patchDir = Path.Combine(AppPaths.CodingAgentStateDir, "apply-patches");
                 Directory.CreateDirectory(patchDir);
@@ -267,7 +286,10 @@ namespace PaRuX.Services
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
-                RedirectStandardError = true
+                RedirectStandardError = true,
+                // Git emits UTF-8 paths and messages; the default console code page garbles non-ASCII names.
+                StandardOutputEncoding = new UTF8Encoding(false),
+                StandardErrorEncoding = new UTF8Encoding(false)
             };
             // Match the user's Git and .gitattributes line-ending rules. The task worktree is
             // created with those same settings; overriding them here makes otherwise unchanged
