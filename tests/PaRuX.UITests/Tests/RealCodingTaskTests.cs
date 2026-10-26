@@ -177,6 +177,165 @@ public sealed class RealCodingTaskTests
         }
     }
 
+    [RealCodingFact("PARUX_REAL_CODING_WORKSPACE"), Trait("Category", "HardwareE2E"), Trait("Category", "PaRuXDogfood"), Trait("Category", "FlaUI")]
+    public void Public_clone_repeated_read_recovery_is_completed_and_applied_through_real_chat()
+    {
+        const string workspaceVariable = "PARUX_REAL_CODING_WORKSPACE";
+        const string goal =
+            "Add test-first coverage and a bounded recovery improvement for repeated read-only coding-agent actions. " +
+            "Currently the first identical read is executed, the second is suppressed and steered using its saved result, " +
+            "and the third identical request stops the run. Change this so the second and third identical requests are " +
+            "both suppressed and steered using the saved result; the fourth identical request remains the hard stop. " +
+            "Preserve no duplicate tool execution, checkpoint preservation, mutation-epoch reset, and the global " +
+            "non-progress safety bound. First add or update the focused regression test and run it to confirm it fails " +
+            "before changing production code. Then make the smallest fix and run: " +
+            "dotnet test tests\\PaRuX.Server.Tests\\PaRuX.Server.Tests.csproj -c Release --filter " +
+            "FullyQualifiedName~CodingAgentRepeatGuardTests. Do not modify unrelated files.";
+        string workspace = Path.GetFullPath(RealCodingProduct.RequireVariable(workspaceVariable));
+        string artifactsRoot = RealCodingProduct.RequireVariable(RealCodingProduct.ArtifactsVariable);
+        string runDirectory = Path.Combine(artifactsRoot, "parux-run-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
+        string screenshots = Path.Combine(runDirectory, "ui");
+        Directory.CreateDirectory(runDirectory);
+
+        Assert.True(File.Exists(Path.Combine(workspace, "AGENTS.md")), "Dogfood workspace must be the PaRuX repository.");
+        string baselineHead = Git(workspace, "rev-parse", "HEAD").Trim();
+        Assert.Equal(string.Empty, Git(workspace, "status", "--porcelain=v1").Trim());
+
+        using var product = new RealCodingProduct(screenshots, workspace);
+        var timeline = new List<string>();
+        void Mark(string text)
+        {
+            timeline.Add(DateTime.UtcNow.ToString("HH:mm:ss.fff") + "  " + text);
+            File.WriteAllLines(Path.Combine(runDirectory, "ui-timeline.txt"), timeline);
+        }
+
+        try
+        {
+            new MainWindowPage(product.MainWindow).Click("MainWindow_NewChat_Button", ControlType.Button);
+            var chat = new ChatPage(product.MainWindow);
+            Assert.Equal(Path.GetFileName(workspace), chat.CodeFolderLabel.Name);
+            chat.SendPrompt("/code " + goal);
+            Mark("submitted /code through Chat_Send_Button");
+
+            UiWait.For(() => (product.TryFindById("Chat_CodingTask_Id_Text")?.Properties.Name.ValueOrDefault ?? string.Empty)
+                    .StartsWith("Task ", StringComparison.Ordinal),
+                "Core task id on the card", TimeSpan.FromMinutes(3));
+            string taskPrefix = product.TryFindById("Chat_CodingTask_Id_Text")!.Name
+                .Replace("Task ", string.Empty, StringComparison.Ordinal).Trim();
+            Assert.True(taskPrefix.Length >= 8, "task id text: " + taskPrefix);
+            Mark("task card visible: Task " + taskPrefix);
+            product.Capture("01-task-submitted");
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            string status = string.Empty;
+            DateTime deadline = DateTime.UtcNow + TimeSpan.FromMinutes(45);
+            while (DateTime.UtcNow < deadline)
+            {
+                status = product.TryFindById("Chat_CodingTask_Status_Text")?.Properties.Name.ValueOrDefault ?? string.Empty;
+                foreach (AutomationElement item in product.FindAllById("Chat_CodingTask_Activity_Item"))
+                {
+                    string activity;
+                    try { activity = item.Properties.Name.ValueOrDefault ?? string.Empty; }
+                    catch (FlaUI.Core.Exceptions.FlaUIException) { continue; }
+                    if (seen.Add(activity))
+                        Mark("activity: " + (activity.Length > 220 ? activity[..220] : activity));
+                }
+
+                if (status.StartsWith("Completed", StringComparison.Ordinal)
+                    || status is "Verification failed" or "Failed" or "Cancelled") break;
+                Thread.Sleep(1500);
+            }
+
+            Mark("terminal card status: " + status);
+            product.Capture("02-terminal-state");
+            File.WriteAllLines(Path.Combine(runDirectory, "ui-activity-seen.txt"),
+                seen.OrderBy(value => value, StringComparer.Ordinal));
+            Assert.Equal("Completed and verified", status);
+
+            string fullTaskId = ResolveTaskId(product, taskPrefix);
+            using JsonDocument logDocument = JsonDocument.Parse(
+                product.CoreGet("/api/v1/orchestrator/tasks/" + fullTaskId + "/logs"));
+            string[] logs = logDocument.RootElement.GetProperty("logs").EnumerateArray()
+                .Select(entry => entry.GetProperty("message").GetString() ?? string.Empty).ToArray();
+            File.WriteAllLines(Path.Combine(runDirectory, "core-task-log.txt"), logs);
+            Assert.Contains(logs, line => line.StartsWith("Coding model:", StringComparison.Ordinal));
+            Assert.Contains(logs, line => line.StartsWith("Step 1:", StringComparison.Ordinal));
+            Assert.Contains(seen, activity => activity.Contains("Step ", StringComparison.Ordinal));
+            Assert.Contains(logs, line => line.Contains("CodingAgentRepeatGuardTests", StringComparison.Ordinal));
+            Assert.Contains(logs, line => line.Contains("run_command", StringComparison.Ordinal)
+                && line.Contains("(exit 0)", StringComparison.Ordinal));
+            Assert.Contains(logs, line => line.StartsWith("Verifier pass", StringComparison.Ordinal)
+                && line.Contains("PASS", StringComparison.Ordinal));
+            Assert.Contains(logs, line => line.StartsWith("[phase-timing-total]", StringComparison.Ordinal));
+
+            using JsonDocument taskDocument = JsonDocument.Parse(product.CoreGet("/api/v1/orchestrator/tasks/" + fullTaskId));
+            Assert.Equal("completed", taskDocument.RootElement.GetProperty("status").GetString());
+            Assert.Equal("pass", taskDocument.RootElement.GetProperty("verificationStatus").GetString()!.ToLowerInvariant());
+
+            string runtimeStatusJson = product.CoreGet("/api/v1/runtime/status");
+            File.WriteAllText(Path.Combine(runDirectory, "runtime-status.json"), runtimeStatusJson);
+            using JsonDocument runtimeStatus = JsonDocument.Parse(runtimeStatusJson);
+            Assert.Contains(runtimeStatus.RootElement.GetProperty("backends").EnumerateArray(), backend =>
+                backend.GetProperty("backend").GetString() == "text-cuda"
+                && backend.GetProperty("running").GetBoolean()
+                && backend.GetProperty("healthy").GetBoolean());
+            Assert.Equal("Qwen3.8-27B-UD-IQ4_XS.gguf",
+                Path.GetFileName(runtimeStatus.RootElement.GetProperty("activeModelPath").GetString()));
+            Assert.Equal(baselineHead, Git(workspace, "rev-parse", "HEAD").Trim());
+            Assert.Equal(string.Empty, Git(workspace, "status", "--porcelain=v1").Trim());
+
+            AutomationElement apply = UiWait.ById(product.MainWindow, "Chat_CodingTask_Apply_Button", ControlType.Button);
+            string diffStat = product.TryFindById("Chat_CodingTask_DiffStat_Text")?.Properties.Name.ValueOrDefault ?? string.Empty;
+            Assert.Contains("CodingAgentRepeatGuard.cs", diffStat, StringComparison.Ordinal);
+            Assert.Contains("CodingAgentRepeatGuardTests.cs", diffStat, StringComparison.Ordinal);
+            product.MainWindow.SetForeground();
+            apply.Patterns.Invoke.Pattern.Invoke();
+            UiWait.For(() => product.TryFindById("Chat_CodingTask_ApplyConfirm_Dialog") != null,
+                "apply confirmation dialog", TimeSpan.FromSeconds(30));
+            AutomationElement dialog = product.TryFindById("Chat_CodingTask_ApplyConfirm_Dialog")!;
+            UiWait.For(() => dialog.FindAllDescendants().Any(element =>
+                    (element.Properties.Name.ValueOrDefault ?? string.Empty).Contains("CodingAgentRepeatGuard", StringComparison.Ordinal)),
+                "repeat-guard files listed in confirmation", TimeSpan.FromSeconds(15));
+            product.Capture("03-apply-confirmation");
+            UiWait.For(() => dialog.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton")) != null,
+                "confirmation primary button", TimeSpan.FromSeconds(15));
+            dialog.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))!.Patterns.Invoke.Pattern.Invoke();
+
+            string[] expectedChangedPaths = new[]
+                {
+                    "src/PaRuX.App/Services/CodingAgentRepeatGuard.cs",
+                    "tests/PaRuX.Server.Tests/CodingAgentRepeatGuardTests.cs"
+                }
+                .OrderBy(path => path, StringComparer.Ordinal).ToArray();
+            UiWait.For(() => Git(workspace, "status", "--porcelain=v1")
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(line => line.TrimEnd('\r'))
+                    .Select(line => line.Length > 3 ? line[3..] : line)
+                    .OrderBy(path => path, StringComparer.Ordinal)
+                    .SequenceEqual(expectedChangedPaths, StringComparer.Ordinal),
+                "applied patch in the public repository", TimeSpan.FromSeconds(60));
+            string[] changed = Git(workspace, "status", "--porcelain=v1").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.TrimEnd('\r')).ToArray();
+            string[] changedPaths = changed.Select(line => line.Length > 3 ? line[3..] : line)
+                .OrderBy(path => path, StringComparer.Ordinal).ToArray();
+            Assert.Equal(expectedChangedPaths, changedPaths);
+            Assert.Equal(baselineHead, Git(workspace, "rev-parse", "HEAD").Trim());
+            string diff = Git(workspace, "diff");
+            File.WriteAllText(Path.Combine(runDirectory, "applied.diff"), diff);
+            Assert.Contains("SecondIdenticalRead", diff, StringComparison.Ordinal);
+            Assert.Contains("Steer", diff, StringComparison.Ordinal);
+            Assert.Contains("Stop", diff, StringComparison.Ordinal);
+            File.WriteAllText(Path.Combine(runDirectory, "RESULT.txt"),
+                "PASS " + DateTime.UtcNow.ToString("O") + "\ntask " + fullTaskId + "\n");
+        }
+        catch (Exception ex)
+        {
+            File.WriteAllText(Path.Combine(runDirectory, "FAILURE.txt"), ex.ToString());
+            product.Capture("failure");
+            throw;
+        }
+    }
+
     private static string ResolveTaskId(RealCodingProduct product, string prefix)
     {
         using JsonDocument list = JsonDocument.Parse(product.CoreGet("/api/v1/orchestrator/tasks"));
