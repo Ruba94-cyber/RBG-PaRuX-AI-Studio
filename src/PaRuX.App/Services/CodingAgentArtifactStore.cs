@@ -156,19 +156,49 @@ namespace PaRuX.Services
 
             var matches = new List<SearchMatch>();
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-            for (int index = 0; index < lines.Length && matches.Count < limit; index++)
+
+            if (regex)
             {
-                string line = lines[index];
-                bool hit;
-                try
+                for (int index = 0; index < lines.Length && matches.Count < limit; index++)
                 {
-                    hit = regex
-                        ? compiled!.IsMatch(line)
-                        : line.Contains(query, StringComparison.OrdinalIgnoreCase);
+                    string line = lines[index];
+                    bool hit;
+                    try
+                    {
+                        hit = compiled!.IsMatch(line);
+                    }
+                    catch (RegexMatchTimeoutException) { break; }
+                    if (hit) matches.Add(new SearchMatch(index + 1, line.Length <= 2_000 ? line : line[..2_000] + "…"));
                 }
-                catch (RegexMatchTimeoutException) { break; }
-                if (hit) matches.Add(new SearchMatch(index + 1, line.Length <= 2_000 ? line : line[..2_000] + "…"));
             }
+            else
+            {
+                // Pass 1: exact case-insensitive literal match.
+                for (int index = 0; index < lines.Length && matches.Count < limit; index++)
+                {
+                    if (lines[index].Contains(query, StringComparison.OrdinalIgnoreCase))
+                        matches.Add(new SearchMatch(index + 1, lines[index].Length <= 2_000 ? lines[index] : lines[index][..2_000] + "…"));
+                }
+
+                // Pass 2 (only when no exact match): OR fallback via | separator.
+                if (matches.Count == 0 && query.Contains('|'))
+                {
+                    var terms = query.Split('|')
+                        .Select(t => t.Trim())
+                        .Where(t => t.Length > 0)
+                        .Take(16)
+                        .ToArray();
+                    if (terms.Length > 0)
+                    {
+                        for (int index = 0; index < lines.Length && matches.Count < limit; index++)
+                        {
+                            if (terms.Any(t => lines[index].Contains(t, StringComparison.OrdinalIgnoreCase)))
+                                matches.Add(new SearchMatch(index + 1, lines[index].Length <= 2_000 ? lines[index] : lines[index][..2_000] + "…"));
+                        }
+                    }
+                }
+            }
+
             return new SearchResult(metadata!, query, regex, matches);
         }
 

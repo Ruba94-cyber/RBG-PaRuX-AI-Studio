@@ -125,4 +125,67 @@ public sealed class CodingAgentArtifactStoreTests : IDisposable
         Assert.True(saved.WasTruncatedAtStorage);
         Assert.Equal(CodingAgentArtifactStore.MaxArtifactCharacters, saved.Characters);
     }
+
+    [Fact]
+    public void Literal_OR_fallback_returns_each_matching_line_once_when_no_exact_match()
+    {
+        // No line contains the complete literal query "foo|bar|baz".
+        string text = string.Join('\n', new[]
+        {
+            "alpha foo delta",
+            "gamma beta zeta",
+            "epsilon foo bar theta",
+            "no match here",
+            "kappa baz lambda"
+        });
+        CodingAgentArtifactStore.ArtifactMetadata saved = CodingAgentArtifactStore.SaveTextToDirectory(
+            _dir, "or-fallback", "test", text);
+
+        // With no complete literal occurrence, the query falls back to OR terms.
+        CodingAgentArtifactStore.SearchResult? result = CodingAgentArtifactStore.SearchFromDirectory(
+            _dir, saved.Id, "foo|bar|baz", regex: false, maxMatches: 10);
+
+        Assert.NotNull(result);
+        // Lines 1, 3, and 5 match. Line 3 contains two terms but appears once.
+        Assert.Equal(3, result!.Matches.Count);
+        Assert.Equal(1, result.Matches[0].LineNumber);
+        Assert.Equal(3, result.Matches[1].LineNumber);
+        Assert.Equal(5, result.Matches[2].LineNumber);
+    }
+
+    [Fact]
+    public void Exact_literal_match_anywhere_in_artifact_suppresses_OR_fallback()
+    {
+        // One line contains the complete query; the other lines match individual OR terms.
+        string text = string.Join('\n', new[]
+        {
+            "alpha foo delta",   // matches the "foo" term
+            "FOO|BAR",           // complete case-insensitive literal query
+            "gamma bar zeta"     // matches the "bar" term
+        });
+        CodingAgentArtifactStore.ArtifactMetadata saved = CodingAgentArtifactStore.SaveTextToDirectory(
+            _dir, "or-suppress", "test", text);
+
+        CodingAgentArtifactStore.SearchResult? result = CodingAgentArtifactStore.SearchFromDirectory(
+            _dir, saved.Id, "foo|bar", regex: false, maxMatches: 10);
+
+        Assert.NotNull(result);
+        // The complete literal on line 2 suppresses OR fallback; only line 2 is returned.
+        Assert.Equal(1, result!.Matches.Count);
+        Assert.Equal(2, result.Matches[0].LineNumber);
+    }
+
+    [Fact]
+    public void Literal_OR_fallback_ignores_empty_terms_and_keeps_a_single_term()
+    {
+        CodingAgentArtifactStore.ArtifactMetadata saved = CodingAgentArtifactStore.SaveTextToDirectory(
+            _dir, "or-empty-terms", "test", "alpha foo delta\nno match here");
+
+        CodingAgentArtifactStore.SearchResult? result = CodingAgentArtifactStore.SearchFromDirectory(
+            _dir, saved.Id, "foo||", regex: false, maxMatches: 10);
+
+        Assert.NotNull(result);
+        Assert.Single(result!.Matches);
+        Assert.Equal(1, result.Matches[0].LineNumber);
+    }
 }
