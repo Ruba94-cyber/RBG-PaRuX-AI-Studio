@@ -40,6 +40,8 @@ namespace PaRuX.Services
         public AutoSetupPhase FailedPhase { get; set; } = AutoSetupPhase.NotStarted;
         public string? Message { get; set; }
         public string? RuntimeNote { get; set; }
+        /// <summary>Why a recommended model was skipped in favour of a smaller one that fits.</summary>
+        public string? ModelNote { get; set; }
         public string? RepoId { get; set; }
         public string? ModelTitle { get; set; }
         public string? Quantization { get; set; }
@@ -55,6 +57,7 @@ namespace PaRuX.Services
         public AutoSetupState Clone() => new()
         {
             Version = Version, Phase = Phase, FailedPhase = FailedPhase, Message = Message, RuntimeNote = RuntimeNote,
+            ModelNote = ModelNote,
             RepoId = RepoId, ModelTitle = ModelTitle, Quantization = Quantization, SetName = SetName,
             Directory = Directory, PartCount = PartCount, Revision = Revision, TotalBytes = TotalBytes,
             DownloadIds = new List<string>(DownloadIds), Attempts = new Dictionary<string, int>(Attempts),
@@ -176,9 +179,17 @@ namespace PaRuX.Services
 
         /// <summary>Best standard general-chat candidate that fits and whose runtime requirement is satisfied.
         /// Null when nothing fits (the TooLarge / no-model path).</summary>
-        public static FirstModelCandidate? PickCandidate(FirstModelAdvice? advice)
+        public static FirstModelCandidate? PickCandidate(FirstModelAdvice? advice) =>
+            RankedCandidates(advice).FirstOrDefault();
+
+        /// <summary>
+        /// Every eligible candidate in the order the automatic setup should try them: the advisor's
+        /// recommendation first, then the rest by fit tier and rank. The setup walks this list so a
+        /// recommended model with no file that fits in memory falls back to a smaller one instead of ending.
+        /// </summary>
+        public static IReadOnlyList<FirstModelCandidate> RankedCandidates(FirstModelAdvice? advice)
         {
-            if (advice == null) return null;
+            if (advice == null) return Array.Empty<FirstModelCandidate>();
             var eligible = advice.Candidates.Where(c =>
                     c.Suitability is "FitsOnGpu" or "SplitWithRam" or "CpuOnly"
                     && !string.IsNullOrWhiteSpace(c.Model.HuggingFaceRepoId)
@@ -186,10 +197,14 @@ namespace PaRuX.Services
                     && (c.Model.CapabilityIds.Count == 0 || c.Model.CapabilityIds.Contains(ModelCapabilityIds.GeneralChat))
                     && c.RuntimeRequirementState is null or "Satisfied")
                 .ToList();
-            if (eligible.Count == 0) return null;
-            FirstModelCandidate? recommended = eligible.FirstOrDefault(c => c.Model.Id == advice.RecommendedId);
-            if (recommended != null) return recommended;
-            return eligible.OrderBy(c => TierOf(c.Suitability)).ThenBy(c => c.Rank).First();
+            var ordered = eligible.OrderBy(c => TierOf(c.Suitability)).ThenBy(c => c.Rank).ToList();
+            FirstModelCandidate? recommended = ordered.FirstOrDefault(c => c.Model.Id == advice.RecommendedId);
+            if (recommended != null)
+            {
+                ordered.Remove(recommended);
+                ordered.Insert(0, recommended);
+            }
+            return ordered;
         }
 
         private static int TierOf(string suitability) => suitability switch
@@ -430,8 +445,8 @@ namespace PaRuX.Services
         private async Task SelectModelAsync(CancellationToken ct)
         {
             _advice ??= await _host.GetAdviceAsync(ct).ConfigureAwait(false);
-            FirstModelCandidate? candidate = AutoSetupModelPicker.PickCandidate(_advice);
-            if (candidate == null)
+            IReadOnlyList<FirstModelCandidate> ranked = AutoSetupModelPicker.RankedCandidates(_advice);
+            if (ranked.Count == 0)
             {
                 _state.Phase = AutoSetupPhase.NoModelFits;
                 _state.Message = "None of the recommended models fits this PC's memory, so nothing was downloaded. "
@@ -440,18 +455,37 @@ namespace PaRuX.Services
                 return;
             }
 
-            string repoId = candidate.Model.HuggingFaceRepoId;
-            IReadOnlyList<ModelQuantChoice> choices = await _host.GetQuantChoicesAsync(repoId, ct).ConfigureAwait(false);
-            ModelQuantChoice? choice = await AutoSetupModelPicker.PickQuantAsync(
-                choices, candidate, bytes => _host.EstimateFitAsync(bytes, ct)).ConfigureAwait(false);
-            if (choice == null)
+            // Walk the ranked list: a recommended model with no complete file that fits is skipped, not fatal.
+            const int MaxCandidatesTried = 6;
+            FirstModelCandidate? candidate = null;
+            ModelQuantChoice? choice = null;
+            var skipped = new List<string>();
+            foreach (FirstModelCandidate attempt in ranked.Take(MaxCandidatesTried))
+            {
+                ct.ThrowIfCancellationRequested();
+                IReadOnlyList<ModelQuantChoice> attemptChoices = await _host
+                    .GetQuantChoicesAsync(attempt.Model.HuggingFaceRepoId, ct).ConfigureAwait(false);
+                ModelQuantChoice? picked = await AutoSetupModelPicker.PickQuantAsync(
+                    attemptChoices, attempt, bytes => _host.EstimateFitAsync(bytes, ct)).ConfigureAwait(false);
+                if (picked != null)
+                {
+                    candidate = attempt;
+                    choice = picked;
+                    break;
+                }
+                skipped.Add(attempt.Model.Title);
+            }
+            if (candidate == null || choice == null)
             {
                 _state.Phase = AutoSetupPhase.NoModelFits;
-                _state.Message = "No complete file of " + candidate.Model.Title + " fits this PC's memory, so nothing was downloaded. "
+                _state.Message = "No complete file of " + string.Join(", ", skipped) + " fits this PC's memory, so nothing was downloaded. "
                     + "Choose another model in Model Hub.";
                 Persist();
                 return;
             }
+            _state.ModelNote = skipped.Count == 0 ? null
+                : string.Join(", ", skipped) + " did not fit this PC's memory, so PaRuX chose " + candidate.Model.Title + " instead.";
+            string repoId = candidate.Model.HuggingFaceRepoId;
 
             ModelDownloadPlan plan = await _host.GetPlanAsync(repoId, choice, ct).ConfigureAwait(false);
             if (!plan.Complete)

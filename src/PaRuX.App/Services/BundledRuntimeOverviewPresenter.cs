@@ -153,8 +153,8 @@ namespace PaRuX.Services
                     EstimatedSizeBytes = CudaRuntimeSizeBytes,
                     EstimatedSizeText = FormatSize(CudaRuntimeSizeBytes),
                     IsRequired = false,
-                    WhenDownloaded = "Optional. Only downloaded if you choose 'Install with PaRuX' for CUDA acceleration.",
-                    Description = "Heavy GPU acceleration for NVIDIA cards. The bundled Vulkan runtime is already sufficient for chat."
+                    WhenDownloaded = "Optional. Only downloaded for older NVIDIA GPUs, if you choose 'Install with PaRuX' for CUDA acceleration.",
+                    Description = "Heavy GPU acceleration for NVIDIA cards. GPUs that support it (RTX 50 series with driver 580 or newer) already get an included CUDA 13.4 engine; this pack is the CUDA 12.4 build for older cards. The bundled Vulkan runtime is sufficient for chat."
                 },
                 new()
                 {
@@ -178,7 +178,7 @@ namespace PaRuX.Services
 
             string subhead = hasWorkingTextPath
                 ? "The included Vulkan runtime is detected. Download a chat model, then verify a real local answer before entering Chat."
-                : "The installer is designed to include the Vulkan engine and package tooling. If detection fails, repair or locate the runtime in Components.";
+                : "The installer is designed to include the Vulkan engine, a CUDA 13.4 engine for supported NVIDIA GPUs, and package tooling. If detection fails, repair or locate the runtime in Components.";
 
             string guidance = $"Verify installer integrity: run '{PowerShellVerificationCommand}' in PowerShell and compare with SHA256SUMS.txt. See {DocumentationPath} for details.";
 

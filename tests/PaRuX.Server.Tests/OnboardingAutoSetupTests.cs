@@ -40,8 +40,9 @@ namespace PaRuX.Server.Tests
             { RuntimeConfirmCalls++; return Task.FromResult(ConfirmRuntime); }
             public Task InstallRuntimeAsync(AutoSetupRuntimeOffer offer, IProgress<InstallProgressPresentation> progress, CancellationToken ct)
             { RuntimeInstallCalls++; return Task.CompletedTask; }
+            public Dictionary<string, List<ModelQuantChoice>> ChoicesByRepo = new();
             public Task<IReadOnlyList<ModelQuantChoice>> GetQuantChoicesAsync(string repoId, CancellationToken ct) =>
-                Task.FromResult<IReadOnlyList<ModelQuantChoice>>(Choices);
+                Task.FromResult<IReadOnlyList<ModelQuantChoice>>(ChoicesByRepo.TryGetValue(repoId, out var list) ? list : Choices);
             public Task<AutoSetupFit> EstimateFitAsync(long totalBytes, CancellationToken ct) => Task.FromResult(Fit(totalBytes));
             public Task<ModelDownloadPlan> GetPlanAsync(string repoId, ModelQuantChoice choice, CancellationToken ct)
             {
@@ -232,6 +233,35 @@ namespace PaRuX.Server.Tests
             AutoSetupViewModel vm = OnboardingAutoSetupPresenter.Present(result);
             Assert.True(vm.ShowSkip);
             Assert.True(vm.PrimaryEnabled);
+        }
+
+        [Fact]
+        public async Task Falls_back_to_the_next_candidate_when_no_file_of_the_recommended_model_fits()
+        {
+            // Real clean install on a 16 GB GPU: the recommended 27B had no quantisation that fit and the
+            // automatic setup stopped with "No recommended model fits this PC" instead of trying a smaller model.
+            FirstModelAdvice advice = MakeAdvice("FitsOnGpu");
+            advice.Candidates.Add(new FirstModelCandidate
+            {
+                Suitability = "FitsOnGpu", Rank = 2, Reason = "r2",
+                Model = new RecommendedModel
+                {
+                    Id = "m2", Title = "Fixture 8B", HuggingFaceRepoId = "fixture/small", QuantHint = "Q4_K_M",
+                    EstimatedSizeBytes = 2 * Gb, CapabilityIds = new List<string> { ModelCapabilityIds.GeneralChat }
+                }
+            });
+            var host = new FakeHost { Advice = advice };
+            host.Fit = bytes => bytes <= 3 * Gb ? AutoSetupFit.Fits : AutoSetupFit.TooBig;
+            host.ChoicesByRepo["fixture/general"] = new List<ModelQuantChoice> { Choice("Q4_K_M", 9 * Gb), Choice("Q2_K", 5 * Gb) };
+            host.ChoicesByRepo["fixture/small"] = new List<ModelQuantChoice> { Choice("Q4_K_M", 2 * Gb) };
+            host.Polls.Enqueue(new() { Dl("completed", 2 * Gb, 2 * Gb) });
+
+            AutoSetupState result = await Make(host).RunAsync(CancellationToken.None);
+
+            Assert.Equal(AutoSetupPhase.Ready, result.Phase);
+            Assert.Equal("fixture/small", result.RepoId);
+            Assert.Equal("Fixture 8B", result.ModelTitle);
+            Assert.Contains("Fixture 7B", result.ModelNote);
         }
 
         [Fact]
