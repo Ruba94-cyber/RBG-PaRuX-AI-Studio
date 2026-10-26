@@ -328,7 +328,7 @@ public sealed class RealCodingTaskTests
             Assert.Contains(logs, line => line.Contains("CodingAgentArtifactStoreTests", StringComparison.Ordinal)
                 && line.Contains("run_command", StringComparison.Ordinal)
                 && line.Contains("(exit 0)", StringComparison.Ordinal));
-            Assert.Contains(logs, line => line.Contains("PaRuX.App.csproj", StringComparison.Ordinal)
+            Assert.Contains(logs, line => line.Contains("PaRuX.Server.Tests.csproj", StringComparison.Ordinal)
                 && line.Contains("run_command", StringComparison.Ordinal)
                 && line.Contains("(exit 0)", StringComparison.Ordinal));
             Assert.Contains(logs, line => line.StartsWith("Verifier pass", StringComparison.Ordinal)
