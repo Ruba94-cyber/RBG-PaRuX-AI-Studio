@@ -20,6 +20,7 @@ using PaRuX.Server.CapabilityProfiler;
 using PaRuX.Intelligence;
 
 StartupTrace.Mark("main-entered");
+PaRuX.Server.BundledBaselineRuntimeBootstrap.Initialize();
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 PaRuX.Server.Gateway.GatewaySettings gatewaySettings = PaRuX.Server.Gateway.GatewaySettings.Load(ServerState.StateDirectory);
 LocalApiServerService.VendorModelDefault = gatewaySettings.VendorModelDefault;

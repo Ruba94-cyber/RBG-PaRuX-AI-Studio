@@ -5,6 +5,17 @@ namespace PaRuX.Server.Tests;
 
 public sealed class BundledBaselineRuntimeBootstrapTests
 {
+    [Fact]
+    public void Bootstrap_is_not_a_module_initializer_because_its_hardware_probe_deadlocks_there()
+    {
+        System.Reflection.MethodInfo initialize = typeof(BundledBaselineRuntimeBootstrap).GetMethod(
+            "Initialize", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+
+        Assert.NotNull(initialize);
+        Assert.Null(System.Attribute.GetCustomAttribute(
+            initialize, typeof(System.Runtime.CompilerServices.ModuleInitializerAttribute)));
+    }
+
     [Theory]
     [InlineData(false, false, null, null, "None")]
     [InlineData(true, false, null, null, "Vulkan")]

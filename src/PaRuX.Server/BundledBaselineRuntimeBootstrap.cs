@@ -29,7 +29,12 @@ internal static class BundledBaselineRuntimeBootstrap
     private const string CudaBuildTag = "b11871";
     private const string CudaToolkit = "13.4";
 
-    [ModuleInitializer]
+    /// <summary>
+    /// Called explicitly from Program before anything else. It must NOT be a module initializer:
+    /// hardware detection awaits async work whose continuations touch types of this assembly, and
+    /// those block on the module-initializer lock held by the initializing thread, so the Server
+    /// never started on a clean first run (found by real clean-state testing).
+    /// </summary>
     internal static void Initialize()
     {
         if (!OperatingSystem.IsWindows()) return;
