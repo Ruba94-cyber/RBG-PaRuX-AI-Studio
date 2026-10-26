@@ -178,24 +178,26 @@ public sealed class RealCodingTaskTests
     }
 
     [RealCodingFact("PARUX_REAL_CODING_WORKSPACE"), Trait("Category", "HardwareE2E"), Trait("Category", "PaRuXDogfood"), Trait("Category", "FlaUI")]
-    public void Public_clone_large_evidence_preview_keeps_test_summary_and_applies_through_real_chat()
+    public void Public_clone_artifact_search_recovers_regex_alternatives_and_applies_through_real_chat()
     {
         const string workspaceVariable = "PARUX_REAL_CODING_WORKSPACE";
         const string goal =
-            "Fix prefix-only truncation in CodingAgentService. In its read_file branch around line 1542 and " +
-            "AppendArtifactHint around line 2185, large source and command outputs keep only their beginnings; " +
-            "the relevant method or final xUnit summary can be hidden, making the local agent repeat reads of " +
-            "the same artifact. Add a focused regression test in CodingAgentArtifactStoreTests for a bounded " +
-            "head-and-tail preview that preserves both the beginning and final summary and marks the omitted " +
-            "middle. First run it and confirm a real assertion failure before changing production code. Keep the " +
-            "full artifact intact, add the preview helper to CodingAgentArtifactStore, and use it in both " +
-            "CodingAgentService branches. Use read_file_range only for the test block and these source locations: " +
-            "CodingAgentArtifactStore near its constants, CodingAgentService lines 1542-1552 and 2182-2196. " +
-            "Do not use batch_read, whole-file reads, or explore unrelated code. Then make the " +
-            "smallest fix and run: dotnet test tests\\PaRuX.Server.Tests\\PaRuX.Server.Tests.csproj -c Release " +
-            "--filter FullyQualifiedName~CodingAgentArtifactStoreTests -v:q -p:GitRepositoryConfigurationScope=local " +
-            "-p:NuGetAudit=false -p:RunAnalyzers=false. A build or Git-config access error is not a valid red test; " +
-            "resolve the command issue and rerun until the focused assertion fails. Do not modify unrelated files.";
+            "Fix how the local coding agent searches persisted tool-output artifacts. The real dogfood log shows " +
+            "it calling search_artifact with OR-style terms such as Failed|Passed|error while regex is false or " +
+            "omitted; CodingAgentArtifactStore.SearchFromDirectory treats that as one literal string and returns " +
+            "no matches, so the agent repeats reads. First add a focused test in CodingAgentArtifactStoreTests: " +
+            "when a literal search containing | has no matches, split a bounded list of trimmed, nonempty terms " +
+            "and return matching lines with case-insensitive literal OR semantics; each line should appear once. " +
+            "Do not run arbitrary regex as an implicit fallback. Preserve literal matches when they exist, explicit " +
+            "regex behavior and timeout, and the match limit. " +
+            "Run the focused test and confirm a real assertion failure before changing production code. Then make " +
+            "the smallest fix in CodingAgentArtifactStore and run: dotnet test " +
+            "tests\\PaRuX.Server.Tests\\PaRuX.Server.Tests.csproj -c Release --filter " +
+            "FullyQualifiedName~CodingAgentArtifactStoreTests -v:q -p:GitRepositoryConfigurationScope=local " +
+            "-p:NuGetAudit=false -p:RunAnalyzers=false. Use read_file_range only for " +
+            "SearchFromDirectory and the existing artifact-search tests; do not use batch_read, whole-file reads, " +
+            "or explore unrelated code. A build or Git-config access error is not a valid red test; resolve the " +
+            "command issue and rerun until the focused assertion fails. Modify only the store and its focused tests.";
         string workspace = Path.GetFullPath(RealCodingProduct.RequireVariable(workspaceVariable));
         string artifactsRoot = RealCodingProduct.RequireVariable(RealCodingProduct.ArtifactsVariable);
         string runDirectory = Path.Combine(artifactsRoot, "parux-run-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
@@ -335,7 +337,6 @@ public sealed class RealCodingTaskTests
             AutomationElement apply = UiWait.ById(product.MainWindow, "Chat_CodingTask_Apply_Button", ControlType.Button);
             string diffStat = product.TryFindById("Chat_CodingTask_DiffStat_Text")?.Properties.Name.ValueOrDefault ?? string.Empty;
             Assert.Contains("CodingAgentArtifactStore.cs", diffStat, StringComparison.Ordinal);
-            Assert.Contains("CodingAgentService.cs", diffStat, StringComparison.Ordinal);
             Assert.Contains("CodingAgentArtifactStoreTests.cs", diffStat, StringComparison.Ordinal);
             product.MainWindow.SetForeground();
             apply.Patterns.Invoke.Pattern.Invoke();
@@ -353,7 +354,6 @@ public sealed class RealCodingTaskTests
             string[] expectedChangedPaths = new[]
                 {
                     "src/PaRuX.App/Services/CodingAgentArtifactStore.cs",
-                    "src/PaRuX.App/Services/CodingAgentService.cs",
                     "tests/PaRuX.Server.Tests/CodingAgentArtifactStoreTests.cs"
                 }
                 .OrderBy(path => path, StringComparer.Ordinal).ToArray();
@@ -372,7 +372,8 @@ public sealed class RealCodingTaskTests
             Assert.Equal(baselineHead, Git(workspace, "rev-parse", "HEAD").Trim());
             string diff = Git(workspace, "diff");
             File.WriteAllText(Path.Combine(runDirectory, "applied.diff"), diff);
-            Assert.Contains("Preview", diff, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Search", diff, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("regex", diff, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Assert", diff, StringComparison.Ordinal);
             File.WriteAllText(Path.Combine(runDirectory, "RESULT.txt"),
                 "PASS " + DateTime.UtcNow.ToString("O") + "\ntask " + fullTaskId + "\n");
