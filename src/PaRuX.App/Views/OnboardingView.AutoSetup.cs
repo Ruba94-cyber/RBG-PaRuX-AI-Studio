@@ -234,6 +234,14 @@ namespace PaRuX.Views
                     string.Equals(r.RepoId, repoId, StringComparison.OrdinalIgnoreCase));
                 if (repo == null || repo.QuantChoices.Count == 0)
                     throw new InvalidOperationException(repoId + " did not list any GGUF files. Choose a model in Model Hub instead.");
+                // Search results carry no file sizes (Hugging Face never returns them from the list
+                // endpoint), so every choice is unsized. Fill them from the repository details, which is
+                // what the Model Hub does; without this the setup discards every choice and never picks a model.
+                if (repo.QuantChoices.Any(choice => choice.SizeBytes <= 0))
+                {
+                    ModelRepoDetails details = await ModelDownloadClient.Current.GetDetailsAsync(repoId, ct);
+                    ModelQuantSizeResolver.Fill(repo.QuantChoices, details.Files);
+                }
                 return repo.QuantChoices;
             }
 
