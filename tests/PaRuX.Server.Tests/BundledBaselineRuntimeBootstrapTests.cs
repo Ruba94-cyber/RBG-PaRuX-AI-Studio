@@ -5,6 +5,19 @@ namespace PaRuX.Server.Tests;
 
 public sealed class BundledBaselineRuntimeBootstrapTests
 {
+    [Theory]
+    [InlineData("Cuda13", "Vulkan,Cuda13")]
+    [InlineData("Vulkan", "Vulkan")]
+    [InlineData("None", "Vulkan")]
+    public void Vulkan_baseline_is_always_installed_and_cuda13_is_added_only_for_supported_hardware(string target, string expected)
+    {
+        // Real clean install on an RTX 5080: only CUDA 13.4 was installed, and the media assistant (which runs on the
+        // bundled Vulkan runtime) failed with "File not found ...llama.cpp-b10549-vulkan\llama-server.exe".
+        var kind = System.Enum.Parse<BundledBaselineRuntimeKind>(target);
+
+        Assert.Equal(expected, string.Join(",", BundledBaselineRuntimeBootstrap.BaselinesToInstall(kind)));
+    }
+
     [Fact]
     public void Bootstrap_is_not_a_module_initializer_because_its_hardware_probe_deadlocks_there()
     {

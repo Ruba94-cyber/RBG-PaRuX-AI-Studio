@@ -39,15 +39,32 @@ internal static class BundledBaselineRuntimeBootstrap
     {
         if (!OperatingSystem.IsWindows()) return;
 
+        // Keep developer/test launches cheap. MSI staging creates this manifest beside the
+        // Server; only then is there a bundled baseline worth selecting or probing for.
+        string manifestPath = Path.Combine(
+            AppContext.BaseDirectory, ManifestRelative.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(manifestPath)) return;
+
+        BundledBaselineRuntimeKind target;
+        try { target = DetectRuntimeTarget(); }
+        catch { target = BundledBaselineRuntimeKind.None; }
+        foreach (BundledBaselineRuntimeKind baseline in BaselinesToInstall(target))
+            InstallBaseline(baseline);
+    }
+
+    /// <summary>
+    /// The bundled Vulkan baseline is always installed, as in 1.9.6: the media assistant and non-NVIDIA text
+    /// path run on it. The bundled CUDA 13.4 build is added only for hardware that supports it.
+    /// </summary>
+    internal static IReadOnlyList<BundledBaselineRuntimeKind> BaselinesToInstall(BundledBaselineRuntimeKind target) =>
+        target == BundledBaselineRuntimeKind.Cuda13
+            ? new[] { BundledBaselineRuntimeKind.Vulkan, BundledBaselineRuntimeKind.Cuda13 }
+            : new[] { BundledBaselineRuntimeKind.Vulkan };
+
+    private static void InstallBaseline(BundledBaselineRuntimeKind kind)
+    {
         try
         {
-            // Keep developer/test launches cheap. MSI staging creates this manifest beside the
-            // Server; only then is there a bundled baseline worth selecting or probing for.
-            string manifestPath = Path.Combine(
-                AppContext.BaseDirectory, ManifestRelative.Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(manifestPath)) return;
-
-            BundledBaselineRuntimeKind kind = DetectRuntimeTarget();
             string? runtimeFolder = kind switch
             {
                 BundledBaselineRuntimeKind.Vulkan => VulkanRuntimeFolder,
