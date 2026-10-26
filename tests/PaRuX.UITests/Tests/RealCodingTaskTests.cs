@@ -200,11 +200,11 @@ public sealed class RealCodingTaskTests
             "then read the final 3000 characters of the relevant artifact once at offset max(0, Characters-3000). " +
             "Never repeat the same artifact read or rerun a completed command to recover output. " +
             "The filtered tests prove the behavior but are not an accepted completion receipt. After they pass, " +
-            "run the unfiltered scoped verifier exactly once: dotnet build src\\PaRuX.App\\PaRuX.App.csproj -c Release " +
-            "-m:1 -p:UseXamlCompilerExecutable=false -p:GitRepositoryConfigurationScope=local " +
-            "-p:NuGetAudit=false -p:RunAnalyzers=false -clp:ErrorsOnly. Do not use --no-restore: " +
-            "the fresh workspace has no project.assets.json, so allow the build's normal restore. " +
-            "The in-process XAML compiler avoids the external executable blocked by AppContainer. " +
+            "run the unfiltered scoped verifier exactly once: dotnet build tests\\PaRuX.Server.Tests\\PaRuX.Server.Tests.csproj -c Release " +
+            "-m:1 -p:GitRepositoryConfigurationScope=local -p:NuGetAudit=false -p:RunAnalyzers=false -clp:ErrorsOnly. " +
+            "Do not add --filter or run the full Server test suite. The test project links the changed App service " +
+            "source file and contains the new tests, so this unfiltered build checks both the source and tests. " +
+            "The WinUI App project build cannot run here because its XAML compiler is unavailable in the isolated sandbox. " +
             "Do not run the full Server suite or root-level dotnet test/build. Use read_file_range only for " +
             "SearchFromDirectory and the artifact-search tests; do not use batch_read, whole-file reads, or explore " +
             "unrelated code. Modify only CodingAgentArtifactStore.cs and CodingAgentArtifactStoreTests.cs.";
