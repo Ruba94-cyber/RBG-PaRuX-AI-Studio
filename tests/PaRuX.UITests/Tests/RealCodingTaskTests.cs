@@ -178,19 +178,20 @@ public sealed class RealCodingTaskTests
     }
 
     [RealCodingFact("PARUX_REAL_CODING_WORKSPACE"), Trait("Category", "HardwareE2E"), Trait("Category", "PaRuXDogfood"), Trait("Category", "FlaUI")]
-    public void Public_clone_repeated_read_recovery_is_completed_and_applied_through_real_chat()
+    public void Public_clone_large_command_output_preview_keeps_test_summary_and_applies_through_real_chat()
     {
         const string workspaceVariable = "PARUX_REAL_CODING_WORKSPACE";
         const string goal =
-            "Add test-first coverage and a bounded recovery improvement for repeated read-only coding-agent actions. " +
-            "Currently the first identical read is executed, the second is suppressed and steered using its saved result, " +
-            "and the third identical request stops the run. Change this so the second and third identical requests are " +
-            "both suppressed and steered using the saved result; the fourth identical request remains the hard stop. " +
-            "Preserve no duplicate tool execution, checkpoint preservation, mutation-epoch reset, and the global " +
-            "non-progress safety bound. First add or update the focused regression test and run it to confirm it fails " +
-            "before changing production code. Then make the smallest fix and run: " +
-            "dotnet test tests\\PaRuX.Server.Tests\\PaRuX.Server.Tests.csproj -c Release --filter " +
-            "FullyQualifiedName~CodingAgentRepeatGuardTests -p:GitRepositoryConfigurationScope=local. In this offline sandbox, a build or Git-config access error is not a valid red test; resolve the command issue and rerun until the focused assertion fails before changing production code. Do not modify unrelated files.";
+            "Fix how PaRuX presents oversized coding-tool output to its local agent. CodingAgentService currently " +
+            "keeps only the beginning of output when adding a preview for a persisted artifact, so the final xUnit " +
+            "failure or pass summary can be hidden and the agent may repeat read_artifact at offset 0. First add a " +
+            "focused regression test for a bounded head-and-tail preview that preserves the final summary and marks " +
+            "the omitted middle, then run it and confirm a real assertion failure before changing production code. " +
+            "Keep the full artifact intact and use the helper from the command-output preview path. Then make the " +
+            "smallest fix and run: dotnet test tests\\PaRuX.Server.Tests\\PaRuX.Server.Tests.csproj -c Release " +
+            "--filter FullyQualifiedName~CodingAgentArtifactStoreTests -v:q -p:GitRepositoryConfigurationScope=local " +
+            "-p:NuGetAudit=false -p:RunAnalyzers=false. A build or Git-config access error is not a valid red test; " +
+            "resolve the command issue and rerun until the focused assertion fails. Do not modify unrelated files.";
         string workspace = Path.GetFullPath(RealCodingProduct.RequireVariable(workspaceVariable));
         string artifactsRoot = RealCodingProduct.RequireVariable(RealCodingProduct.ArtifactsVariable);
         string runDirectory = Path.Combine(artifactsRoot, "parux-run-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
@@ -308,7 +309,7 @@ public sealed class RealCodingTaskTests
             Assert.Contains(logs, line => line.StartsWith("Coding model:", StringComparison.Ordinal));
             Assert.Contains(logs, line => line.StartsWith("Step 1:", StringComparison.Ordinal));
             Assert.Contains(seen, activity => activity.Contains("Step ", StringComparison.Ordinal));
-            Assert.Contains(logs, line => line.Contains("CodingAgentRepeatGuardTests", StringComparison.Ordinal));
+            Assert.Contains(logs, line => line.Contains("CodingAgentArtifactStoreTests", StringComparison.Ordinal));
             Assert.Contains(logs, line => line.Contains("run_command", StringComparison.Ordinal)
                 && line.Contains("(exit 0)", StringComparison.Ordinal));
             Assert.Contains(logs, line => line.StartsWith("Verifier pass", StringComparison.Ordinal)
@@ -329,16 +330,17 @@ public sealed class RealCodingTaskTests
 
             AutomationElement apply = UiWait.ById(product.MainWindow, "Chat_CodingTask_Apply_Button", ControlType.Button);
             string diffStat = product.TryFindById("Chat_CodingTask_DiffStat_Text")?.Properties.Name.ValueOrDefault ?? string.Empty;
-            Assert.Contains("CodingAgentRepeatGuard.cs", diffStat, StringComparison.Ordinal);
-            Assert.Contains("CodingAgentRepeatGuardTests.cs", diffStat, StringComparison.Ordinal);
+            Assert.Contains("CodingAgentArtifactStore.cs", diffStat, StringComparison.Ordinal);
+            Assert.Contains("CodingAgentService.cs", diffStat, StringComparison.Ordinal);
+            Assert.Contains("CodingAgentArtifactStoreTests.cs", diffStat, StringComparison.Ordinal);
             product.MainWindow.SetForeground();
             apply.Patterns.Invoke.Pattern.Invoke();
             UiWait.For(() => product.TryFindById("Chat_CodingTask_ApplyConfirm_Dialog") != null,
                 "apply confirmation dialog", TimeSpan.FromSeconds(30));
             AutomationElement dialog = product.TryFindById("Chat_CodingTask_ApplyConfirm_Dialog")!;
             UiWait.For(() => dialog.FindAllDescendants().Any(element =>
-                    (element.Properties.Name.ValueOrDefault ?? string.Empty).Contains("CodingAgentRepeatGuard", StringComparison.Ordinal)),
-                "repeat-guard files listed in confirmation", TimeSpan.FromSeconds(15));
+                    (element.Properties.Name.ValueOrDefault ?? string.Empty).Contains("CodingAgentArtifactStore", StringComparison.Ordinal)),
+                "artifact-preview files listed in confirmation", TimeSpan.FromSeconds(15));
             product.Capture("03-apply-confirmation");
             UiWait.For(() => dialog.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton")) != null,
                 "confirmation primary button", TimeSpan.FromSeconds(15));
@@ -346,8 +348,9 @@ public sealed class RealCodingTaskTests
 
             string[] expectedChangedPaths = new[]
                 {
-                    "src/PaRuX.App/Services/CodingAgentRepeatGuard.cs",
-                    "tests/PaRuX.Server.Tests/CodingAgentRepeatGuardTests.cs"
+                    "src/PaRuX.App/Services/CodingAgentArtifactStore.cs",
+                    "src/PaRuX.App/Services/CodingAgentService.cs",
+                    "tests/PaRuX.Server.Tests/CodingAgentArtifactStoreTests.cs"
                 }
                 .OrderBy(path => path, StringComparer.Ordinal).ToArray();
             UiWait.For(() => Git(workspace, "status", "--porcelain=v1")
@@ -365,9 +368,8 @@ public sealed class RealCodingTaskTests
             Assert.Equal(baselineHead, Git(workspace, "rev-parse", "HEAD").Trim());
             string diff = Git(workspace, "diff");
             File.WriteAllText(Path.Combine(runDirectory, "applied.diff"), diff);
-            Assert.Contains("SecondIdenticalRead", diff, StringComparison.Ordinal);
-            Assert.Contains("Steer", diff, StringComparison.Ordinal);
-            Assert.Contains("Stop", diff, StringComparison.Ordinal);
+            Assert.Contains("Preview", diff, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Assert", diff, StringComparison.Ordinal);
             File.WriteAllText(Path.Combine(runDirectory, "RESULT.txt"),
                 "PASS " + DateTime.UtcNow.ToString("O") + "\ntask " + fullTaskId + "\n");
         }
