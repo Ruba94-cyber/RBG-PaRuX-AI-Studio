@@ -128,7 +128,7 @@ public sealed class RealCodingTaskTests
             Assert.Equal(1, RunVerifier(repository).ExitCode); // the bug is still there in the original
 
             // 5. Review -> apply -> confirm, all through the UI.
-            AutomationElement apply = UiWait.ById(product.MainWindow, "Chat_CodingTask_Apply_Button", ControlType.Button);
+            AutomationElement apply = UiWait.ById(product.MainWindow, "parux-coding-apply", ControlType.Button);
             UiWait.For(() => product.TryFindById("Chat_CodingTask_DiffStat_Text") != null, "review diffstat on the card", TimeSpan.FromSeconds(30));
             string diffStat = product.TryFindById("Chat_CodingTask_DiffStat_Text")!.Properties.Name.ValueOrDefault ?? string.Empty;
             Assert.Contains("src/inventory.py", diffStat, StringComparison.Ordinal);
@@ -166,7 +166,7 @@ public sealed class RealCodingTaskTests
             File.WriteAllText(Path.Combine(runDirectory, "applied.diff"), diff);
             Assert.Contains(">= 10", diff, StringComparison.Ordinal);
             Assert.Equal(0, RunVerifier(repository).ExitCode);
-            Assert.Equal("Changes applied to project", UiWait.ById(product.MainWindow, "Chat_CodingTask_Apply_Button", ControlType.Button).Name);
+            Assert.Equal("Changes applied to project", UiWait.ById(product.MainWindow, "parux-coding-apply", ControlType.Button).Name);
             File.WriteAllText(Path.Combine(runDirectory, "RESULT.txt"), "PASS " + DateTime.UtcNow.ToString("O") + "\ntask " + fullTaskId + "\n");
         }
         catch (Exception ex)
@@ -347,7 +347,7 @@ public sealed class RealCodingTaskTests
             Assert.Equal(baselineHead, Git(workspace, "rev-parse", "HEAD").Trim());
             Assert.Equal(string.Empty, Git(workspace, "status", "--porcelain=v1").Trim());
 
-            AutomationElement apply = UiWait.ById(product.MainWindow, "Chat_CodingTask_Apply_Button", ControlType.Button);
+            AutomationElement apply = UiWait.ById(product.MainWindow, "parux-coding-apply", ControlType.Button);
             string diffStat = product.TryFindById("Chat_CodingTask_DiffStat_Text")?.Properties.Name.ValueOrDefault ?? string.Empty;
             Assert.Contains("CodingAgentArtifactStore.cs", diffStat, StringComparison.Ordinal);
             Assert.Contains("CodingAgentArtifactStoreTests.cs", diffStat, StringComparison.Ordinal);
