@@ -190,17 +190,21 @@ public sealed class RealCodingTaskTests
             "First add two tests in CodingAgentArtifactStoreTests: one proving literal OR fallback returns each " +
             "matching line once when there is no exact match, and one proving an exact literal match anywhere in " +
             "the artifact suppresses OR fallback matches on other lines. Run the new fallback test with a focused " +
-            "filter and confirm a real assertion failure before changing production code. Then implement the smallest " +
+            "filter with -clp:ErrorsOnly and confirm a real assertion failure before changing production code. Then implement the smallest " +
             "fix in the store, run all CodingAgentArtifactStoreTests with: dotnet test " +
             "tests\\PaRuX.Server.Tests\\PaRuX.Server.Tests.csproj -c Release --filter " +
             "FullyQualifiedName~CodingAgentArtifactStoreTests -v:q -p:GitRepositoryConfigurationScope=local " +
-            "-p:NuGetAudit=false -p:RunAnalyzers=false. This machine localizes the VSTest summary in Italian " +
-            "(Superato, Superati, Non superati, Totale); after list_artifacts, read the final 3000 characters " +
-            "using offset max(0, Characters-3000) when needed. Do not repeat the same read_artifact offset or rerun " +
-            "the command just to recover its output. " +
+            "-p:NuGetAudit=false -p:RunAnalyzers=false -clp:ErrorsOnly. " +
+            "This machine localizes the VSTest summary in Italian " +
+            "(Superato, Superati, Non superati, Totale). If output is truncated, call list_artifacts once, " +
+            "then read the final 3000 characters of the relevant artifact once at offset max(0, Characters-3000). " +
+            "Never repeat the same artifact read or rerun a completed command to recover output. " +
             "The filtered tests prove the behavior but are not an accepted completion receipt. After they pass, " +
-            "run the unfiltered scoped verifier: dotnet build src\\PaRuX.App\\PaRuX.App.csproj -c Release " +
-            "--no-restore -m:1 -p:GitRepositoryConfigurationScope=local -p:NuGetAudit=false -p:RunAnalyzers=false. " +
+            "run the unfiltered scoped verifier exactly once: dotnet build src\\PaRuX.App\\PaRuX.App.csproj -c Release " +
+            "-m:1 -p:UseXamlCompilerExecutable=false -p:GitRepositoryConfigurationScope=local " +
+            "-p:NuGetAudit=false -p:RunAnalyzers=false -clp:ErrorsOnly. Do not use --no-restore: " +
+            "the fresh workspace has no project.assets.json, so allow the build's normal restore. " +
+            "The in-process XAML compiler avoids the external executable blocked by AppContainer. " +
             "Do not run the full Server suite or root-level dotnet test/build. Use read_file_range only for " +
             "SearchFromDirectory and the artifact-search tests; do not use batch_read, whole-file reads, or explore " +
             "unrelated code. Modify only CodingAgentArtifactStore.cs and CodingAgentArtifactStoreTests.cs.";
