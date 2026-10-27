@@ -22,6 +22,14 @@ namespace PaRuX.Views
             return ext is ".png" or ".jpg" or ".jpeg" or ".webp" or ".bmp";
         }
 
+        private UIElement ThreedWithSetup()
+        {
+            var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(NewSetupCard("3d", "image to 3D"));
+            panel.Children.Add(BuildThreedPanel());
+            return panel;
+        }
+
         private UIElement BuildResultStrip()
         {
             var panel = new StackPanel { Spacing = 8 };
@@ -43,6 +51,14 @@ namespace PaRuX.Views
                 _videoStartImagePath = _resultPath;
                 _videoStartLabel.Text = "Start image: " + Path.GetFileName(_resultPath);
                 _status.Text = "Result set as the first frame in VIDEO below.";
+            }));
+            _resultActions.Children.Add(ResultButton("Make 3D", "Create_Result_3D_Button", (_, _) =>
+            {
+                if (_resultPath == null || !IsImageFile(_resultPath)) return;
+                _threedSourcePath = _resultPath;
+                _threedSourceLabel.Text = _resultPath;
+                SelectMode("3D");
+                _status.Text = "Result set as the source image in IMAGE → 3D.";
             }));
             panel.Children.Add(_resultActions);
             return panel;

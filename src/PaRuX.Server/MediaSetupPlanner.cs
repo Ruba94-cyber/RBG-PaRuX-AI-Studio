@@ -74,6 +74,20 @@ internal static class MediaSetupPlanner
                 License: SpeechLicense)
     });
 
+    internal const string ThreedStepId = "threed-engine";
+    internal const long ThreedApproxBytes = 3_500_000_000;
+    internal const string ThreedLicense = "BSD-3 (PyTorch), MIT (trimesh), Apache-2.0 (transformers)";
+
+    /// <summary>Image to 3D is one managed Python engine: installed or not.</summary>
+    internal static MediaSetupPlan PlanThreed(bool installed) => new(new[]
+    {
+        installed
+            ? new MediaSetupStep(ThreedStepId, "Image to 3D engine", MediaSetupStepState.Done, 0, "Installed.", License: ThreedLicense)
+            : new MediaSetupStep(ThreedStepId, "Image to 3D engine", MediaSetupStepState.Pending, ThreedApproxBytes,
+                "PaRuX installs a private Python environment with PyTorch and mesh tools. The 3D model weights download on first use.",
+                License: ThreedLicense)
+    });
+
     internal const string SpeechLicense = "Apache-2.0 (Kokoro), CC-BY-4.0 (Parakeet), BSD-3 (PyTorch)";
 
     internal static MediaSetupPlan Plan(

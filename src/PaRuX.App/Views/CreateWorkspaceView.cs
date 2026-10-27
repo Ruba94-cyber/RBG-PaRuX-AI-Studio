@@ -149,7 +149,7 @@ namespace PaRuX.Views
                 ("Image", Section("IMAGE", BuildImagePanel())),
                 ("Video", Section("VIDEO", BuildVideoPanel())),
                 ("Edit", Section("IMAGE EDIT", BuildEditPanel())),
-                ("3D", Section("IMAGE → 3D", BuildThreedPanel())),
+                ("3D", Section("IMAGE → 3D", ThreedWithSetup())),
                 ("Speech", speech),
                 ("Workflows", Section("COMFYUI WORKFLOWS AND LORAS", BuildWorkflowLoraPanel())),
                 ("Gallery", gallery)

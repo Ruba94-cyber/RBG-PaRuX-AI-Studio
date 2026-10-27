@@ -112,6 +112,18 @@ public sealed class MediaSetupPlannerTests
     }
 
     [Fact]
+    public void Threed_plan_is_one_engine_step_pending_until_installed()
+    {
+        MediaSetupStep step = Assert.Single(MediaSetupPlanner.PlanThreed(installed: false).Steps);
+        Assert.Equal("threed-engine", step.Id);
+        Assert.Equal(MediaSetupStepState.Pending, step.State);
+        Assert.True(step.SizeBytes > 0);
+        Assert.False(string.IsNullOrWhiteSpace(step.License));
+        Assert.True(MediaSetupPlanner.PlanThreed(installed: true).Ready);
+        Assert.Equal("3d", MediaSetupService.NormalizeType("3d"));
+    }
+
+    [Fact]
     public void A_pc_too_small_for_every_checkpoint_is_blocked_with_a_reason_instead_of_downloading_something_unusable()
     {
         MediaSetupPlan plan = Plan(Facts(true, true), Hw(1, 4));

@@ -13,18 +13,34 @@ public sealed class MediaSetupService
     private readonly RuntimeInstallService _runtime;
     private readonly ModelDownloadService _downloads;
     private readonly SpeechService? _speech;
+    private readonly ThreedService? _threed;
     private (DateTime AtUtc, SpeechEngineStatus Status)? _speechStatus;
+    private (DateTime AtUtc, bool Installed)? _threedStatus;
     private readonly object _gate = new();
     private CancellationTokenSource? _cts;
     private Task? _run;
     private MediaSetupStatus _last = new();
     private string _lastType = "image";
 
-    public MediaSetupService(RuntimeInstallService runtime, ModelDownloadService downloads, SpeechService? speech = null)
+    public MediaSetupService(RuntimeInstallService runtime, ModelDownloadService downloads, SpeechService? speech = null,
+        ThreedService? threed = null)
     {
         _runtime = runtime;
         _downloads = downloads;
         _speech = speech;
+        _threed = threed;
+    }
+
+    private bool ReadThreedInstalled(bool fresh = false)
+    {
+        if (_threed is null) return false;
+        lock (_gate)
+        {
+            if (!fresh && _threedStatus is { } cached && DateTime.UtcNow - cached.AtUtc < TimeSpan.FromSeconds(20)) return cached.Installed;
+        }
+        bool installed = _threed.GetStatusAsync(CancellationToken.None).GetAwaiter().GetResult().Installed;
+        lock (_gate) _threedStatus = (DateTime.UtcNow, installed);
+        return installed;
     }
 
     /// <summary>The Python probe costs about a second, so polling reads a short-lived cache.</summary>
@@ -42,6 +58,7 @@ public sealed class MediaSetupService
 
     private MediaSetupPlan PlanFor(string type, bool freshSpeech = false)
     {
+        if (type == "3d") return MediaSetupPlanner.PlanThreed(ReadThreedInstalled(freshSpeech));
         if (type != "speech") return CurrentPlan(type);
         SpeechEngineStatus engine = ReadSpeechStatus(freshSpeech);
         return MediaSetupPlanner.PlanSpeech(engine.SttInstalled, engine.TtsInstalled);
@@ -68,7 +85,7 @@ public sealed class MediaSetupService
             MediaCatalogueLive.SpeedLookup(MediaSetupPlanner.CapabilityFor(type), digest), type);
     }
 
-    internal static string NormalizeType(string? type) => type is "video" or "edit" or "speech" ? type : "image";
+    internal static string NormalizeType(string? type) => type is "video" or "edit" or "speech" or "3d" ? type : "image";
 
     public MediaSetupStatus GetStatus(string? type = null)
     {
@@ -102,6 +119,7 @@ public sealed class MediaSetupService
         "video" => "Video generation",
         "edit" => "Image editing",
         "speech" => "Speech",
+        "3d" => "Image to 3D",
         _ => "Image generation"
     };
 
@@ -152,7 +170,8 @@ public sealed class MediaSetupService
                 Update(step.Id, "Setting up: " + step.Title, 0, step.SizeBytes);
                 try
                 {
-                    if (step.Id == MediaSetupPlanner.SpeechStepId) await InstallSpeechAsync(step, stepTimeout.Token);
+                    if (step.Id == MediaSetupPlanner.ThreedStepId) await InstallThreedAsync(step, stepTimeout.Token);
+                    else if (step.Id == MediaSetupPlanner.SpeechStepId) await InstallSpeechAsync(step, stepTimeout.Token);
                     else if (step.Id == MediaSetupPlanner.ComfyStepId) await InstallComfyAsync(step, stepTimeout.Token);
                     else if (step.Id == MediaSetupPlanner.AssistantStepId) await DownloadAssistantAsync(step, stepTimeout.Token);
                     else if (step.Id == MediaSetupPlanner.CheckpointStepIdFor(type)) await DownloadCheckpointAsync(step, type, stepTimeout.Token);
@@ -183,6 +202,18 @@ public sealed class MediaSetupService
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             Finish("failed", "Media setup failed: " + ex.Message, ex.Message, null);
+        }
+    }
+
+    private async Task InstallThreedAsync(MediaSetupStep step, CancellationToken ct)
+    {
+        if (_threed is null) throw new MediaSetupException(step.Id, "The 3D engine is not available in this build.");
+        Update(step.Id, "Installing the image-to-3D engine (PyTorch and mesh tools); this takes several minutes.", 0, 0);
+        try { await _threed.InstallEngineAsync(ct); }
+        catch (InvalidOperationException ex) { throw new MediaSetupException(step.Id, "The 3D engine could not be installed: " + ex.Message); }
+        catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception or TimeoutException)
+        {
+            throw new MediaSetupException(step.Id, "The 3D engine could not be installed: " + ex.Message);
         }
     }
 
