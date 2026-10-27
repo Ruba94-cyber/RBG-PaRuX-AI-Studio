@@ -3521,6 +3521,17 @@ app.MapPost("/api/v1/media/checkpoints/{type}/reset", (string type) =>
 
 app.MapGet("/api/v1/media/checkpoints/recommended", () => Results.Ok(RecommendedCheckpointsService.List));
 
+// Add-your-own checkpoint from Hugging Face: the server reads the repository listing and returns the pinned commit, the
+// real size and the resolve URL it built itself. Read-only; the client then starts the normal consent-gated download.
+var hfCheckpointResolver = new HuggingFaceCheckpointResolver(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+app.MapGet("/api/v1/media/checkpoints/huggingface/resolve", async (string repoId, string filePath, CancellationToken ct) =>
+{
+    try { return Results.Ok(await hfCheckpointResolver.ResolveAsync(repoId, filePath, ct)); }
+    catch (InvalidDataException ex) { return Results.BadRequest(new { error = ex.Message }); }
+    catch (HttpRequestException ex) { return Results.Json(new { error = "Could not reach Hugging Face: " + ex.Message }, statusCode: StatusCodes.Status502BadGateway); }
+    catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return Results.Json(new { error = "Hugging Face did not answer in time." }, statusCode: StatusCodes.Status504GatewayTimeout); }
+});
+
 // Companion plan for the checkpoint the next job of this type will load: what is installed, what is missing,
 // and the plan hash a fetch must present. Read-only; nothing is downloaded here.
 app.MapGet("/api/v1/media/companions", (string type) =>

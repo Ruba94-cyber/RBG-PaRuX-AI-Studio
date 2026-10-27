@@ -247,18 +247,21 @@ namespace PaRuX.Views
         {
             var root = new Grid();
             var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-            var body = new StackPanel
+            // The page is three tab panels under one header: Text models (everything that was here before), Media, Downloads.
+            // "body" stays the Text panel so the existing section ordering code keeps working unchanged.
+            var outer = new StackPanel
             {
                 Spacing = 18,
                 Margin = new Thickness(24),
                 MaxWidth = 1180,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
-            scroll.Content = body;
+            var body = new StackPanel { Spacing = 18 };
+            scroll.Content = outer;
             root.Children.Add(scroll);
 
-            body.Children.Add(new TextBlock { Text = "Model Hub", FontSize = 28, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-            body.Children.Add(new TextBlock
+            outer.Children.Add(new TextBlock { Text = "Model Hub", FontSize = 28, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+            outer.Children.Add(new TextBlock
             {
                 Text = "Choose the right local model, not just a file. Compare GGUF quantizations against this PC's real GPU/RAM capacity, manage resumable downloads, inspect installed performance and select compatible Image / Video / Edit checkpoints from one workspace.",
                 TextWrapping = TextWrapping.Wrap,
@@ -292,9 +295,7 @@ namespace PaRuX.Views
             AutomationProperties.SetAutomationId(_discoveryRefreshStatus,
                 "ModelHub_DiscoveryRefresh_Status_Text");
             body.Children.Add(_discoveryRefreshStatus);
-            body.Children.Add(_busy);
             AutomationProperties.SetAutomationId(_status, "ModelHub_Status_Text");
-            body.Children.Add(_status);
             body.Children.Add(_hardwareSummary);
 
             _suggestionsSection = Section("SUGGESTED FOR THIS PC · CANDIDATES, NOT VALIDATED", _suggestions);
@@ -688,9 +689,8 @@ namespace PaRuX.Views
             _installedSection = Section("INSTALLED TEXT MODEL LIBRARY", _installed);
             body.Children.Add(_recommendedSection);
             body.Children.Add(_searchSection);
-            body.Children.Add(_mediaSection);
-            body.Children.Add(_downloadsSection);
             body.Children.Add(_installedSection);
+            BuildHubTabs(outer, body);
             return root;
         }
 
@@ -747,8 +747,6 @@ namespace PaRuX.Views
             elementsToMove.AddRange(_debugFixtures);
             elementsToMove.Add(_recommendedSection);
             elementsToMove.Add(_searchSection);
-            elementsToMove.Add(_mediaSection);
-            elementsToMove.Add(_downloadsSection);
             elementsToMove.Add(_installedSection);
 
             foreach (var elem in elementsToMove)
@@ -772,16 +770,12 @@ namespace PaRuX.Views
                 }
                 _body.Children.Add(_recommendedSection);
                 _body.Children.Add(_searchSection);
-                _body.Children.Add(_mediaSection);
-                _body.Children.Add(_downloadsSection);
                 _body.Children.Add(_installedSection);
             }
             else
             {
                 _body.Children.Add(_recommendedSection);
                 _body.Children.Add(_searchSection);
-                _body.Children.Add(_mediaSection);
-                _body.Children.Add(_downloadsSection);
                 _body.Children.Add(_installedSection);
                 if (_cohortFilterRow != null) _body.Children.Add(_cohortFilterRow);
                 _body.Children.Add(_candidateActions);
@@ -883,6 +877,7 @@ namespace PaRuX.Views
                 RenderCandidateUtilityPolicyStatus();
                 _mediaCatalogue = mediaCatalogueTask.Result ?? _mediaCatalogue;
                 RenderMedia(mediaTask.Result, mediaRecommendedTask.Result, downloadsTask.Result);
+                RenderHuggingFaceRows(downloadsTask.Result);
                 RenderDiscoveryRefreshStatus();
                 _status.Text = installedTask.Result.Count + " PaRuX-managed GGUF model(s) (models you linked from elsewhere are listed in Settings > Models) · "
                     + mediaTask.Result.Count + " media role(s) · " + downloadsTask.Result.Count + " download job(s) · "

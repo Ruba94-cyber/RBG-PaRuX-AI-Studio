@@ -217,6 +217,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\OnboardingAutoSetup.cs" Link="Onboarding\OnboardingAutoSetup.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\OnboardingAutoSetupPresenter.cs" Link="Onboarding\OnboardingAutoSetupPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaSetupPresenter.cs" Link="Media\MediaSetupPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaHubSelectionPresenter.cs" Link="ModelHub\MediaHubSelectionPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\BundledRuntimeOverviewPresenter.cs" Link="Onboarding\BundledRuntimeOverviewPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ComponentLifecyclePresenter.cs" Link="Lifecycle\ComponentLifecyclePresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\UserFailureRecoveryMapper.cs" Link="Diagnostics\UserFailureRecoveryMapper.cs" />

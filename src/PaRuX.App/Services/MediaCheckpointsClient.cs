@@ -40,6 +40,12 @@ namespace PaRuX.Services
         public Task<MediaCatalogueResponse> GetCatalogueAsync(string lane, CancellationToken ct) =>
             SendAsync<MediaCatalogueResponse>(HttpMethod.Get, "/api/v1/media/catalogue?lane=" + Uri.EscapeDataString(lane), null, ct);
 
+        /// <summary>Asks PaRuX Core to read the Hugging Face listing and return the pinned commit, size and resolve URL for one file.</summary>
+        public Task<HuggingFaceCheckpointResolution> ResolveHuggingFaceAsync(string repoId, string filePath, CancellationToken ct) =>
+            SendAsync<HuggingFaceCheckpointResolution>(HttpMethod.Get,
+                "/api/v1/media/checkpoints/huggingface/resolve?repoId=" + Uri.EscapeDataString(repoId)
+                + "&filePath=" + Uri.EscapeDataString(filePath), null, ct);
+
         /// <summary>Moves a downloaded checkpoint into ComfyUI's folder WITHOUT pinning it, so Automatic mode can pick it.</summary>
         public Task<MediaCheckpointStatus> InstallForAutomaticAsync(string type, string fileName, CancellationToken ct) =>
             SendAsync<MediaCheckpointStatus>(HttpMethod.Post, "/api/v1/media/checkpoints/activate",
