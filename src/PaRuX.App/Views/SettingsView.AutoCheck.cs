@@ -60,6 +60,7 @@ namespace PaRuX.Views
                     Settings_AutoCheck_RuntimeUpdate_Toggle.IsOn = status.Settings.KeepRuntimesUpdated;
                 if (Settings_AutoCheck_MediaOptimize_Toggle != null)
                     Settings_AutoCheck_MediaOptimize_Toggle.IsOn = status.Settings.AutoOptimizeMedia;
+                    Settings_AutoCheck_Tuning_Explanation_Text.Text = ModelTuningPresenter.SettingsExplanation;
                 if (Settings_AutoCheck_MediaOptimize_Text != null && !_mediaOptimizeBusy)
                     Settings_AutoCheck_MediaOptimize_Text.Text = MaintenancePresenter.SummarizeMediaOptimization(status.MediaOptimization);
                 if (Settings_AutoCheck_RuntimeUpdate_Text != null)

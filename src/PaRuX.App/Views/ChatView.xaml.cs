@@ -99,6 +99,8 @@ namespace PaRuX.Views
         public ChatView()
         {
             InitializeComponent();
+            // Non-modal "Tuning for your PC" line: visible only while a model is queued or being tuned.
+            TuningStatusHost.Children.Add(new ModelTuningStatusControl(ModelTuningStatusControl.Mode.Line, "text"));
 
             _dispatcher = DispatcherQueue.GetForCurrentThread();
             ChatSession.Current.ComputerUseConsentPrompt = ShowComputerUseConsentAsync;

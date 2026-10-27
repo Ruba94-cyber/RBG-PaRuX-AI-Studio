@@ -74,9 +74,11 @@ internal static class MediaCompanionGraph
             throw new InvalidDataException("The resolver plan does not match the selected workflow family.");
 
         JsonObject prompt = request["prompt"]!.AsObject();
-        if (family.Companions.Count(companion => companion.Role == "text_encoder") != 1
-            || family.Companions.Count(companion => companion.Role == "vae") != 1)
-            throw new InvalidDataException("The workflow requires exactly one registered text encoder and VAE companion.");
+        // A single-file checkpoint (SDXL, FLUX.1 schnell) embeds its text encoders and VAE, so it declares none; a split family
+        // declares exactly one of each because its template has one CLIPLoader and one VAELoader.
+        if (family.Companions.Count(companion => companion.Role == "text_encoder") > 1
+            || family.Companions.Count(companion => companion.Role == "vae") > 1)
+            throw new InvalidDataException("The workflow supports at most one registered text encoder and one VAE companion.");
 
         for (int i = 0; i < family.Companions.Count; i++)
         {

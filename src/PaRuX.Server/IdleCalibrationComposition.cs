@@ -17,6 +17,9 @@ internal static class IdleCalibrationComposition
         AutoMaintenanceService maintenance = sp.GetRequiredService<AutoMaintenanceService>();
         LocalAiProcessManager process = sp.GetRequiredService<LocalAiProcessManager>();
         LocalRuntimeService localRuntime = sp.GetRequiredService<LocalRuntimeService>();
+        ModelTuningTracker tuning = sp.GetRequiredService<ModelTuningTracker>();
+        // A model pointed at a role for the first time is queued (and shown) like a fresh download.
+        LocalAiPaths.RoleModelAssigned += (role, path) => OnRoleAssigned(tuning, role, path);
         var telemetry = new GpuPerformanceTelemetryService();
         var gpuInventory = new GpuInventoryService();
 
@@ -38,6 +41,9 @@ internal static class IdleCalibrationComposition
                 return peak;
             },
             HasFreshModel = () => new PostDownloadOptimizationQueue().Pending().Count > 0,
+            IsFreshModel = IsFresh,
+            FreshModelHandled = path => new PostDownloadOptimizationQueue().MarkDone(path),
+            Tuning = tuning,
             Targets = Targets,
             Environment = async ct =>
             {
@@ -58,6 +64,16 @@ internal static class IdleCalibrationComposition
         return new IdleCalibrationService(deps, tracker, new IdleCalibrationRegistry(), idle);
     }
 
+    internal static bool IsFresh(string path) =>
+        new PostDownloadOptimizationQueue().Pending().Any(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+
+    internal static void OnRoleAssigned(ModelTuningTracker tuning, string role, string path, PostDownloadOptimizationQueue? queue = null)
+    {
+        if (!PostDownloadOptimizationQueue.Qualifies(path)) return;
+        (queue ?? new PostDownloadOptimizationQueue()).Enqueue(path);
+        tuning.Queued("text", path, Path.GetFileNameWithoutExtension(path), role == "coding" ? "coding" : "chat", "Starts shortly if the PC is idle");
+    }
+
     /// <summary>Same machine digest the Arena writes, so calibration rows and arena rows are comparable.</summary>
     internal static string HardwareDigest(IServiceProvider sp)
     {
@@ -76,8 +92,8 @@ internal static class IdleCalibrationComposition
         {
             string? path = null;
             try { path = LocalAiPaths.GetRoleModelPathOrNull(role); } catch (Exception) { }
-            if (string.IsNullOrWhiteSpace(path) || !path.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase)
-                || path.Contains("mmproj", StringComparison.OrdinalIgnoreCase) || !File.Exists(path)) continue;
+            // Same filter as the post-download queue: projectors, speculative heads and the fallback/media-assistant models are never tuned as chat models.
+            if (string.IsNullOrWhiteSpace(path) || !PostDownloadOptimizationQueue.Qualifies(path)) continue;
             string workload = role == "coding" ? "coding" : "chat";
             if (seen.Add(path + "|" + workload)) result.Add(new CalibrationTarget(path, workload));
         }

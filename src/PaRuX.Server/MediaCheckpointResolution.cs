@@ -12,7 +12,11 @@ internal sealed record MediaCheckpointEffective(
     bool IsOverridden,
     IReadOnlyList<string> ReplacesInputs,
     string? ClearedOverrideFile,
-    MediaRoutingDecision? Routing = null);
+    MediaRoutingDecision? Routing = null,
+    string? FamilyId = null,
+    string LoaderNode = "1",
+    string LoaderClass = "UNETLoader",
+    string LoaderInput = "unet_name");
 
 /// <summary>
 /// The single answer to "which checkpoint does the next <type> job load". The graph builder, the ComfyUI race
@@ -34,16 +38,7 @@ internal static class MediaCheckpointResolution
 
     /// <summary>Resolves the checkpoint for a type. A stored override whose file has gone is cleared here, so the
     /// status and the next job both fall back to the template default and say so.</summary>
-    public static MediaCheckpointEffective Resolve(string type) =>
-        WithFamilyTemplate(ApplyCapabilityMode(type, ResolveBase(type), forJob: false));
-
-    /// <summary>The on-disk workflow template a job for this resolved checkpoint submits: the template of the family the
-    /// checkpoint belongs to, which is the per-type default unless an activated checkpoint is of another supported family.</summary>
-    public static string TemplatePathFor(MediaCheckpointEffective effective)
-    {
-        ArgumentNullException.ThrowIfNull(effective);
-        return Path.Combine(LocalAiPaths.ConfigDir, effective.TemplateFile);
-    }
+    public static MediaCheckpointEffective Resolve(string type) => WithFamily(type, ApplyCapabilityMode(type, ResolveBase(type), forJob: false));
 
     /// <summary>Resolve for a job about to run: records the routing trace and throws a typed refusal when a Forced
     /// checkpoint cannot be used (no substitution).</summary>
@@ -52,48 +47,115 @@ internal static class MediaCheckpointResolution
         MediaCheckpointEffective effective = ApplyCapabilityMode(type, ResolveBase(type), forJob: true);
         if (effective.Routing is { IsRefusal: true } refusal)
             throw new MediaRoutingRefusedException(refusal.Capability, refusal.RefusalCode!, refusal.Trace, refusal.Explanation);
-        return WithFamilyTemplate(effective);
+        return WithFamily(type, effective);
     }
 
-    /// <summary>A checkpoint of another supported family runs that family's own graph (its text encoder, VAE and sampler
-    /// settings), never the default family's graph with a foreign file patched into it. Without an override, or when the
-    /// file's family cannot be identified or does not run this type, the per-type default template stays and the family
-    /// gate reports the problem where it always has.</summary>
-    private static MediaCheckpointEffective WithFamilyTemplate(MediaCheckpointEffective effective)
+    /// <summary>
+    /// Resolves the checkpoint for an image-to-image job. Only families that list the img2img pipeline (Z-Image) have a graph for it, so when
+    /// the active image checkpoint is another family the job uses the img2img template's own Z-Image default. It is refused by name, never
+    /// substituted silently, when that default is not installed.
+    /// </summary>
+    public static MediaCheckpointEffective ResolveForImg2Img()
     {
-        if (!effective.IsOverridden || string.IsNullOrWhiteSpace(effective.File)) return effective;
-        string? template = FamilyTemplateFile(effective.Type, effective.File);
-        if (template is null || string.Equals(template, effective.TemplateFile, StringComparison.Ordinal)) return effective;
+        MediaCheckpointEffective effective = ResolveForJob("image");
+        if (effective.FamilyId is null) return effective;
+        RegistryFamily? family = MediaCompanionRegistry.Shipped.FindFamily(effective.FamilyId);
+        if (family is null || family.Pipelines.Contains("img2img", StringComparer.Ordinal)) return effective;
+
+        ConfigAssets.EnsureAll();
+        string defaultFile = ReadTemplateUnet(LocalAiPaths.Img2ImgWorkflowTemplate);
+        if (string.IsNullOrEmpty(defaultFile) || !File.Exists(LocalAiPaths.MainModelPath(defaultFile)))
+            throw new InvalidOperationException("The active image model (" + family.DisplayName
+                + ") cannot do image-to-image yet, and the Z-Image model that can (" + (string.IsNullOrEmpty(defaultFile) ? "the default" : defaultFile)
+                + ") is not installed. Install or activate a Z-Image model to use image-to-image.");
         return effective with
         {
-            TemplateFile = template,
-            ReplacesInputs = new[] { "UNETLoader.unet_name (node " + UnetNode + " of " + template + ")" }
+            IsOverridden = false,
+            File = defaultFile,
+            TemplateFile = Path.GetFileName(LocalAiPaths.Img2ImgWorkflowTemplate),
+            FamilyId = null,
+            LoaderNode = UnetNode,
+            LoaderClass = "UNETLoader",
+            LoaderInput = "unet_name",
+            ReplacesInputs = Array.Empty<string>()
         };
     }
 
-    private static string? FamilyTemplateFile(string type, string file)
+    /// <summary>The checkpoint file an image-to-image job reports as its model (see <see cref="ResolveForImg2Img"/>).</summary>
+    public static string? FileNameForImg2ImgProvenance()
     {
-        MediaFamilyDetection? detection = DetectInstalledFamily(Path.Combine(LocalAiPaths.DiffusionModelsPath, file));
-        if (detection?.FamilyId is null) return null;
-        RegistryFamily? family = MediaCompanionRegistry.Shipped.FindFamily(detection.FamilyId);
-        return family is { IsSupported: true } ? family.TemplateFor(type) : null;
+        string? file = FileNameForProvenance("image");
+        if (string.IsNullOrEmpty(file)) return file;
+        string path = LocalAiPaths.MainModelPath(file);
+        if (!File.Exists(path)) return file;
+        MediaFamilyDetection detection = DetectCached(path, MediaCompanionRegistry.Shipped);
+        RegistryFamily? family = detection.FamilyId is null ? null : MediaCompanionRegistry.Shipped.FindFamily(detection.FamilyId);
+        if (family is null || family.Pipelines.Contains("img2img", StringComparer.Ordinal)) return file;
+        string defaultFile = ReadTemplateUnet(LocalAiPaths.Img2ImgWorkflowTemplate);
+        return string.IsNullOrEmpty(defaultFile) ? file : defaultFile;
     }
 
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, MediaFamilyDetection> DetectionCache =
+    /// <summary>The ComfyUI models folder (full path) a downloaded main model belongs in, by its family: a single-file checkpoint goes to
+    /// checkpoints, every other main model to diffusion_models. An unidentified file goes to diffusion_models (the family gate refuses it earlier).</summary>
+    public static string DestinationFolderFor(string sourcePath)
+    {
+        MediaCompanionRegistry registry = MediaCompanionRegistry.Shipped;
+        MediaFamilyDetection detection = MediaFamilyDetector.DetectFile(sourcePath, registry);
+        RegistryFamily? family = detection.FamilyId is null ? null : registry.FindFamily(detection.FamilyId);
+        return LocalAiPaths.MainModelFolderPath(family?.MainLoader?.Folder ?? "diffusion_models");
+    }
+
+    /// <summary>Full path of the template a resolved checkpoint runs with (the family's own template when the active checkpoint is another family).</summary>
+    public static string TemplatePathFor(MediaCheckpointEffective effective) => Path.Combine(LocalAiPaths.ConfigDir, effective.TemplateFile);
+
+    /// <summary>
+    /// An activated checkpoint of another supported family (SDXL, FLUX.1 schnell, Chroma) runs that family's own template and loader,
+    /// not the Z-Image default. Detected from the file header (cached per size and write time), so the graph, the status API and the
+    /// companion plan all describe the same file. A default (not overridden) or unidentified file keeps the template default.
+    /// </summary>
+    private static MediaCheckpointEffective WithFamily(string type, MediaCheckpointEffective effective)
+    {
+        if (!effective.IsOverridden || string.IsNullOrEmpty(effective.File)) return effective;
+        string path = LocalAiPaths.MainModelPath(effective.File);
+        if (!File.Exists(path)) return effective;
+        MediaCompanionRegistry registry = MediaCompanionRegistry.Shipped;
+        MediaFamilyDetection detection = DetectCached(path, registry);
+        RegistryFamily? family = detection.FamilyId is null ? null : registry.FindFamily(detection.FamilyId);
+        string? template = family?.TemplateFor(type);
+        if (family is not { IsSupported: true, MainLoader: { } loader } || template is null
+            || !family.Pipelines.Contains(type, StringComparer.Ordinal))
+            return effective;
+        return effective with
+        {
+            TemplateFile = template,
+            FamilyId = family.Id,
+            LoaderNode = loader.Node,
+            LoaderClass = loader.ClassType,
+            LoaderInput = loader.Input,
+            ReplacesInputs = new[] { loader.ClassType + "." + loader.Input + " (node " + loader.Node + " of " + template + ")" }
+        };
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Length, DateTime WrittenUtc, MediaFamilyDetection Detection)> DetectionCache =
         new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Family of an installed checkpoint, read from its safetensors header once per file version (path, length,
-    /// modified time) because status endpoints resolve on every poll. Null when the file is not there.</summary>
-    private static MediaFamilyDetection? DetectInstalledFamily(string path)
+    /// <summary>Family detection that reads a file's header once per (size, write time); status polls call Resolve often.</summary>
+    internal static MediaFamilyDetection DetectCached(string path, MediaCompanionRegistry registry)
     {
-        FileInfo info = new(path);
-        if (!info.Exists) return null;
-        string key = path + "|" + info.Length + "|" + info.LastWriteTimeUtc.Ticks;
-        if (DetectionCache.TryGetValue(key, out MediaFamilyDetection? cached)) return cached;
-        MediaFamilyDetection detection = MediaFamilyDetector.DetectFile(path, MediaCompanionRegistry.Shipped);
-        if (DetectionCache.Count >= 64) DetectionCache.Clear();
-        DetectionCache[key] = detection;
-        return detection;
+        try
+        {
+            var info = new FileInfo(path);
+            if (DetectionCache.TryGetValue(path, out var hit) && hit.Length == info.Length && hit.WrittenUtc == info.LastWriteTimeUtc)
+                return hit.Detection;
+            MediaFamilyDetection detection = MediaFamilyDetector.DetectFile(path, registry);
+            // A shipped registry is immutable, so the verdict only changes with the file; test registries bypass the cache.
+            if (ReferenceEquals(registry, MediaCompanionRegistry.Shipped)) DetectionCache[path] = (info.Length, info.LastWriteTimeUtc, detection);
+            return detection;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return MediaFamilyDetector.DetectFile(path, registry);
+        }
     }
 
     private static MediaCheckpointEffective ApplyCapabilityMode(string type, MediaCheckpointEffective baseline, bool forJob)
@@ -114,7 +176,7 @@ internal static class MediaCheckpointResolution
 
         string? overrideFile = LocalAiPaths.GetMediaCheckpointOverride(type);
         string? cleared = null;
-        if (overrideFile != null && !File.Exists(Path.Combine(LocalAiPaths.DiffusionModelsPath, overrideFile)))
+        if (overrideFile != null && !File.Exists(LocalAiPaths.MainModelPath(overrideFile)))
         {
             LocalAiPaths.ClearMediaCheckpointOverride(type);
             cleared = overrideFile;
@@ -139,7 +201,7 @@ internal static class MediaCheckpointResolution
             return routed.ChosenFile;
         string? overrideFile = LocalAiPaths.GetMediaCheckpointOverride(type);
         if (!string.IsNullOrWhiteSpace(overrideFile)
-            && File.Exists(Path.Combine(LocalAiPaths.DiffusionModelsPath, overrideFile)))
+            && File.Exists(LocalAiPaths.MainModelPath(overrideFile)))
             return overrideFile;
         return ReadTemplateUnet(TemplatePathFor(type));
     }
@@ -211,9 +273,9 @@ internal static class MediaCheckpointResolution
     /// <summary>Family name read from an installed diffusion file's header, or null when it cannot be identified.</summary>
     public static string? FamilyOfInstalledFile(string fileName)
     {
-        string path = Path.Combine(LocalAiPaths.DiffusionModelsPath, fileName);
+        string path = LocalAiPaths.MainModelPath(fileName);
         if (!File.Exists(path)) return null;
-        MediaFamilyDetection detection = MediaFamilyDetector.DetectFile(path, MediaCompanionRegistry.Shipped);
+        MediaFamilyDetection detection = DetectCached(path, MediaCompanionRegistry.Shipped);
         return detection.FamilyName;
     }
 

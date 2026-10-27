@@ -120,9 +120,10 @@ internal sealed class AutoMaintenanceSettings
     /// <summary>While the machine is idle, run the existing "Optimize for this PC" calibration in the background (once per model,
     /// hardware fingerprint and runtime build; it never downloads anything). Needs <see cref="Enabled"/> as well.</summary>
     public bool CalibrateWhenIdle { get; set; } = true;
-    /// <summary>Opt-in: when the PC is idle (no generation, Gaming off) measure ComfyUI flag sets once per hardware/ComfyUI/PyTorch/model
-    /// fingerprint and keep the fastest output-equivalent one. Off by default; the "Optimize media engine" button works regardless.</summary>
-    public bool AutoOptimizeMedia { get; set; }
+    /// <summary>When the PC is idle (no generation, Gaming off, not on battery) measure ComfyUI flag sets once per hardware/ComfyUI/PyTorch/model
+    /// fingerprint and keep the fastest output-equivalent one; a freshly downloaded media checkpoint is queued for it right away.
+    /// On for newly created settings; a stored explicit choice (including off) is kept. The "Optimize media engine" button works regardless.</summary>
+    public bool AutoOptimizeMedia { get; set; } = true;
 
     internal static int ClampInterval(int hours) => Math.Clamp(hours, MinimumIntervalHours, MaximumIntervalHours);
     internal AutoMaintenanceSettings Normalized() => new()
