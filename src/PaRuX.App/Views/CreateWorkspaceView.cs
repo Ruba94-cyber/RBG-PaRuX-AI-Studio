@@ -78,7 +78,7 @@ namespace PaRuX.Views
 
         public void OnShown()
         {
-            _status.Text = "Checking what image generation needs on this PC.";
+            _status.Text = CreateSetupStatusLine.Checking;
             SetProvenance(null);
             foreach (MediaSetupCard card in _setupCards) card.StartPolling();
         }
@@ -201,10 +201,8 @@ namespace PaRuX.Views
             if (type == "image")
                 card.StatusChanged += status =>
                 {
-                    if (_operations.IsBusy || _operationMessageSticky) return;
-                    _status.Text = status.Ready
-                        ? "Create is ready. Every generation runs locally through PaRuX Core."
-                        : "Image generation needs a one-time setup. Use the setup card in the Image section; everything runs and stays on this PC.";
+                    if (_operations.IsBusy || _operationMessageSticky || !CreateSetupStatusLine.MayReplace(_status.Text)) return;
+                    _status.Text = CreateSetupStatusLine.For(status.Ready);
                 };
             _setupCards.Add(card);
             return card;
@@ -214,6 +212,9 @@ namespace PaRuX.Views
         {
             var panel = new StackPanel { Spacing = 8 };
             panel.Children.Add(NewSetupCard("image", "image generation"));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_imagePrompt, "Create_Image_Prompt_Box");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_imageWidth, "Create_Image_Width_Box");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_imageHeight, "Create_Image_Height_Box");
             panel.Children.Add(_imagePrompt);
             panel.Children.Add(ExampleChips(_imagePrompt, "Create_Image_Example",
                 "A cozy cabin in a snowy forest at dusk, warm light in the windows",
@@ -256,6 +257,9 @@ namespace PaRuX.Views
         {
             var panel = new StackPanel { Spacing = 8 };
             panel.Children.Add(NewSetupCard("video", "video generation"));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_videoPrompt, "Create_Video_Prompt_Box");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_videoWidth, "Create_Video_Width_Box");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_videoHeight, "Create_Video_Height_Box");
             panel.Children.Add(_videoPrompt);
             panel.Children.Add(ExampleChips(_videoPrompt, "Create_Video_Example",
                 "Waves rolling onto a beach at sunset, cinematic, slow motion",

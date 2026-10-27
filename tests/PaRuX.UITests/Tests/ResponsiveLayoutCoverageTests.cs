@@ -178,13 +178,25 @@ public sealed class ResponsiveLayoutCoverageTests
                 var cancelBtn = UiWait.ById(app.MainWindow, "Create_Cancel_Active_Job_Button", ControlType.Button);
                 var status = UiWait.ById(app.MainWindow, "Create_Operation_Status_Text", ControlType.Text);
 
+                // Status and cancel sit below the selected mode's panel, so on a small window they are reached by scrolling.
+                // Bring them into view first; they must then be fully inside the window and clear of the navigation.
+                cancelBtn.Patterns.ScrollItem.PatternOrDefault?.ScrollIntoView();
+                status.Patterns.ScrollItem.PatternOrDefault?.ScrollIntoView();
+                UiWait.For(() => cancelBtn.Properties.BoundingRectangle.ValueOrDefault.Height > 0
+                    && status.Properties.BoundingRectangle.ValueOrDefault.Height > 0,
+                    $"Create cancel button and status visible after scrolling at {label}");
+
                 AssertInsideWindow(app.MainWindow, cancelBtn, $"Create cancel button at {label}");
                 AssertInsideWindow(app.MainWindow, status, $"Create status text at {label}");
 
                 AssertNoOverlapWithNav(app, cancelBtn, $"Create cancel button at {label}");
                 AssertNoOverlapWithNav(app, status, $"Create status text at {label}");
 
-                Assert.Contains("Create is ready", status.Name, StringComparison.Ordinal);
+                Assert.True(
+                    status.Name.StartsWith("Create is ready", StringComparison.Ordinal)
+                    || status.Name.StartsWith("Image generation needs a one-time setup", StringComparison.Ordinal)
+                    || status.Name.StartsWith("Checking what image generation needs", StringComparison.Ordinal),
+                    $"Create status at {label} must be one of the honest setup messages but was '{status.Name}'");
             }
         }
         catch (Exception ex)

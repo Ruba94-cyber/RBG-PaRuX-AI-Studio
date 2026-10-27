@@ -50,10 +50,19 @@ internal sealed class OnboardingReturnAndReadinessPage
         }
     }
 
-    internal AutomationElement? UnprovenReadinessCard =>
-        _app.FindRawDescendant(_window, el =>
-            el.Properties.AutomationId.ValueOrDefault == "UnprovenReadinessCard"
-            && !el.Properties.IsOffscreen.ValueOrDefault);
+    // A Collapsed card is absent from the UIA tree, so being found means the product made it Visible. It sits below the fold of a
+    // long page, so scroll it into view before judging whether it is on screen.
+    internal AutomationElement? UnprovenReadinessCard
+    {
+        get
+        {
+            var card = _app.FindRawDescendant(_window, el =>
+                el.Properties.AutomationId.ValueOrDefault == "UnprovenReadinessCard");
+            if (card == null) return null;
+            try { card.Patterns.ScrollItem.PatternOrDefault?.ScrollIntoView(); } catch { }
+            return card;
+        }
+    }
 
     internal AutomationElement UnprovenReadinessHeader =>
         UiWait.ById(_window, "UnprovenReadinessHeader", ControlType.Text);
