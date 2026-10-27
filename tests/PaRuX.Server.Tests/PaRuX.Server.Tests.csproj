@@ -56,6 +56,9 @@
     <Compile Include="..\..\src\PaRuX.App\Services\CandidateEvaluationStatusText.cs" Link="ModelHub\CandidateEvaluationStatusText.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\DiscoveryRefreshStatusPresenter.cs" Link="ModelHub\DiscoveryRefreshStatusPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MaintenancePresenter.cs" Link="Maintenance\MaintenancePresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\WavSilenceDetector.cs" Link="Chat\WavSilenceDetector.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\SpeechTextPreparer.cs" Link="Chat\SpeechTextPreparer.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\VoiceRecordingSession.cs" Link="Chat\VoiceRecordingSession.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ProjectWorkspaceSession.cs" Link="Projects\ProjectWorkspaceSession.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\DocumentTextExtractor.cs" Link="Documents\DocumentTextExtractor.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\AppPaths.cs" Link="CodingAgent\AppPaths.cs" />

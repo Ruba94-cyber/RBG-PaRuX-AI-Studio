@@ -55,6 +55,9 @@ namespace PaRuX.Models
         /// <summary>Optional editor command used only to open a PaRuX-owned task worktree for review.</summary>
         public string VsCodeCommand { get; set; } = "code";
 
+        /// <summary>When on, a voice message recorded with the Chat microphone is sent right after transcription. Default off: the text is only placed in the prompt box.</summary>
+        public bool SendVoiceMessagesAutomatically { get; set; }
+
         /// <summary>Coding agent may batch 2-6 independent read-only actions into one model step (default on).</summary>
         public bool CodingBatchReadEnabled { get; set; } = true;
 

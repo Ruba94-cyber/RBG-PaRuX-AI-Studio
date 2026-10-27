@@ -1957,6 +1957,7 @@ namespace PaRuX.Views
                 if (AgentWorkspaceRootBox != null) AgentWorkspaceRootBox.Text = s.AgentCodingWorkspaceRoot;
                 StorageQuotaBox.Value = Math.Clamp(s.StorageQuotaGigabytes, 10, StorageQuotaService.MaximumQuotaGigabytes);
                 ComputerUseAutomationSwitch.IsOn = s.ComputerUseFullAutomationEnabled;
+                VoiceAutoSendSwitch.IsOn = s.SendVoiceMessagesAutomatically;
                 RefreshComputerApps();
                 RefreshGamingStatus();
                 PopulateLanAddresses();
@@ -2010,6 +2011,13 @@ namespace PaRuX.Views
             SettingsStore.Current.Data.Theme = tag;
             SettingsStore.Current.Save();
             App.ApplyTheme();
+        }
+
+        private void VoiceAutoSendSwitch_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_loading) return;
+            SettingsStore.Current.Data.SendVoiceMessagesAutomatically = VoiceAutoSendSwitch.IsOn;
+            SettingsStore.Current.Save();
         }
 
         private void ComputerUseAutomationSwitch_Toggled(object sender, RoutedEventArgs e)

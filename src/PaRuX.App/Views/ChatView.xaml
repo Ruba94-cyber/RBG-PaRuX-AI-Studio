@@ -485,7 +485,23 @@
                             Width="36"
                             Padding="0"
                             ToolTipService.ToolTip="Attach audio to transcribe locally (WAV, MP3, M4A, OGG, FLAC)">
-                            <FontIcon Glyph="&#xE720;" FontSize="15" />
+                            <FontIcon Glyph="&#xE8D6;" FontSize="15" />
+                        </Button>
+                        <Button
+                            x:Name="MicButton"
+                            AutomationProperties.AutomationId="Chat_Mic_Button"
+                            AutomationProperties.Name="Record voice message"
+                            Click="Mic_Click"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                            Foreground="{ThemeResource PaRuXTextTertiaryBrush}"
+                            VerticalAlignment="Bottom"
+                            Height="36"
+                            Width="36"
+                            Padding="0"
+                            ToolTipService.ToolTip="Dictate: click to start recording, click again to stop (Esc cancels, 2 min max)">
+                            <FontIcon x:Name="MicIcon" Glyph="&#xE720;" FontSize="15" />
                         </Button>
                     </StackPanel>
 
@@ -509,6 +525,14 @@
                         TextChanged="InputBox_TextChanged" />
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceXS}" VerticalAlignment="Bottom">
+                        <TextBlock
+                            x:Name="VoiceIndicator"
+                            AutomationProperties.AutomationId="Chat_Voice_Indicator_Text"
+                            Visibility="Collapsed"
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{ThemeResource PaRuXDangerTextBrush}"
+                            ToolTipService.ToolTip="Recording. Click the microphone to stop, Esc to cancel." />
                         <!-- Stop only exists while a reply streams, and reads as a
                              neutral/danger control so it can never be mistaken for Send. -->
                         <Button
