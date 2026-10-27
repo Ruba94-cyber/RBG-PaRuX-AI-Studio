@@ -34,7 +34,16 @@ internal static class MediaCheckpointResolution
 
     /// <summary>Resolves the checkpoint for a type. A stored override whose file has gone is cleared here, so the
     /// status and the next job both fall back to the template default and say so.</summary>
-    public static MediaCheckpointEffective Resolve(string type) => ApplyCapabilityMode(type, ResolveBase(type), forJob: false);
+    public static MediaCheckpointEffective Resolve(string type) =>
+        WithFamilyTemplate(ApplyCapabilityMode(type, ResolveBase(type), forJob: false));
+
+    /// <summary>The on-disk workflow template a job for this resolved checkpoint submits: the template of the family the
+    /// checkpoint belongs to, which is the per-type default unless an activated checkpoint is of another supported family.</summary>
+    public static string TemplatePathFor(MediaCheckpointEffective effective)
+    {
+        ArgumentNullException.ThrowIfNull(effective);
+        return Path.Combine(LocalAiPaths.ConfigDir, effective.TemplateFile);
+    }
 
     /// <summary>Resolve for a job about to run: records the routing trace and throws a typed refusal when a Forced
     /// checkpoint cannot be used (no substitution).</summary>
@@ -43,7 +52,48 @@ internal static class MediaCheckpointResolution
         MediaCheckpointEffective effective = ApplyCapabilityMode(type, ResolveBase(type), forJob: true);
         if (effective.Routing is { IsRefusal: true } refusal)
             throw new MediaRoutingRefusedException(refusal.Capability, refusal.RefusalCode!, refusal.Trace, refusal.Explanation);
-        return effective;
+        return WithFamilyTemplate(effective);
+    }
+
+    /// <summary>A checkpoint of another supported family runs that family's own graph (its text encoder, VAE and sampler
+    /// settings), never the default family's graph with a foreign file patched into it. Without an override, or when the
+    /// file's family cannot be identified or does not run this type, the per-type default template stays and the family
+    /// gate reports the problem where it always has.</summary>
+    private static MediaCheckpointEffective WithFamilyTemplate(MediaCheckpointEffective effective)
+    {
+        if (!effective.IsOverridden || string.IsNullOrWhiteSpace(effective.File)) return effective;
+        string? template = FamilyTemplateFile(effective.Type, effective.File);
+        if (template is null || string.Equals(template, effective.TemplateFile, StringComparison.Ordinal)) return effective;
+        return effective with
+        {
+            TemplateFile = template,
+            ReplacesInputs = new[] { "UNETLoader.unet_name (node " + UnetNode + " of " + template + ")" }
+        };
+    }
+
+    private static string? FamilyTemplateFile(string type, string file)
+    {
+        MediaFamilyDetection? detection = DetectInstalledFamily(Path.Combine(LocalAiPaths.DiffusionModelsPath, file));
+        if (detection?.FamilyId is null) return null;
+        RegistryFamily? family = MediaCompanionRegistry.Shipped.FindFamily(detection.FamilyId);
+        return family is { IsSupported: true } ? family.TemplateFor(type) : null;
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, MediaFamilyDetection> DetectionCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Family of an installed checkpoint, read from its safetensors header once per file version (path, length,
+    /// modified time) because status endpoints resolve on every poll. Null when the file is not there.</summary>
+    private static MediaFamilyDetection? DetectInstalledFamily(string path)
+    {
+        FileInfo info = new(path);
+        if (!info.Exists) return null;
+        string key = path + "|" + info.Length + "|" + info.LastWriteTimeUtc.Ticks;
+        if (DetectionCache.TryGetValue(key, out MediaFamilyDetection? cached)) return cached;
+        MediaFamilyDetection detection = MediaFamilyDetector.DetectFile(path, MediaCompanionRegistry.Shipped);
+        if (DetectionCache.Count >= 64) DetectionCache.Clear();
+        DetectionCache[key] = detection;
+        return detection;
     }
 
     private static MediaCheckpointEffective ApplyCapabilityMode(string type, MediaCheckpointEffective baseline, bool forJob)

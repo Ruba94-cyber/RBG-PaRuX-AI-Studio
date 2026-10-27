@@ -1,0 +1,272 @@
+{
+  "_comment": "Input and output shape of every ComfyUI node the shipped workflow templates use, read from /object_info of a real ComfyUI 0.42.1 (portable build) started with --cpu on a throw-away port. Tests compare each template against it so a graph that names a node, input or output slot the real server does not have fails here, not at the first user job.",
+  "comfyuiVersion": "0.42.1",
+  "nodes": {
+    "CFGGuider": {
+      "required": [
+        "cfg",
+        "model",
+        "negative",
+        "positive"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "CFGNorm": {
+      "required": [
+        "model",
+        "strength"
+      ],
+      "optional": [
+        "pre_cfg"
+      ],
+      "outputs": 1
+    },
+    "CLIPLoader": {
+      "required": [
+        "clip_name",
+        "type"
+      ],
+      "optional": [
+        "device"
+      ],
+      "outputs": 1
+    },
+    "CLIPTextEncode": {
+      "required": [
+        "clip",
+        "text"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "ConditioningZeroOut": {
+      "required": [
+        "conditioning"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "CreateVideo": {
+      "required": [
+        "fps",
+        "images"
+      ],
+      "optional": [
+        "audio",
+        "bit_depth",
+        "codec",
+        "color_space"
+      ],
+      "outputs": 1
+    },
+    "EmptyFlux2LatentImage": {
+      "required": [
+        "batch_size",
+        "height",
+        "width"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "EmptySD3LatentImage": {
+      "required": [
+        "batch_size",
+        "height",
+        "width"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "Flux2Scheduler": {
+      "required": [
+        "height",
+        "steps",
+        "width"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "GetImageSize": {
+      "required": [
+        "image"
+      ],
+      "optional": [],
+      "outputs": 3
+    },
+    "ImageScaleToTotalPixels": {
+      "required": [
+        "image",
+        "megapixels",
+        "resolution_steps",
+        "upscale_method"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "ImageUpscaleWithModel": {
+      "required": [
+        "image",
+        "upscale_model"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "KSampler": {
+      "required": [
+        "cfg",
+        "denoise",
+        "latent_image",
+        "model",
+        "negative",
+        "positive",
+        "sampler_name",
+        "scheduler",
+        "seed",
+        "steps"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "KSamplerSelect": {
+      "required": [
+        "sampler_name"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "LoadImage": {
+      "required": [
+        "image"
+      ],
+      "optional": [],
+      "outputs": 2
+    },
+    "ModelSamplingAuraFlow": {
+      "required": [
+        "model",
+        "shift"
+      ],
+      "optional": [
+        "sampling"
+      ],
+      "outputs": 1
+    },
+    "ModelSamplingSD3": {
+      "required": [
+        "model",
+        "shift"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "RandomNoise": {
+      "required": [
+        "noise_seed"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "ReferenceLatent": {
+      "required": [
+        "conditioning"
+      ],
+      "optional": [
+        "latent"
+      ],
+      "outputs": 1
+    },
+    "SamplerCustomAdvanced": {
+      "required": [
+        "guider",
+        "latent_image",
+        "noise",
+        "sampler",
+        "sigmas"
+      ],
+      "optional": [],
+      "outputs": 2
+    },
+    "SaveImage": {
+      "required": [
+        "filename_prefix",
+        "images"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "SaveVideo": {
+      "required": [
+        "filename_prefix",
+        "format",
+        "video"
+      ],
+      "optional": [
+        "codec"
+      ],
+      "outputs": 1
+    },
+    "TextEncodeQwenImageEdit": {
+      "required": [
+        "clip",
+        "prompt"
+      ],
+      "optional": [
+        "image",
+        "vae"
+      ],
+      "outputs": 1
+    },
+    "UNETLoader": {
+      "required": [
+        "unet_name",
+        "weight_dtype"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "UpscaleModelLoader": {
+      "required": [
+        "model_name"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "VAEDecode": {
+      "required": [
+        "samples",
+        "vae"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "VAEEncode": {
+      "required": [
+        "pixels",
+        "vae"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "VAELoader": {
+      "required": [
+        "vae_name"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "Wan22ImageToVideoLatent": {
+      "required": [
+        "batch_size",
+        "height",
+        "length",
+        "vae",
+        "width"
+      ],
+      "optional": [
+        "start_image"
+      ],
+      "outputs": 1
+    }
+  }
+}
