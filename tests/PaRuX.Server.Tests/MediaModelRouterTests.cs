@@ -22,7 +22,7 @@ public sealed class MediaModelRouterTests
     }
 
     private static string Family(string id, string capability, string strengths, params string[] variants) =>
-        $"{{ \"id\": \"{id}\", \"displayName\": \"{id}\", \"capability\": \"{capability}\", \"support\": \"supported\", \"registryFamily\": \"z-image\", " +
+        $"{{ \"id\": \"{id}\", \"displayName\": \"{id}\", \"capability\": \"{capability}\", \"support\": \"supported\", \"registryFamily\": \"{(capability == "image.edit" ? "flux2-klein" : "z-image")}\", " +
         $"\"parametersBillion\": 2, \"textEncoderGb\": 0, \"vaeGb\": 0, {(strengths.Length == 0 ? string.Empty : $"\"strengths\": [{strengths}], ")}\"variants\": [ {string.Join(", ", variants)} ] }}";
 
     private static MediaCatalogue Catalogue(params string[] families) => MediaCatalogue.Parse($$"""
