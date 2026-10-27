@@ -35,6 +35,23 @@ public static class TextInferenceQuiescence
             {
                 case SlotState.TextServerAbsent:
                     return;
+                case SlotState.Unsupported when probe.ServerResponded:
+                    // The server answered but exposes no trustworthy slot table (endpoint disabled,
+                    // older/optimised launch profile, router without /slots). PaRuX's own request
+                    // leases are the authoritative record of PaRuX-originated work, so absence of
+                    // slot data alone is not a reason to refuse. Wait for those leases to drain and
+                    // refuse only on positive evidence that something else is generating.
+                    if (MediaExecutionCoordinator.Current.Snapshot().ActiveTextReaders > 0)
+                    {
+                        observedBusy = true;
+                        break;
+                    }
+                    if (await HasPositiveBusyEvidenceAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        observedBusy = true;
+                        break;
+                    }
+                    return;
                 case SlotState.Unsupported:
                     throw new TextRuntimeStateUnavailableException(
                         "The active managed text runtime does not expose trustworthy slot processing state; refusing to swap it out during media work because an in-flight chat could be truncated.");
@@ -52,6 +69,41 @@ public static class TextInferenceQuiescence
             : "Timed out proving text-inference quiescence before media GPU takeover.");
     }
 
+    private static Func<CancellationToken, Task<bool>>? _busyEvidenceOverride;
+
+    internal static IDisposable OverrideBusyEvidenceForTests(Func<CancellationToken, Task<bool>> probe)
+    {
+        Func<CancellationToken, Task<bool>>? previous = _busyEvidenceOverride;
+        _busyEvidenceOverride = probe;
+        return new Restore(() => _busyEvidenceOverride = previous);
+    }
+
+    /// <summary>
+    /// Positive evidence that a text server with no slot table is generating right now: the process
+    /// that owns the text port burned at least half a core over a one second window. Unreadable
+    /// ownership or CPU is not evidence.
+    /// </summary>
+    private static async Task<bool> HasPositiveBusyEvidenceAsync(CancellationToken cancellationToken)
+    {
+        if (_busyEvidenceOverride is { } probe) return await probe(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            IReadOnlyList<int> owners = OperatingSystem.IsWindows()
+                ? ManagedListenerOwnership.FindListenerOwners(TextPort).Where(pid => pid > 0).ToList()
+                : new List<int>();
+            if (owners.Count == 0) return false;
+            using var process = System.Diagnostics.Process.GetProcessById(owners[0]);
+            TimeSpan before = process.TotalProcessorTime;
+            DateTime started = DateTime.UtcNow;
+            await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
+            process.Refresh();
+            double wall = (DateTime.UtcNow - started).TotalSeconds;
+            return wall > 0 && (process.TotalProcessorTime - before).TotalSeconds / wall >= 0.5;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch { return false; }
+    }
+
     internal static async Task<SlotProbe> ProbeAsync(CancellationToken cancellationToken)
     {
         SlotProbe primary = await ProbeSlotsEndpointAsync(
@@ -63,7 +115,10 @@ public static class TextInferenceQuiescence
         // is legitimate to use router discovery; otherwise an unsupported primary endpoint remains
         // a hard failure rather than being guessed away.
         if (!HotModelPoolCatalog.IsActive) return primary;
-        return await ProbeRouterChildrenAsync(cancellationToken).ConfigureAwait(false);
+        SlotProbe router = await ProbeRouterChildrenAsync(cancellationToken).ConfigureAwait(false);
+        return router.State == SlotState.Unsupported
+            ? router with { ServerResponded = primary.ServerResponded }
+            : router;
     }
 
     private static async Task<SlotProbe> ProbeRouterChildrenAsync(CancellationToken cancellationToken)
@@ -135,14 +190,13 @@ public static class TextInferenceQuiescence
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(2));
             using HttpResponseMessage response = await Http.GetAsync(endpoint, timeout.Token).ConfigureAwait(false);
-            if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden)
-                return new SlotProbe(SlotState.Unsupported, 0, 0);
             if (!response.IsSuccessStatusCode)
-                return new SlotProbe(SlotState.Unsupported, 0, 0);
+                return new SlotProbe(SlotState.Unsupported, 0, 0, ServerResponded: true);
 
             using JsonDocument document = JsonDocument.Parse(
                 await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false));
-            return ParseSlots(document.RootElement);
+            SlotProbe parsed = ParseSlots(document.RootElement);
+            return parsed.State == SlotState.Unsupported ? parsed with { ServerResponded = true } : parsed;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (OperationCanceledException)
@@ -166,7 +220,7 @@ public static class TextInferenceQuiescence
         }
         catch (JsonException)
         {
-            return new SlotProbe(SlotState.Unsupported, 0, 0);
+            return new SlotProbe(SlotState.Unsupported, 0, 0, ServerResponded: true);
         }
     }
 
@@ -236,7 +290,7 @@ public static class TextInferenceQuiescence
         Unsupported
     }
 
-    internal sealed record SlotProbe(SlotState State, int Slots, int Processing);
+    internal sealed record SlotProbe(SlotState State, int Slots, int Processing, bool ServerResponded = false);
 }
 
 /// <summary>
