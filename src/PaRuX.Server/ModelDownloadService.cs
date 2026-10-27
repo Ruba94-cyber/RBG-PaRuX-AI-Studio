@@ -2586,17 +2586,30 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
         else if (entry.SplitSet is { } completedSet && completedSet.TryMarkLanded(entry.Status.FileName))
             _completionHandler?.OnGgufDownloaded(completedSet.FirstPartPath, completedSet.Label);
 
+        var finalInfo = new FileInfo(finalPath);
+        long finalLength = finalInfo.Length;
+        DateTime finalWriteUtc = finalInfo.LastWriteTimeUtc;
+        string publishedPath = finalPath;
         if (!string.IsNullOrWhiteSpace(request.MediaCheckpointType))
         {
+            // A media checkpoint belongs in ComfyUI's model folder, whichever UI started the download. Place it now, so it is listed as
+            // installed and tuning sees the real file. When ComfyUI is missing or the destination is taken, it stays here and the
+            // migration/"Install" step reports why; nothing is replaced or deleted.
+            try
+            {
+                MediaPlacementResult placed = MediaCheckpointPlacement.PlaceMainModel(finalPath);
+                if (placed.Installed && File.Exists(placed.Path)) publishedPath = placed.Path;
+                else if (placed.Outcome == MediaPlacementOutcome.Failed) System.Diagnostics.Trace.TraceWarning("Media checkpoint placement: " + placed.Message);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException) { System.Diagnostics.Trace.TraceWarning("Media checkpoint placement failed: " + ex.Message); }
             // Media checkpoints join the automatic "tuning for your PC" queue; a failing observer never fails the download.
-            try { _completionHandler?.OnMediaCheckpointDownloaded(finalPath, Path.GetFileNameWithoutExtension(finalPath)); }
+            try { _completionHandler?.OnMediaCheckpointDownloaded(publishedPath, Path.GetFileNameWithoutExtension(publishedPath)); }
             catch (Exception ex) when (ex is not OutOfMemoryException) { System.Diagnostics.Trace.TraceWarning("Media tuning hand-off failed: " + ex.Message); }
         }
 
         ModelDownloadLicenseEvidence capturedLicense = request.LicenseEvidence ?? new ModelDownloadLicenseEvidence();
         var sourceIdentity = ModelDownloadProvenanceManifestStore.SourceIdentityFromValidatedUrl(
             request.RepoId, request.Revision, request.DownloadUrl);
-        var finalInfo = new FileInfo(finalPath);
         var provenance = new ModelDownloadProvenance
         {
             RepoId = request.RepoId,
@@ -2613,15 +2626,15 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
             ExpectedSha256 = entry.Status.Sha256,
             ComputedSha256 = computedSha256,
             IntegrityStatus = verificationStatus,
-            SizeBytes = finalInfo.Length,
-            FileLastWriteUtc = finalInfo.LastWriteTimeUtc,
+            SizeBytes = finalLength,
+            FileLastWriteUtc = finalWriteUtc,
             CompletedUtc = DateTime.UtcNow
         };
         ModelDownloadProvenanceManifestStore.Upsert(ModelsDirectory, request.FileName, provenance);
         lock (entry.Gate)
         {
             entry.Status.Status = "completed";
-            entry.Status.LocalPath = finalPath;
+            entry.Status.LocalPath = publishedPath;
             entry.Status.VerificationStatus = verificationStatus;
             entry.Status.Error = null;
             entry.Status.FailureClass = null;
