@@ -49,11 +49,23 @@ internal static class MediaMaintenanceProposals
         try
         {
             var (hw, _, digest) = MediaCatalogueLive.DetectHardware();
-            return Propose(MediaCatalogue.Shipped, hw, MediaCatalogueLive.InstalledFiles(),
-                cap => MediaCatalogueLive.SpeedLookup(cap, digest), new HashSet<string>());
+            MediaCatalogue catalogue = MediaDiscoveryLive.Effective();
+            ISet<string> installed = MediaCatalogueLive.InstalledFiles();
+            Func<string, Func<string, double?>> speed = cap => MediaCatalogueLive.SpeedLookup(cap, digest);
+            // Curated proposals keep their rank; a discovered one only fills a capability that has none. Standard lane unless the
+            // user chose Uncensored (Automatic stays Standard).
+            List<MaintenanceProposal> curated = Propose(catalogue, hw, installed, speed, new HashSet<string>())
+                .Where(p => !IsDiscoveredKey(catalogue, p.Key)).ToList();
+            string lane = string.Equals(MediaContentLaneStore.Get(), MediaContentLanes.Uncensored, StringComparison.OrdinalIgnoreCase) ? "uncensored" : "standard";
+            var covered = new HashSet<string>(curated.Select(p => p.Capability ?? string.Empty));
+            curated.AddRange(MediaDiscoveryProposals.Propose(catalogue, hw, installed, speed, lane, covered, new HashSet<string>()));
+            return curated;
         }
         catch (Exception ex) when (ex is not OperationCanceledException) { return Array.Empty<MaintenanceProposal>(); }
     }
+
+    private static bool IsDiscoveredKey(MediaCatalogue catalogue, string key) =>
+        catalogue.Families.SelectMany(f => f.Variants).Any(v => v.Id == key && v.IsDiscovered);
 
     private static int FitRank(MediaFitClass c) => c switch { MediaFitClass.Fits => 0, MediaFitClass.Offload => 1, MediaFitClass.Unknown => 2, _ => 3 };
     private static string Describe(MediaFitClass c) => c switch

@@ -49,6 +49,22 @@ namespace PaRuX.Views
                 });
             }
 
+            // Discovery: the user decides when to look on Hugging Face; this only lists models and never downloads one.
+            var discoveryRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(0, 8, 0, 0) };
+            var refresh = new Button { Content = "Refresh from Hugging Face" };
+            AutomationProperties.SetName(refresh, "Refresh media models from Hugging Face");
+            AutomationProperties.SetAutomationId(refresh, "ModelHub_MediaDiscoveryRefresh");
+            var refreshLine = new TextBlock
+            {
+                Text = MediaHubPresenter.DiscoveryStatusLine(_mediaCatalogue), TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.72,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            AutomationProperties.SetAutomationId(refreshLine, "ModelHub_MediaDiscoveryStatus");
+            refresh.Click += async (_, _) => await RefreshMediaDiscoveryAsync(refresh, refreshLine);
+            discoveryRow.Children.Add(refresh);
+            discoveryRow.Children.Add(refreshLine);
+            _media.Children.Add(discoveryRow);
+
             var laneRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 8, 0, 0) };
             foreach (string lane in new[] { MediaHubPresenter.Standard, MediaHubPresenter.Uncensored })
             {
@@ -87,6 +103,13 @@ namespace PaRuX.Views
                     _media.Children.Add(new TextBlock { Text = "Alternatives", FontSize = 12, Opacity = 0.7, Margin = new Thickness(0, 6, 0, 0) });
                     foreach (MediaHubCard alt in cap.Alternatives) _media.Children.Add(BuildMediaCatalogueCard(alt, capCurrent));
                 }
+                _media.Children.Add(new TextBlock
+                {
+                    Text = "Found on Hugging Face (" + MediaHubPresenter.DiscoveredNote + ")", FontSize = 12, Opacity = 0.7, Margin = new Thickness(0, 6, 0, 0)
+                });
+                if (cap.DiscoveredCards.Count == 0)
+                    _media.Children.Add(new TextBlock { Text = cap.DiscoveredMessage, TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.72 });
+                foreach (MediaHubCard found in cap.DiscoveredCards) _media.Children.Add(BuildMediaCatalogueCard(found, capCurrent));
             }
             return true;
         }
@@ -96,7 +119,7 @@ namespace PaRuX.Views
             var panel = new StackPanel { Spacing = 4, Margin = new Thickness(0, 6, 0, 0) };
             panel.Children.Add(new TextBlock
             {
-                Text = (card.IsBest ? "Recommended · " : string.Empty) + card.Title,
+                Text = (card.Badge.Length > 0 ? card.Badge + " · " : card.IsBest ? "Recommended · " : string.Empty) + card.Title,
                 TextWrapping = TextWrapping.Wrap,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
             });
@@ -183,6 +206,24 @@ namespace PaRuX.Views
             {
                 // The server refuses a family the workflow cannot run with a typed reason; show it as is.
                 _status.Text = "Could not use " + title + ": " + CustomCheckpointPresenter.ExtractServerError(ex.Message);
+                button.IsEnabled = true;
+            }
+        }
+
+        private async Task RefreshMediaDiscoveryAsync(Button button, TextBlock statusLine)
+        {
+            button.IsEnabled = false;
+            statusLine.Text = "Reading Hugging Face (public listings only, this can take a minute)…";
+            try
+            {
+                MediaDiscoveryRefreshResultDto result = await MediaCheckpointsClient.Current.RefreshDiscoveryAsync(CancellationToken.None);
+                _status.Text = MediaHubPresenter.RefreshResultLine(result);
+                await RefreshAllAsync();
+            }
+            catch (Exception ex)
+            {
+                _status.Text = "Could not refresh from Hugging Face: " + CustomCheckpointPresenter.ExtractServerError(ex.Message);
+                statusLine.Text = _status.Text;
                 button.IsEnabled = true;
             }
         }

@@ -130,6 +130,9 @@ builder.Services.AddSingleton<IModelDiscoveryProvider>(_ => ModelDiscoveryProvid
     () => new HuggingFaceModelDiscoveryProvider()));
 builder.Services.AddSingleton<LoraInstallJobs>(services => new LoraInstallJobs(services.GetRequiredService<ModelDownloadService>()));
 builder.Services.AddSingleton(_ => new ModelDiscoveryCatalogStore());
+builder.Services.AddSingleton<IMediaDiscoveryProvider>(_ => new HuggingFaceMediaDiscoveryProvider());
+builder.Services.AddSingleton(sp => new MediaDiscoveryService(sp.GetRequiredService<IMediaDiscoveryProvider>(),
+    new MediaDiscoveryStore(), MediaCompanionRegistry.Shipped, isGamingActive: () => sp.GetRequiredService<LocalRuntimeService>().GamingMode));
 builder.Services.AddSingleton(_ => new ModelDiscoveryPolicyStore());
 builder.Services.AddSingleton(services => new ModelDiscoveryService(
     services.GetRequiredService<IModelDiscoveryProvider>(),
@@ -2666,6 +2669,7 @@ app.MapPost("/api/v1/models/roles/auto-assign", async (
 
 AutoMaintenanceEndpoints.Map(app);
 MediaCatalogueEndpoints.Map(app);
+MediaDiscoveryEndpoints.Map(app);
 MediaLaneEndpoints.Map(app);
 RuntimeSuggestionEndpoints.Map(app);
 

@@ -8,11 +8,16 @@ internal sealed record MediaJobShape(double Megapixels, int Frames, double Secon
 
 internal sealed record MediaCatalogueCapability(string Id, string Label, MediaJobShape DefaultJob);
 
+/// <summary>Provenance of a variant that was discovered on Hugging Face instead of curated: popularity and recency drive the
+/// "best proposed" ordering; none of it is quality evidence.</summary>
+internal sealed record MediaDiscoveryMeta(long Downloads, long Likes, DateTime? LastModifiedUtc, string SourceLabel);
+
 internal sealed record MediaCatalogueVariant(
     string Id, string Title, string Lane, string? LaneEvidence, string Precision, string? Repository, string? Path,
     string FileName, long? SizeBytes, string SizeBasis, string License, int Tier, bool ListingVerified, bool Bundled,
-    string BaseCompat, IReadOnlyList<string> AdditionalFiles, string? Revision = null, string? Sha256 = null)
+    string BaseCompat, IReadOnlyList<string> AdditionalFiles, string? Revision = null, string? Sha256 = null, MediaDiscoveryMeta? Discovery = null)
 {
+    internal bool IsDiscovered => Discovery is not null;
     /// <summary>Pinned to the listed commit when the catalogue records one, so the bytes cannot change under the recorded size.</summary>
     internal string? DownloadUrl => Repository is not null && Path is not null
         ? $"https://huggingface.co/{Repository}/resolve/{Revision ?? "main"}/{Path}" : null;
@@ -71,6 +76,26 @@ internal sealed class MediaCatalogue
         "video.generate" => "video",
         _ => null
     };
+
+    /// <summary>This catalogue plus discovered families. Embedded (curated) entries always win: a discovered variant that names the
+    /// same checkpoint file, or the same repository path, as an embedded one is dropped.</summary>
+    internal MediaCatalogue WithDiscovered(IEnumerable<MediaCatalogueFamily> discovered)
+    {
+        var files = new HashSet<string>(Families.SelectMany(f => f.Variants).Select(v => v.FileName), StringComparer.OrdinalIgnoreCase);
+        var paths = new HashSet<string>(Families.SelectMany(f => f.Variants).Where(v => v.Repository != null && v.Path != null)
+            .Select(v => v.Repository + "/" + v.Path), StringComparer.OrdinalIgnoreCase);
+        var ids = new HashSet<string>(Families.SelectMany(f => f.Variants).Select(v => v.Id), StringComparer.Ordinal);
+        var merged = new List<MediaCatalogueFamily>(Families);
+        foreach (MediaCatalogueFamily family in discovered)
+        {
+            if (Capabilities.All(c => c.Id != family.Capability)) continue;
+            var keep = family.Variants.Where(v => !files.Contains(v.FileName)
+                && !(v.Repository != null && v.Path != null && paths.Contains(v.Repository + "/" + v.Path)) && ids.Add(v.Id)).ToList();
+            foreach (MediaCatalogueVariant v in keep) { files.Add(v.FileName); }
+            if (keep.Count > 0) merged.Add(family with { Variants = keep });
+        }
+        return new MediaCatalogue(Version, Capabilities, merged);
+    }
 
     internal MediaCatalogueCapability? CapabilityOf(string id) => Capabilities.FirstOrDefault(c => c.Id == id);
 

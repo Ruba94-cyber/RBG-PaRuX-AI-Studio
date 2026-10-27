@@ -196,6 +196,8 @@ internal static class AutoMaintenanceComposition
                 .ToList(),
             SuggestBackends = ct => sp.GetRequiredService<RuntimeSuggestionService>().ProposalsAsync(ct),
             SuggestMedia = MediaMaintenanceProposals.ProposeLive,
+            RefreshMediaDiscovery = ct => sp.GetRequiredService<MediaDiscoveryService>().RefreshAsync(force: false, ct),
+            IsOnBattery = SystemPower.IsOnBattery,
             IsGamingActive = () => localRuntime.GamingMode
         });
     }
