@@ -28,6 +28,13 @@ namespace PaRuX.Services
             MaintenancePresenter.ParseSettings((await SendAsync(HttpMethod.Put, "/api/v1/maintenance/settings",
                 MaintenancePresenter.BuildSettingsBody(enabled, intervalHours, keepRuntimesUpdated, autoOptimizeMedia), ct).ConfigureAwait(false)).Body);
 
+        /// <summary>Per-model state of the automatic "tuning for your PC" (queued / running / applied / skipped / failed).</summary>
+        public async Task<ModelTuningStatusDto> GetTuningAsync(CancellationToken ct) =>
+            ModelTuningPresenter.Parse((await SendAsync(HttpMethod.Get, "/api/v1/models/tuning", null, ct).ConfigureAwait(false)).Body);
+
+        public Task CancelTuningAsync(string id, CancellationToken ct) =>
+            SendAsync(HttpMethod.Post, "/api/v1/models/tuning/cancel", new { id }, ct, allowConflict: true);
+
         /// <summary>"Optimize media engine for this PC": starts the background calibration (409 = one is already running).</summary>
         public async Task<MediaOptimizationStatusDto> StartMediaOptimizationAsync(CancellationToken ct) =>
             MaintenancePresenter.ParseMediaOptimization((await SendAsync(HttpMethod.Post, "/api/v1/media/optimize?force=true", null, ct, allowConflict: true).ConfigureAwait(false)).Body);

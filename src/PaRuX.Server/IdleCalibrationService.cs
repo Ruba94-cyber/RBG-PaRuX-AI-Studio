@@ -20,6 +20,12 @@ internal sealed class IdleCalibrationDependencies
     public required Func<IReadOnlyList<CalibrationTarget>> Targets { get; init; }
     /// <summary>True while a freshly downloaded model still awaits its first calibration; the machine then needs only a short pause.</summary>
     public Func<bool> HasFreshModel { get; init; } = () => false;
+    /// <summary>True when this very model is a freshly downloaded / newly assigned one (short grace); defaults to <see cref="HasFreshModel"/>.</summary>
+    public Func<string, bool>? IsFreshModel { get; init; }
+    /// <summary>A fresh model needs no calibration (already tuned, or not measurable): drop it from the fresh queue.</summary>
+    public Action<string> FreshModelHandled { get; init; } = _ => { };
+    /// <summary>Visible "tuning for your PC" state; null keeps the service silent (older tests).</summary>
+    public ModelTuningTracker? Tuning { get; init; }
     public required Func<CancellationToken, Task<CalibrationEnvironment?>> Environment { get; init; }
     public Func<string, string?> ModelId { get; init; } = LocalBenchmarkIdentity.ModelId;
     public required Func<RuntimeOptimizationRequest, RuntimeOptimizationRun> Start { get; init; }
@@ -37,8 +43,8 @@ internal sealed class IdleCalibrationDependencies
 internal sealed class IdleCalibrationService
 {
     internal static readonly TimeSpan DefaultIdleThreshold = TimeSpan.FromMinutes(10);
-    /// <summary>A new model's first calibration waits only this long for a quiet machine, so its first real use is already tuned.</summary>
-    internal static readonly TimeSpan FreshModelIdleThreshold = TimeSpan.FromMinutes(2);
+    /// <summary>A new model's first calibration waits only this short grace for a quiet machine, so its first real use is already tuned.</summary>
+    internal static readonly TimeSpan FreshModelIdleThreshold = TimeSpan.FromSeconds(20);
     internal const int GpuBusyPercent = 15;
 
     private readonly IdleCalibrationDependencies _deps;
@@ -50,6 +56,9 @@ internal sealed class IdleCalibrationService
     private string? _runLabel;
     private string _runWorkload = string.Empty;
     private string? _cancelReason;
+    private string? _runPath;
+    private string? _runTuningId;
+    private readonly HashSet<string> _declined = new(StringComparer.OrdinalIgnoreCase);
 
     internal IdleCalibrationService(
         IdleCalibrationDependencies deps, GenerationActivityTracker activity, IdleCalibrationRegistry registry,
@@ -94,10 +103,38 @@ internal sealed class IdleCalibrationService
         if (id != null) { try { _deps.Cancel(id); } catch { } }
     }
 
+    /// <summary>The user pressed Cancel on a tuning job: stops the running calibration (if it is this model) and keeps queued ones from starting this session.</summary>
+    internal bool CancelByUser(string modelPath)
+    {
+        string? id = null;
+        lock (_gate)
+        {
+            _declined.Add(modelPath);
+            if (_runId != null && string.Equals(_runPath, modelPath, StringComparison.OrdinalIgnoreCase)) { id = _runId; _cancelReason = "user_cancel"; }
+        }
+        if (id != null) { try { _deps.Cancel(id); } catch { } return true; }
+        return false;
+    }
+
+    private bool IsFresh(string path) => _deps.IsFreshModel is { } f ? f(path) : _deps.HasFreshModel();
+
+    private static string WaitingText(string decision) => decision switch
+    {
+        "not_idle" => "Waiting for the PC to be idle",
+        "gaming" => "Paused: Gaming Mode is on",
+        "on_battery" => "Paused: running on battery",
+        "gpu_busy" => "Waiting: the GPU is busy",
+        "disabled" => "Automatic tuning is off in Settings > Automatic checks",
+        "no_runtime" => "Waiting for the local runtime",
+        _ => "Waiting for the PC to be idle"
+    };
+
     /// <summary>One scheduling step. Safe to call at any cadence; starts at most one calibration at a time.</summary>
     internal async Task<string> TickAsync(CancellationToken ct)
     {
         string decision = await EvaluateAsync(ct).ConfigureAwait(false);
+        if (_deps.Tuning is { } tuning && decision is "not_idle" or "gaming" or "on_battery" or "gpu_busy" or "disabled" or "no_runtime")
+            tuning.Waiting(WaitingText(decision));
         LastDecision = decision;
         LastDecisionUtc = _deps.UtcNow();
         return decision;
@@ -119,7 +156,9 @@ internal sealed class IdleCalibrationService
         }
         if (!enabled) return "disabled";
         if (_deps.IsGamingActive()) return "gaming";
-        TimeSpan needed = _deps.HasFreshModel() && FreshModelIdleThreshold < IdleThreshold ? FreshModelIdleThreshold : IdleThreshold;
+        List<CalibrationTarget> targets = _deps.Targets().Where(t => !IsDeclined(t.ModelPath)).ToList();
+        bool anyFresh = targets.Any(t => IsFresh(t.ModelPath));
+        TimeSpan needed = anyFresh && FreshModelIdleThreshold < IdleThreshold ? FreshModelIdleThreshold : IdleThreshold;
         if (!_activity.IsIdle(needed)) return "not_idle";
         if (_deps.IsOnBattery() == true) return "on_battery";
 
@@ -135,15 +174,35 @@ internal sealed class IdleCalibrationService
         if (env is null) return "no_runtime";
         DateTime now = _deps.UtcNow();
         TimeSpan retry = TimeSpan.FromHours(Math.Max(1, settings.IntervalHours));
-        foreach (CalibrationTarget target in _deps.Targets())
+        bool waitedForIdle = false;
+        foreach (CalibrationTarget target in targets)
         {
-            string? modelId = _deps.ModelId(target.ModelPath);
-            if (modelId is null) continue;
-            string workload = RuntimePerformanceTuner.NormalizeWorkload(target.Workload);
-            string key = IdleCalibrationRegistry.KeyOf(modelId, env.HardwareKey, env.RuntimeTag, workload);
-            if (!_registry.IsDue(key, now, retry)) continue;
-
+            bool fresh = IsFresh(target.ModelPath);
             string label = Path.GetFileNameWithoutExtension(target.ModelPath);
+            string workload = RuntimePerformanceTuner.NormalizeWorkload(target.Workload);
+            string? modelId = _deps.ModelId(target.ModelPath);
+            if (modelId is null)
+            {
+                if (fresh)
+                {
+                    if (_deps.Tuning is { } t0) t0.Skipped(t0.Queued("text", target.ModelPath, label, workload), "This model's identity could not be read, so it was not tuned.");
+                    _deps.FreshModelHandled(target.ModelPath);
+                }
+                continue;
+            }
+            string key = IdleCalibrationRegistry.KeyOf(modelId, env.HardwareKey, env.RuntimeTag, workload);
+            if (!_registry.IsDue(key, now, retry))
+            {
+                if (fresh)
+                {
+                    if (_deps.Tuning is { } t1) t1.Skipped(t1.Queued("text", target.ModelPath, label, workload), "Already tuned for this PC");
+                    _deps.FreshModelHandled(target.ModelPath);
+                }
+                continue;
+            }
+            // Only a fresh model may start after the short grace; any other model still needs the full idle period.
+            if (!fresh && !_activity.IsIdle(IdleThreshold)) { waitedForIdle = true; continue; }
+
             try
             {
                 RuntimeOptimizationRun run = _deps.Start(new RuntimeOptimizationRequest
@@ -156,17 +215,22 @@ internal sealed class IdleCalibrationService
                     SustainedValidation = true,
                     Trigger = "idle"
                 });
-                lock (_gate) { _runId = run.Id; _runKey = key; _runLabel = label; _runWorkload = workload; _cancelReason = null; }
+                string? tuningId = _deps.Tuning?.Running("text", target.ModelPath, label, workload,
+                    "Measuring the fastest settings (KV cache, context, speculative decoding) on this PC");
+                lock (_gate) { _runId = run.Id; _runKey = key; _runLabel = label; _runWorkload = workload; _cancelReason = null; _runPath = target.ModelPath; _runTuningId = tuningId; }
                 return "started:" + label + ":" + workload;
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException or InvalidOperationException)
             {
                 _registry.MarkFailed(key, label, workload, ex.Message, now);
+                if (_deps.Tuning is { } t2) t2.Failed(t2.Queued("text", target.ModelPath, label, workload), "Could not start: " + ex.Message);
                 return "start_failed:" + label;
             }
         }
-        return "nothing_due";
+        return waitedForIdle ? "not_idle" : "nothing_due";
     }
+
+    private bool IsDeclined(string path) { lock (_gate) return _declined.Contains(path); }
 
     private bool HasActiveRun() { lock (_gate) return _runId != null; }
 
@@ -181,22 +245,40 @@ internal sealed class IdleCalibrationService
     private bool ReapActiveRun()
     {
         string id, key, label, workload;
-        string? reason;
+        string? reason, tuningId;
         lock (_gate)
         {
             if (_runId is null) return true;
-            (id, key, label, workload, reason) = (_runId, _runKey!, _runLabel ?? string.Empty, _runWorkload, _cancelReason);
+            (id, key, label, workload, reason, tuningId) = (_runId, _runKey!, _runLabel ?? string.Empty, _runWorkload, _cancelReason, _runTuningId);
         }
         RuntimeOptimizationRun? run = _deps.Get(id);
         if (run is not null && run.Status is not ("completed" or "failed" or "cancelled")) return false;
         DateTime now = _deps.UtcNow();
         if (run is null || run.Status == "failed")
+        {
             _registry.MarkFailed(key, label, workload, run?.Error ?? "run disappeared", now);
+            if (tuningId != null) _deps.Tuning?.Failed(tuningId, "Tuning failed: " + (run?.Error ?? "the run disappeared"));
+        }
         else if (run.Status == "cancelled")
+        {
             _registry.MarkCancelled(key, label, workload, reason ?? "cancelled", now);
+            if (tuningId != null && _deps.Tuning is { } tracker)
+            {
+                if (reason == "user_cancel") tracker.Skipped(tuningId, "Cancelled by you");
+                else tracker.Requeue(tuningId, reason switch
+                {
+                    "gaming" => "Paused: Gaming Mode is on",
+                    "on_battery" => "Paused: running on battery",
+                    "disabled" => "Automatic tuning is off in Settings > Automatic checks",
+                    _ => "Paused because you started using the model; it will retry later when the PC is idle"
+                });
+            }
+        }
         else if (_registry.Find(key)?.State != "calibrated")
             _registry.MarkCalibrated(key, label, workload, "idle", now);
-        lock (_gate) { _runId = null; _runKey = null; _cancelReason = null; }
+        if (run is { Status: "completed" } && tuningId != null && _deps.Tuning is { } done && done.Get(tuningId)?.State == ModelTuningStates.Running)
+            done.Skipped(tuningId, "No faster profile found");
+        lock (_gate) { _runId = null; _runKey = null; _cancelReason = null; _runPath = null; _runTuningId = null; }
         return true;
     }
 
@@ -214,7 +296,14 @@ internal sealed class IdleCalibrationService
             IdleCalibrationRegistry.KeyOf(modelId, completion.HardwareKey, completion.RuntimeTag, completion.Workload),
             label, completion.Workload, run.Trigger, _deps.UtcNow());
         CalibrationHistory.Record(run, completion, modelId, hardwareDigest, history);
-        new PostDownloadOptimizationQueue().MarkDone(completion.ModelPath);
+        if (_deps.Tuning is { } tuning)
+        {
+            string id = tuning.Queued("text", completion.ModelPath, label, completion.Workload);
+            double gain = ModelTuningGain.Compute(run) ?? 0;
+            if (gain >= ModelTuningGain.MinimumReportedPercent) tuning.Applied(id, gain);
+            else tuning.Skipped(id, "No faster profile found");
+        }
+        _deps.FreshModelHandled(completion.ModelPath);
     }
 }
 
@@ -303,7 +392,7 @@ internal sealed class IdleCalibrationHostedService : BackgroundService
     private readonly TimeSpan _tick;
 
     internal IdleCalibrationHostedService(IdleCalibrationService service)
-        : this(service, TimeSpan.FromMinutes(2), TimeSpan.FromSeconds(30)) { }
+        : this(service, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(10)) { }
 
     internal IdleCalibrationHostedService(IdleCalibrationService service, TimeSpan startupDelay, TimeSpan tick)
     {

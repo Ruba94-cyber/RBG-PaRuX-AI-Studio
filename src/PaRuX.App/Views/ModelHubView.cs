@@ -268,6 +268,9 @@ namespace PaRuX.Views
                 Opacity = 0.78
             });
 
+            // Non-modal "Tuning for your PC" status: the running job, or the latest result for a few minutes (text and media).
+            outer.Children.Add(new ModelTuningStatusControl(ModelTuningStatusControl.Mode.Hub));
+
             var searchRow = new Grid { ColumnSpacing = 8 };
             searchRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             searchRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });

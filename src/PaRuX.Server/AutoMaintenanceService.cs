@@ -118,8 +118,9 @@ internal sealed class AutoMaintenanceService
                 else if (updater.IsRetryDue()) await updater.RunAsync(true, false, ct).ConfigureAwait(false);
             }
         // Opt-in idle optimisation of the media engine; it checks idleness, Gaming and its own failure backoff.
-        if (settings.AutoOptimizeMedia && _deps.MediaOptimizer is { } optimizer)
-            await optimizer.TickAsync(true, ct).ConfigureAwait(false);
+        // With the setting off a queued checkpoint is reported as skipped instead of waiting forever.
+        if (_deps.MediaOptimizer is { } optimizer)
+            await optimizer.TickAsync(settings.AutoOptimizeMedia, ct).ConfigureAwait(false);
     }
 
     /// <summary>When the next scheduled run is due (bounded backoff after failures), or null when disabled.</summary>
