@@ -53,14 +53,20 @@
       ]
     },
     {
-      "id": "qwen-image", "displayName": "Qwen-Image", "capability": "image.generate", "support": "resolver_only",
-      "reason": "No Qwen-Image workflow template could be validated against a real ComfyUI in this build, so PaRuX does not run it yet. The requested label 'Qwen-Image 2.1' could not be confirmed offline; the family is catalogued as Qwen-Image.",
-      "registryFamily": "qwen-image", "parametersBillion": 20.0, "textEncoderGb": 9.0, "vaeGb": 0.25,
+      "id": "qwen-image", "displayName": "Qwen-Image", "capability": "image.generate", "support": "supported",
+      "registryFamily": "qwen-image", "parametersBillion": 20.0, "textEncoderGb": 8.8, "vaeGb": 0.24,
       "variants": [
         { "id": "qwen-image-fp8", "title": "Qwen-Image (fp8)", "lane": "standard", "precision": "fp8",
-          "repository": "Comfy-Org/Qwen-Image_ComfyUI", "path": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors", "fileName": "qwen_image_fp8_e4m3fn.safetensors",
-          "sizeBytes": null, "sizeBasis": "derived_from_parameters", "license": "Apache-2.0", "tier": 5, "listingVerified": false,
-          "baseCompat": "Needs the qwen_2.5_vl_7b text encoder and qwen_image_vae." },
+          "repository": "Comfy-Org/Qwen-Image_ComfyUI", "path": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors", "revision": "1f12b17be14c89b026c51a91d67c32f84bb047bc", "fileName": "qwen_image_fp8_e4m3fn.safetensors",
+          "sha256": "98763a127701eb6fb59096f7742cb3aa7d64ed510b9f4e882d8351f8176e3ce3", "sizeBytes": 20430635136, "sizeBasis": "exact_listing", "license": "Apache-2.0", "tier": 5, "listingVerified": true,
+          "baseCompat": "Qwen-Image text-to-image graph (20 steps, CFG 4) with the qwen_2.5_vl_7b_fp8_scaled text encoder and qwen_image_vae. About 20 GB of weights: more than a 16 GB card holds, so ComfyUI offloads part of them to system RAM (slower; not yet timed on this PC)." }
+      ]
+    },
+    {
+      "id": "qwen-image-gguf", "displayName": "Qwen-Image (GGUF)", "capability": "image.generate", "support": "resolver_only",
+      "reason": "The GGUF build needs a GGUF loader node that PaRuX does not install or validate, so it is listed only; the supported Qwen-Image fp8 checkpoint covers the same model.",
+      "registryFamily": null, "parametersBillion": 20.0, "textEncoderGb": 8.8, "vaeGb": 0.24,
+      "variants": [
         { "id": "qwen-image-q4km", "title": "Qwen-Image (GGUF Q4_K_M)", "lane": "standard", "precision": "q4_k_m",
           "repository": "QuantStack/Qwen-Image-GGUF", "path": "Qwen_Image-Q4_K_M.gguf", "fileName": "Qwen_Image-Q4_K_M.gguf",
           "sizeBytes": null, "sizeBasis": "derived_from_parameters", "license": "Apache-2.0", "tier": 4, "listingVerified": false,
@@ -68,14 +74,13 @@
       ]
     },
     {
-      "id": "qwen-image-edit", "displayName": "Qwen-Image-Edit", "capability": "image.edit", "support": "resolver_only",
-      "reason": "No Qwen-Image-Edit workflow template could be validated against a real ComfyUI in this build, so PaRuX does not run it yet.",
-      "registryFamily": "qwen-image", "parametersBillion": 20.0, "textEncoderGb": 9.0, "vaeGb": 0.25,
+      "id": "qwen-image-edit", "displayName": "Qwen-Image-Edit", "capability": "image.edit", "support": "supported",
+      "registryFamily": "qwen-image", "parametersBillion": 20.0, "textEncoderGb": 8.8, "vaeGb": 0.24,
       "variants": [
         { "id": "qwen-image-edit-fp8", "title": "Qwen-Image-Edit (fp8)", "lane": "standard", "precision": "fp8",
-          "repository": "Comfy-Org/Qwen-Image-Edit_ComfyUI", "path": "split_files/diffusion_models/qwen_image_edit_fp8_e4m3fn.safetensors", "fileName": "qwen_image_edit_fp8_e4m3fn.safetensors",
-          "sizeBytes": null, "sizeBasis": "derived_from_parameters", "license": "Apache-2.0", "tier": 5, "listingVerified": false,
-          "baseCompat": "Needs the qwen_2.5_vl_7b text encoder and qwen_image_vae." }
+          "repository": "Comfy-Org/Qwen-Image-Edit_ComfyUI", "path": "split_files/diffusion_models/qwen_image_edit_fp8_e4m3fn.safetensors", "revision": "f68ace85e60b4a02a323e394253731947657b7d2", "fileName": "qwen_image_edit_fp8_e4m3fn.safetensors",
+          "sha256": "393c6743d1de2e9031b5197027b36116f2096958ccc0223526d34e1860266021", "sizeBytes": 20430635136, "sizeBasis": "exact_listing", "license": "Apache-2.0", "tier": 5, "listingVerified": true,
+          "baseCompat": "Qwen-Image-Edit instruction-edit graph (source image scaled to 1 megapixel, 20 steps, CFG 2.5) with the same qwen_2.5_vl_7b_fp8_scaled text encoder and qwen_image_vae as Qwen-Image, so installing both shares those two files. PaRuX cannot tell these weights from Qwen-Image's by their header: assign this file to editing, not the text-to-image checkpoint. About 20 GB of weights, offloaded to system RAM on a 16 GB card (slower; not yet timed on this PC)." }
       ]
     },
     {
@@ -105,13 +110,13 @@
     },
     {
       "id": "ltx-video", "displayName": "LTX-Video 2B", "capability": "video.generate", "support": "resolver_only",
-      "reason": "No LTX-Video workflow template could be validated against a real ComfyUI in this build, so PaRuX does not run it yet.",
+      "reason": "PaRuX does not run LTX-Video yet. Its checkpoint embeds its own VAE and ComfyUI loads it as a full checkpoint, while PaRuX's video workflow takes a diffusion model plus a separate VAE file and drives the Wan graph's latent, sampler and start-image nodes. An LTX graph needs its own video runner contract (including image-to-video continuation) before it can be offered.",
       "registryFamily": null, "parametersBillion": 2.0, "textEncoderGb": 4.9, "vaeGb": 0.0,
       "variants": [
         { "id": "ltx-video-2b-v095", "title": "LTX-Video 2B v0.9.5", "lane": "standard", "precision": "bf16",
-          "repository": "Lightricks/LTX-Video", "path": "ltx-video-2b-v0.9.5.safetensors", "fileName": "ltx-video-2b-v0.9.5.safetensors",
-          "sizeBytes": null, "sizeBasis": "derived_from_parameters", "license": "See repository licence (not verified offline)", "tier": 3, "listingVerified": false,
-          "baseCompat": "Single-file checkpoint with its own VAE; needs a T5-XXL text encoder." }
+          "repository": "Lightricks/LTX-Video", "path": "ltx-video-2b-v0.9.5.safetensors", "revision": "8984fa25007f376c1a299016d0957a37a2f797bb", "fileName": "ltx-video-2b-v0.9.5.safetensors",
+          "sha256": "720d15c9f19f7d0f6b2a92bbbc34410e2cfb2f6856a100b38f734fbf973d4adf", "sizeBytes": 6340729500, "sizeBasis": "exact_listing", "license": "LTX-Video Open Weights License (Hugging Face license: other; read the repository's license file before use)", "tier": 3, "listingVerified": true,
+          "baseCompat": "Single-file checkpoint with its own VAE; needs a T5-XXL text encoder. Size, commit and digest were read from the repository listing; listed only, PaRuX cannot run it yet." }
       ]
     },
     {

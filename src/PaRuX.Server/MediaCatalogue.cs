@@ -57,6 +57,16 @@ internal sealed class MediaCatalogue
         return Parse(r.ReadToEnd(), MediaCompanionRegistry.Shipped);
     }
 
+    /// <summary>The media job type (companion-registry pipeline) a ComfyUI capability is submitted as. Null for the audio
+    /// capabilities, which PaRuX does not run through the media workflow templates.</summary>
+    internal static string? PipelineOf(string capability) => capability switch
+    {
+        "image.generate" => "image",
+        "image.edit" => "edit",
+        "video.generate" => "video",
+        _ => null
+    };
+
     internal MediaCatalogueCapability? CapabilityOf(string id) => Capabilities.FirstOrDefault(c => c.Id == id);
 
     internal IEnumerable<(MediaCatalogueFamily Family, MediaCatalogueVariant Variant)> VariantsFor(string capability) =>
@@ -102,6 +112,11 @@ internal sealed class MediaCatalogue
                 RegistryFamily? rf = registry.Families.FirstOrDefault(x => x.Id == regFamily);
                 if (rf is null || !rf.IsSupported || string.IsNullOrEmpty(rf.TemplateFile))
                     throw new InvalidDataException($"{where}: a supported family must map to a supported companion-registry family with a workflow template.");
+                // The registry family must actually run the media type this capability is submitted as, or the Hub would
+                // offer a download whose file the workflow gate then refuses.
+                string? pipeline = PipelineOf(cap);
+                if (pipeline is null || !rf.Pipelines.Contains(pipeline, StringComparer.Ordinal))
+                    throw new InvalidDataException($"{where}: capability \"{cap}\" is not a pipeline the companion-registry family \"{rf.Id}\" runs.");
             }
             else if (string.IsNullOrWhiteSpace(reason))
                 throw new InvalidDataException($"{where}: a resolver_only family must state an honest reason.");
