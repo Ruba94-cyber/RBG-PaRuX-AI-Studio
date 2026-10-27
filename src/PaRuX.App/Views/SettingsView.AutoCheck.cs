@@ -16,6 +16,20 @@ namespace PaRuX.Views
         private bool _autoCheckLoading = true;
         private bool _autoCheckBusy;
 
+        private MediaLaneControl? _mediaLane;
+
+        /// <summary>Content lane (Standard / Uncensored / Automatic) for media generation; the same control and setting as the Create tabs.</summary>
+        private async Task RefreshMediaLaneAsync()
+        {
+            if (MediaLaneHost == null) return;
+            if (_mediaLane == null)
+            {
+                _mediaLane = new MediaLaneControl("Settings_Media");
+                MediaLaneHost.Children.Add(_mediaLane);
+            }
+            await _mediaLane.RefreshAsync();
+        }
+
         public async Task RefreshAutoCheckAsync(CancellationToken ct = default)
         {
             if (Settings_AutoCheck_Enabled_Toggle == null || Settings_AutoCheck_Interval_Box == null) return;

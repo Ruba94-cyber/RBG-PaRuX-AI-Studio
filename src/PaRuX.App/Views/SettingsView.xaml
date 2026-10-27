@@ -430,6 +430,12 @@
                             Text="Which real checkpoint file image/video/edit generation actually uses. Everything found in ComfyUI's diffusion_models folder shows up here - download an alternative into that folder and it becomes pickable, per generation type, without touching a workflow file by hand."
                             TextWrapping="Wrap"
                             Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <TextBlock
+                            Text="Content lane for image, video and edit generation. Automatic mode picks the model per prompt inside this lane; a model you pin in Create always wins."
+                            TextWrapping="Wrap"
+                            Margin="0,10,0,0"
+                            Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <StackPanel x:Name="MediaLaneHost" Margin="0,6,0,0" />
                         <StackPanel x:Name="MediaCheckpointsList" Spacing="10" Margin="0,10,0,0" />
                         <TextBlock
                             Text="Recommended alternatives to download"

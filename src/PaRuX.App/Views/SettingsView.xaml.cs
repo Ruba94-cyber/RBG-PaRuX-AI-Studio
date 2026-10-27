@@ -159,6 +159,7 @@ namespace PaRuX.Views
             _ = RefreshCloudFallbackAsync();
             _ = RefreshDesktopIntegrationsAsync();
             _ = RefreshDocumentOutputAsync();
+            _ = RefreshMediaLaneAsync();
             _ = RefreshMediaCheckpointsAsync();
             _ = RefreshRecommendedCheckpointsAsync();
             _ = RefreshCustomWorkflowsAsync();

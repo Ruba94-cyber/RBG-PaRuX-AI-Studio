@@ -240,6 +240,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryItem.cs" Link="MediaGallery\MediaGalleryItem.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryItemMapper.cs" Link="MediaGallery\MediaGalleryItemMapper.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaProvenanceFormatter.cs" Link="MediaGallery\MediaProvenanceFormatter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaModelPickerPresenter.cs" Link="MediaGallery\MediaModelPickerPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryBrowser.cs" Link="MediaGallery\MediaGalleryBrowser.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryDeleteCoordinator.cs" Link="MediaGallery\MediaGalleryDeleteCoordinator.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaEditSourceBridge.cs" Link="MediaGallery\MediaEditSourceBridge.cs" />
