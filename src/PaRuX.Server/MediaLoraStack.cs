@@ -240,7 +240,7 @@ internal static class MediaLoraStack
         string? key = null;
         try
         {
-            string path = Path.Combine(LocalAiPaths.DiffusionModelsPath, file);
+            string path = LocalAiPaths.MainModelPath(file); // full checkpoints (SDXL) live under models/checkpoints, not diffusion_models
             if (File.Exists(path))
                 key = KeyForRegistryFamily(MediaFamilyDetector.DetectFile(path, MediaCompanionRegistry.Shipped).FamilyId);
         }
