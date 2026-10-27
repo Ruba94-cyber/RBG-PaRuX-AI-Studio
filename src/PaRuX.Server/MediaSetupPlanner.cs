@@ -106,6 +106,26 @@ internal static class MediaSetupPlanner
                 License: ThreedLicense)
     });
 
+    internal const string CutoutRuntimeStepId = "cutout-engine";
+    internal const string CutoutModelStepId = "cutout-model";
+    internal const long CutoutRuntimeApproxBytes = 120_000_000;
+
+    /// <summary>Background removal: a small private Python runtime (onnxruntime on the CPU) plus one pinned, checksum-verified ONNX model.</summary>
+    internal static MediaSetupPlan PlanCutout(bool runtimeInstalled, bool modelInstalled) => new(new[]
+    {
+        runtimeInstalled
+            ? new MediaSetupStep(CutoutRuntimeStepId, "Background removal engine", MediaSetupStepState.Done, 0, "Installed.", License: CutoutModel.RuntimeLicense)
+            : new MediaSetupStep(CutoutRuntimeStepId, "Background removal engine", MediaSetupStepState.Pending, CutoutRuntimeApproxBytes,
+                "PaRuX installs a private Python environment with onnxruntime (CPU), Pillow and NumPy. Nothing is sent anywhere.",
+                License: CutoutModel.RuntimeLicense),
+        modelInstalled
+            ? new MediaSetupStep(CutoutModelStepId, "Background removal model (" + CutoutModel.Title + ")", MediaSetupStepState.Done, 0, "Installed and verified.",
+                CutoutModel.FileName, License: CutoutModel.License)
+            : new MediaSetupStep(CutoutModelStepId, "Background removal model (" + CutoutModel.Title + ")", MediaSetupStepState.Pending, CutoutModel.Bytes,
+                "One checksum-verified model that cuts the subject out of a picture on this PC; it is deleted if its SHA-256 does not match.",
+                CutoutModel.FileName, CutoutModel.Repository, CutoutModel.DownloadUri.AbsoluteUri, CutoutModel.Revision, CutoutModel.License, CutoutModel.Sha256)
+    });
+
     internal const string SpeechLicense = "Apache-2.0 (Kokoro), CC-BY-4.0 (Parakeet), BSD-3 (PyTorch)";
 
     internal static MediaSetupPlan Plan(

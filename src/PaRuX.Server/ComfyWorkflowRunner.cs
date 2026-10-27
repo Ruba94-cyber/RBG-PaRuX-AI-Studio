@@ -115,7 +115,7 @@ public sealed class ComfyWorkflowRunner
                 SetIn(request, "6", "width", width);
                 SetIn(request, "6", "height", height);
                 SetIn(request, "10", "filename_prefix", "LocalAI_images/AI_Studio");
-                MediaImageGraph.ApplyEffective(request, effective);
+                ApplyResolvedCheckpoint(request, effective);
             }, saveNode: "10", timeout: TimeSpan.FromMinutes(10), ct, progressPercent, mediaType: "image");
             return new MediaResult(path, seed, width, height, 0, 0, 0);
         }
@@ -128,12 +128,15 @@ public sealed class ComfyWorkflowRunner
         try
         {
             string uploadedName = await UploadImageAsync(sourceImage, sourceFileName, ct);
-            string path = await SubmitAndWaitAsync(LocalAiPaths.EditWorkflowTemplate, request =>
+            // One resolution per job picks the checkpoint and the graph of its family. Every edit template shares the node
+            // contract patched below: 4 source image, 7 instruction, 13 the noise/sampler node that holds the seed, 19 save.
+            MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob("edit");
+            string path = await SubmitAndWaitAsync(MediaCheckpointResolution.TemplatePathFor(effective), request =>
             {
                 SetIn(request, "4", "image", uploadedName);
-                SetIn(request, "7", "text", instruction);
-                SetIn(request, "13", "noise_seed", seed);
-                ApplyCheckpointOverrideIfSet(request, "edit");
+                SetEditInstruction(request, instruction);
+                SetEditSeed(request, seed);
+                ApplyResolvedCheckpoint(request, effective);
             }, saveNode: "19", timeout: TimeSpan.FromMinutes(10), ct, mediaType: "edit");
             return new MediaResult(path, seed, 0, 0, 0, 0, 0);
         }
@@ -480,8 +483,37 @@ public sealed class ComfyWorkflowRunner
     private static void ApplyCheckpointOverrideIfSet(JsonObject request, string type)
     {
         // Same resolution the status API reports (MediaCheckpointResolution.Resolve), so the graph and the UI agree.
-        MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob(type);
-        if (effective.IsOverridden) SetIn(request, MediaCheckpointResolution.UnetNode, "unet_name", effective.File);
+        ApplyResolvedCheckpoint(request, MediaCheckpointResolution.ResolveForJob(type));
+    }
+
+    /// <summary>The instruction goes to node 7 under the input that node's class names it: <c>text</c> on FLUX.2's
+    /// CLIPTextEncode, <c>prompt</c> on Qwen-Image-Edit's TextEncodeQwenImageEdit.</summary>
+    internal static void SetEditInstruction(JsonObject request, string instruction) =>
+        SetIn(request, "7", EditInstructionInput(request), instruction);
+
+    internal static string EditInstructionInput(JsonObject request) =>
+        request["prompt"]?["7"]?["inputs"] is JsonObject inputs && inputs.ContainsKey("prompt") ? "prompt" : "text";
+
+    /// <summary>The seed lives in node 13 under the input that node's class names it: <c>noise_seed</c> on FLUX.2's
+    /// RandomNoise, <c>seed</c> on Qwen-Image-Edit's KSampler.</summary>
+    internal static void SetEditSeed(JsonObject request, long seed) =>
+        SetIn(request, "13", EditSeedInput(request), seed);
+
+    internal static string EditSeedInput(JsonObject request) =>
+        request["prompt"]?["13"]?["inputs"] is JsonObject inputs && inputs.ContainsKey("seed") ? "seed" : "noise_seed";
+
+    /// <summary>Same patch as <see cref="ApplyCheckpointOverrideIfSet"/> for a job that already resolved its checkpoint, so
+    /// the template it submitted and the file it loads come from one decision.</summary>
+    private static void ApplyResolvedCheckpoint(JsonObject request, MediaCheckpointEffective effective)
+    {
+        // The family's own loader input (unet_name, or ckpt_name for a single-file checkpoint) plus its catalogue sampler hints.
+        MediaImageGraph.ApplyEffective(request, effective);
+    }
+
+    internal static string? ModelSelectionReasonForProvenance(MediaJobRequest request)
+    {
+        string type = (request.Type ?? string.Empty).Trim().ToLowerInvariant();
+        return MediaCheckpointResolution.SelectionReasonFor(type == "img2img" ? "image" : type);
     }
 
     internal string? ModelFileNameForProvenance(MediaJobRequest request)

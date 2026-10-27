@@ -121,17 +121,18 @@ internal static class MediaCheckpointResolution
         MediaCompanionRegistry registry = MediaCompanionRegistry.Shipped;
         MediaFamilyDetection detection = DetectCached(path, registry);
         RegistryFamily? family = detection.FamilyId is null ? null : registry.FindFamily(detection.FamilyId);
-        if (family is not { IsSupported: true, MainLoader: { } loader } || family.TemplateFile is null
+        string? template = family?.TemplateFor(type);
+        if (family is not { IsSupported: true, MainLoader: { } loader } || template is null
             || !family.Pipelines.Contains(type, StringComparer.Ordinal))
             return effective;
         return effective with
         {
-            TemplateFile = family.TemplateFile,
+            TemplateFile = template,
             FamilyId = family.Id,
             LoaderNode = loader.Node,
             LoaderClass = loader.ClassType,
             LoaderInput = loader.Input,
-            ReplacesInputs = new[] { loader.ClassType + "." + loader.Input + " (node " + loader.Node + " of " + family.TemplateFile + ")" }
+            ReplacesInputs = new[] { loader.ClassType + "." + loader.Input + " (node " + loader.Node + " of " + template + ")" }
         };
     }
 
@@ -203,6 +204,25 @@ internal static class MediaCheckpointResolution
             && File.Exists(LocalAiPaths.MainModelPath(overrideFile)))
             return overrideFile;
         return ReadTemplateUnet(TemplatePathFor(type));
+    }
+
+    /// <summary>Installed diffusion files this type's workflow can run (family allowed), for the per-tab Model picker. Never throws.</summary>
+    public static List<string> CompatibleFiles(string type)
+    {
+        try
+        {
+            MediaRoutingFacts facts = (MediaCapabilityRouting.FactsOverride ?? MediaCapabilityRouting.LiveFacts)(type);
+            return facts.InstalledFiles.Where(f => facts.Inspect(f).FamilyAllowed).ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { return new List<string>(); }
+    }
+
+    /// <summary>Why the model for the next job of this type was chosen, for the job provenance. Read-only (does not record a trace).</summary>
+    public static string? SelectionReasonFor(string type)
+    {
+        if (MediaCapabilityRouting.CapabilityFor(type) is not { } cap) return null;
+        try { return MediaCapabilityRouting.Preview(cap).Explanation; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { return null; }
     }
 
     /// <summary>Refuses a checkpoint whose family the given media type cannot run, and names the families it can.

@@ -48,9 +48,23 @@ internal sealed record RegistryFamily(
     IReadOnlyList<string> RequiredNodes,
     RegistrySignature Signature,
     IReadOnlyList<RegistryCompanion> Companions,
-    string? MinComfyUiVersion = null)
+    string? MinComfyUiVersion = null,
+    IReadOnlyDictionary<string, string>? PipelineTemplates = null)
 {
     public bool IsSupported => Support == "supported";
+
+    /// <summary>The workflow template this family runs for a pipeline: its own entry in <see cref="PipelineTemplates"/> when the
+    /// family needs a different graph for that pipeline (for example an edit graph beside a text-to-image graph), otherwise
+    /// <see cref="TemplateFile"/>. Null when the family does not run the pipeline.</summary>
+    public string? TemplateFor(string pipeline)
+    {
+        if (!Pipelines.Contains(pipeline, StringComparer.Ordinal)) return null;
+        return PipelineTemplates is not null && PipelineTemplates.TryGetValue(pipeline, out string? own) ? own : TemplateFile;
+    }
+
+    /// <summary>Every template file this family can submit.</summary>
+    public IEnumerable<string> AllTemplateFiles =>
+        Pipelines.Select(TemplateFor).Where(file => file != null).Select(file => file!).Distinct(StringComparer.Ordinal);
 }
 
 internal sealed record RegistryEmbeddedStems(IReadOnlyList<string> TextEncoder, IReadOnlyList<string> Vae);
@@ -111,7 +125,7 @@ internal sealed class MediaCompanionRegistry
     /// <summary>The ComfyUI version a supported family's workflow needs, found by its workflow template file name.
     /// Null when the family declares no minimum; the shipped manifest declares none until a minimum is verified.</summary>
     public string? MinimumComfyUiVersionFor(string templateFile) =>
-        Families.FirstOrDefault(family => family.IsSupported && string.Equals(family.TemplateFile, templateFile, StringComparison.Ordinal))
+        Families.FirstOrDefault(family => family.IsSupported && family.AllTemplateFiles.Contains(templateFile, StringComparer.Ordinal))
             ?.MinComfyUiVersion;
 
     /// <summary>Families a media pipeline can run, such as those that list "image" in their pipelines.</summary>
@@ -193,7 +207,7 @@ internal sealed class MediaCompanionRegistry
     private static RegistryFamily ParseFamily(JsonObject family)
     {
         AllowOnly(family, "family", "id", "displayName", "support", "reason", "pipelines", "templateFile",
-            "mainLoader", "requiredNodes", "signature", "companions", "minComfyUiVersion");
+            "mainLoader", "requiredNodes", "signature", "companions", "minComfyUiVersion", "pipelineTemplates");
 
         string id = Str(family, "family", "id", 40);
         if (!FamilyIdPattern.IsMatch(id)) throw Invalid("family id \"" + id + "\" is not a lowercase slug.");
@@ -236,6 +250,23 @@ internal sealed class MediaCompanionRegistry
         if (support == "supported" && (templateFile == null || !templateFile.EndsWith(".json", StringComparison.Ordinal) || mainLoader == null))
             throw Invalid(where + ": a supported family needs a workflow template and a main loader.");
 
+        Dictionary<string, string>? pipelineTemplates = null;
+        if (family["pipelineTemplates"] != null)
+        {
+            JsonObject own = Obj(family["pipelineTemplates"], where + ".pipelineTemplates");
+            if (support != "supported") throw Invalid(where + ": only a supported family may name pipeline templates.");
+            pipelineTemplates = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, JsonNode?> entry in own)
+            {
+                if (!pipelines.Contains(entry.Key, StringComparer.Ordinal))
+                    throw Invalid(where + ": a template is named for pipeline \"" + entry.Key + "\", which the family does not run.");
+                string file = Str(own, where + ".pipelineTemplates", entry.Key, 120);
+                if (!file.EndsWith(".json", StringComparison.Ordinal) || file.Contains('/') || file.Contains('\\') || file.Contains(".."))
+                    throw Invalid(where + ": pipeline template \"" + file + "\" must be a plain .json file name.");
+                pipelineTemplates[entry.Key] = file;
+            }
+        }
+
         List<string> requiredNodes = StringArray(family, where, "requiredNodes", required: false, maxItems: 64).ToList();
         if (support == "supported" && requiredNodes.Count == 0) throw Invalid(where + ": a supported family must list the ComfyUI nodes it needs.");
 
@@ -274,7 +305,7 @@ internal sealed class MediaCompanionRegistry
         }
 
         return new RegistryFamily(id, displayName, support, reason, pipelines, templateFile, mainLoader,
-            requiredNodes, new RegistrySignature(required, forbidden, shapeChecks), companions, minComfyUi);
+            requiredNodes, new RegistrySignature(required, forbidden, shapeChecks), companions, minComfyUi, pipelineTemplates);
     }
 
     private static RegistryCompanion ParseCompanion(JsonObject companion, string where, string support)

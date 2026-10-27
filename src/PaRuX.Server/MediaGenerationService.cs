@@ -38,6 +38,8 @@ public sealed class MediaGenerationService
         CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
+        // The same prompt scope as GenerateAsync, so the model named in the provenance is the one the router will pick for this request.
+        using IDisposable routingScope = MediaRoutingContext.Begin(request.Prompt);
         MediaJobProvenance provenance = CreateManagedEngineProvenance(request);
         try
         {
@@ -71,7 +73,11 @@ public sealed class MediaGenerationService
         try { modelFileName = _comfy.ModelFileNameForProvenance(request); }
         catch (Exception) { }
 
-        return MediaJobProvenanceFactory.Create("ComfyUI", runtimeIdentity, modelFileName);
+        string? selectionReason = null;
+        try { selectionReason = ComfyWorkflowRunner.ModelSelectionReasonForProvenance(request); }
+        catch (Exception) { }
+
+        return MediaJobProvenanceFactory.Create("ComfyUI", runtimeIdentity, modelFileName, modelSelectionReason: selectionReason);
     }
 
     public async Task<MediaAsset> GenerateAsync(MediaJobRequest request,
@@ -88,6 +94,7 @@ public sealed class MediaGenerationService
         if (type is "custom" or "imported" && string.IsNullOrWhiteSpace(request.CustomWorkflowId))
             throw new InvalidDataException(type + " requires customWorkflowId.");
 
+        using IDisposable routingScope = MediaRoutingContext.Begin(request.Prompt);
         progress?.Report(("Waiting for exclusive media GPU", 1, null));
         await using MediaExecutionCoordinator.Lease executionLease = await MediaExecutionCoordinator.Current
             .AcquireAsync("media:" + type, ct).ConfigureAwait(false);

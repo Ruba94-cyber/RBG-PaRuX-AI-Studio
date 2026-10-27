@@ -17,7 +17,9 @@ public sealed class CreateWorkspaceSpeechCancellationTests
         using var app = new UiTestApplication(testName, enableSpeechCancellationFixture: true);
         try
         {
-            new MainWindowPage(app.MainWindow).Click("Navigation_Create_Item", ControlType.ListItem);
+            var page = new CreateWorkspaceModesPage(app.MainWindow, app);
+            page.OpenCreateWorkspace();
+            page.SelectMode("Speech");
             AutomationElement text = UiWait.ById(app.MainWindow, "Create_TTS_Text_Box", ControlType.Edit);
             text.Patterns.ScrollItem.PatternOrDefault?.ScrollIntoView();
             text.Patterns.Value.Pattern.SetValue("synthetic cancellation fixture turn");

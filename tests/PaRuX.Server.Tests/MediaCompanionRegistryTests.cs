@@ -45,14 +45,21 @@ public sealed class MediaCompanionRegistryTests : IDisposable
         ("time_embedding.0.weight", new long[] { 3072, 256 }),
         ("head.head.weight", new long[] { 48, 3072 }));
 
+    // Tensor names read from the real header of Comfy-Org/Qwen-Image_ComfyUI qwen_image_fp8_e4m3fn.safetensors
+    // (1933 tensors); the same top-level names are in the Qwen-Image-Edit and nvfp4 files.
     private static SafetensorsHeader QwenLayout() => Layout(
         ("transformer_blocks.0.attn.add_q_proj.weight", new long[] { 4, 4 }),
-        ("time_text_embed.timestep_embedder.linear_1.weight", new long[] { 4, 4 }),
-        ("img_in.weight", new long[] { 4, 4 }));
+        ("time_text_embed.timestep_embedder.linear_1.weight", new long[] { 3072, 256 }),
+        ("img_in.weight", new long[] { 3072, 64 }),
+        ("txt_in.weight", new long[] { 3072, 3584 }),
+        ("txt_norm.weight", new long[] { 3584 }),
+        ("norm_out.linear.weight", new long[] { 4, 4 }),
+        ("proj_out.weight", new long[] { 4, 4 }));
 
     private static SafetensorsHeader SdxlLayout() => Layout(
         ("model.diffusion_model.input_blocks.0.0.weight", new long[] { 4, 4 }),
         ("conditioner.embedders.0.transformer.text_model.embeddings.weight", new long[] { 4, 4 }),
+        ("conditioner.embedders.1.model.ln_final.weight", new long[] { 4 }),
         ("first_stage_model.encoder.conv_in.weight", new long[] { 4, 4 }));
 
     private static SafetensorsHeader Flux1Layout() => Layout(
@@ -97,19 +104,21 @@ public sealed class MediaCompanionRegistryTests : IDisposable
     // ---------- shipped manifest ----------
 
     [Fact]
-    public void Shipped_registry_declares_exactly_the_three_families_this_repo_can_run()
+    public void Shipped_registry_declares_exactly_the_families_this_repo_can_run()
     {
         string[] supported = MediaCompanionRegistry.Shipped.Families
             .Where(family => family.IsSupported).Select(family => family.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray();
 
-        Assert.Equal(new[] { "flux2-klein", "wan2.2-ti2v-5b", "z-image" }, supported);
+        Assert.Equal(new[] { "chroma", "flux1-schnell", "flux2-klein", "qwen-image", "sdxl", "wan2.2-ti2v-5b", "z-image" }, supported);
     }
 
     [Fact]
-    public void Each_media_type_maps_to_one_supported_family()
+    public void Each_media_type_maps_to_its_supported_families()
     {
-        Assert.Equal("z-image", Assert.Single(MediaCompanionRegistry.Shipped.SupportedFor("image")).Id);
-        Assert.Equal("flux2-klein", Assert.Single(MediaCompanionRegistry.Shipped.SupportedFor("edit")).Id);
+        Assert.Equal(new[] { "chroma", "flux1-schnell", "qwen-image", "sdxl", "z-image" },
+            MediaCompanionRegistry.Shipped.SupportedFor("image").Select(family => family.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray());
+        Assert.Equal(new[] { "flux2-klein", "qwen-image" },
+            MediaCompanionRegistry.Shipped.SupportedFor("edit").Select(family => family.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray());
         Assert.Equal("wan2.2-ti2v-5b", Assert.Single(MediaCompanionRegistry.Shipped.SupportedFor("video")).Id);
         Assert.Empty(MediaCompanionRegistry.Shipped.SupportedFor("upscale"));
     }
@@ -167,6 +176,55 @@ public sealed class MediaCompanionRegistryTests : IDisposable
         string family = DemoFamily.Replace("\"pipelines\":[\"image\"]", "\"pipelines\":[]");
         var error = Assert.Throws<InvalidDataException>(() => MediaCompanionRegistry.Parse(MakeRegistry(family)));
         Assert.Contains("needs at least one pipeline", error.Message);
+    }
+
+    [Fact]
+    public void A_pipeline_template_overrides_the_family_template_for_that_pipeline_only()
+    {
+        string family = DemoFamily.Replace("\"pipelines\":[\"image\"]", "\"pipelines\":[\"image\",\"edit\"]")
+            .Replace("\"templateFile\":\"z-image-smoke-api.json\",",
+                "\"templateFile\":\"z-image-smoke-api.json\",\"pipelineTemplates\":{\"edit\":\"flux2-klein-edit-api.json\"},");
+
+        RegistryFamily parsed = Assert.Single(MediaCompanionRegistry.Parse(MakeRegistry(family)).Families);
+
+        Assert.Equal("z-image-smoke-api.json", parsed.TemplateFor("image"));
+        Assert.Equal("flux2-klein-edit-api.json", parsed.TemplateFor("edit"));
+        Assert.Null(parsed.TemplateFor("video"));
+        Assert.Equal(new[] { "z-image-smoke-api.json", "flux2-klein-edit-api.json" }, parsed.AllTemplateFiles);
+    }
+
+    [Fact]
+    public void Parse_rejects_a_pipeline_template_for_a_pipeline_the_family_does_not_run()
+    {
+        string family = DemoFamily.Replace("\"templateFile\":\"z-image-smoke-api.json\",",
+            "\"templateFile\":\"z-image-smoke-api.json\",\"pipelineTemplates\":{\"video\":\"wan-video-smoke-api.json\"},");
+        var error = Assert.Throws<InvalidDataException>(() => MediaCompanionRegistry.Parse(MakeRegistry(family)));
+        Assert.Contains("does not run", error.Message);
+    }
+
+    [Theory]
+    [InlineData("../x.json")]
+    [InlineData("sub/x.json")]
+    [InlineData("x.txt")]
+    public void Parse_rejects_a_pipeline_template_that_is_not_a_plain_json_file_name(string file)
+    {
+        string family = DemoFamily.Replace("\"templateFile\":\"z-image-smoke-api.json\",",
+            "\"templateFile\":\"z-image-smoke-api.json\",\"pipelineTemplates\":{\"image\":\"" + file + "\"},");
+        var error = Assert.Throws<InvalidDataException>(() => MediaCompanionRegistry.Parse(MakeRegistry(family)));
+        Assert.Contains("plain .json file name", error.Message);
+    }
+
+    [Fact]
+    public void The_minimum_comfyui_version_is_found_for_any_template_of_a_family()
+    {
+        string family = DemoFamily.Replace("\"pipelines\":[\"image\"]", "\"pipelines\":[\"image\",\"edit\"]")
+            .Replace("\"templateFile\":\"z-image-smoke-api.json\",",
+                "\"templateFile\":\"z-image-smoke-api.json\",\"minComfyUiVersion\":\"0.40.0\",\"pipelineTemplates\":{\"edit\":\"flux2-klein-edit-api.json\"},");
+        MediaCompanionRegistry registry = MediaCompanionRegistry.Parse(MakeRegistry(family));
+
+        Assert.Equal("0.40.0", registry.MinimumComfyUiVersionFor("flux2-klein-edit-api.json"));
+        Assert.Equal("0.40.0", registry.MinimumComfyUiVersionFor("z-image-smoke-api.json"));
+        Assert.Null(registry.MinimumComfyUiVersionFor("other.json"));
     }
 
     [Fact]
@@ -264,22 +322,41 @@ public sealed class MediaCompanionRegistryTests : IDisposable
     }
 
     [Fact]
-    public void Qwen_image_is_identified_but_never_as_a_supported_family()
+    public void Qwen_image_is_identified_as_a_supported_image_family_and_no_other_layout_matches_it()
     {
         MediaFamilyDetection detection = MediaFamilyDetector.Detect(QwenLayout(), MediaCompanionRegistry.Shipped);
 
         Assert.Equal("qwen-image", detection.FamilyId);
-        Assert.Equal("resolver_only", detection.Support);
-        Assert.Empty(MediaCompanionRegistry.Shipped.SupportedFor("image").Where(family => family.Id == "qwen-image"));
+        Assert.Equal("supported", detection.Support);
+        Assert.Contains(MediaCompanionRegistry.Shipped.SupportedFor("image"), family => family.Id == "qwen-image");
+        Assert.Contains(MediaCompanionRegistry.Shipped.SupportedFor("edit"), family => family.Id == "qwen-image");
+        Assert.DoesNotContain(MediaCompanionRegistry.Shipped.SupportedFor("video"), family => family.Id == "qwen-image");
+
+        // The reverse direction: none of the other shipped layouts is mistaken for Qwen-Image.
+        foreach (SafetensorsHeader other in new[] { ZImageLayout(), Flux2Layout(), Wan5BLayout(), Flux1Layout(), SdxlLayout() })
+            Assert.NotEqual("qwen-image", MediaFamilyDetector.Detect(other, MediaCompanionRegistry.Shipped).FamilyId);
     }
 
     [Fact]
-    public void Sdxl_checkpoint_reports_its_embedded_text_encoder_and_is_unsupported()
+    public void A_qwen_file_saved_with_the_model_diffusion_model_prefix_is_not_identified_rather_than_guessed()
+    {
+        // qwen_image_2512_fp8_e4m3fn.safetensors in Comfy-Org/Qwen-Image_ComfyUI carries this prefix on all 1933 tensors.
+        SafetensorsHeader prefixed = Layout(QwenLayout().Tensors
+            .Select(tensor => ("model.diffusion_model." + tensor.Name, tensor.Shape)).ToArray());
+
+        MediaFamilyDetection detection = MediaFamilyDetector.Detect(prefixed, MediaCompanionRegistry.Shipped);
+
+        Assert.Null(detection.FamilyId);
+        Assert.Equal("unidentified", detection.Support);
+    }
+
+    [Fact]
+    public void Sdxl_checkpoint_reports_its_embedded_text_encoder_and_is_supported_for_images()
     {
         MediaFamilyDetection detection = MediaFamilyDetector.Detect(SdxlLayout(), MediaCompanionRegistry.Shipped);
 
         Assert.Equal("sdxl", detection.FamilyId);
-        Assert.Equal("unsupported", detection.Support);
+        Assert.Equal("supported", detection.Support);
         Assert.True(detection.EmbedsTextEncoder);
         Assert.True(detection.EmbedsVae);
     }
@@ -340,14 +417,17 @@ public sealed class MediaCompanionRegistryTests : IDisposable
     }
 
     [Fact]
-    public void Qwen_image_plan_never_requires_an_sdxl_checkpoint_and_is_not_installable()
+    public void Qwen_image_plan_never_requires_an_sdxl_checkpoint_and_is_installable_from_pinned_sources()
     {
         string root = MakeModels(("diffusion_models", "qwen_image_fp8.safetensors", 4));
 
         MediaCompanionPlan plan = PlanFor("image", "qwen_image_fp8.safetensors", QwenLayout(), MediaCompanionRegistry.Shipped, root);
 
-        Assert.Equal("resolver_only", plan.Support);
-        Assert.False(plan.Installable);
+        Assert.Equal("supported", plan.Support);
+        Assert.True(plan.Installable);
+        Assert.Equal(new[] { "qwen_2.5_vl_7b_fp8_scaled.safetensors", "qwen_image_vae.safetensors" },
+            plan.Missing.Select(item => item.FileName).OrderBy(n => n, StringComparer.Ordinal));
+        Assert.All(plan.Missing, item => Assert.True(item.Fetchable));
         Assert.DoesNotContain(plan.Companions, item => item.FileName.Contains("xl", StringComparison.OrdinalIgnoreCase)
             || item.FileName.Contains("sdxl", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(plan.Companions, item => item.Role == "checkpoint");

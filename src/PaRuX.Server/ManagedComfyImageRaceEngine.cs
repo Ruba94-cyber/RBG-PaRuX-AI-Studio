@@ -57,7 +57,7 @@ public sealed class ManagedComfyImageRaceEngine
         await EnsureRendererOnlyReadyAsync(ct).ConfigureAwait(false);
         try
         {
-            string path = await SubmitAndWaitAsync(prompt.Trim(), seed, width, height, ct).ConfigureAwait(false);
+            (string path, int steps) = await SubmitAndWaitAsync(prompt.Trim(), seed, width, height, ct).ConfigureAwait(false);
             if (!File.Exists(path)) throw new FileNotFoundException("ComfyUI race output could not be found.", path);
             byte[] bytes = await File.ReadAllBytesAsync(path, ct).ConfigureAwait(false);
             var asset = new MediaAsset
@@ -68,7 +68,7 @@ public sealed class ManagedComfyImageRaceEngine
                 Seed = seed,
                 Width = width,
                 Height = height,
-                Steps = SamplerSteps
+                Steps = steps
             };
             completed = true;
             return asset;
@@ -190,7 +190,7 @@ public sealed class ManagedComfyImageRaceEngine
             throw new InvalidOperationException("Gaming Mode is active, so media Engine Race is unavailable.");
     }
 
-    private async Task<string> SubmitAndWaitAsync(
+    private async Task<(string Path, int Steps)> SubmitAndWaitAsync(
         string prompt,
         long seed,
         int width,
@@ -198,7 +198,8 @@ public sealed class ManagedComfyImageRaceEngine
         CancellationToken ct)
     {
         ConfigAssets.EnsureAll();
-        MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob("image");
+        MediaCheckpointEffective effective;
+        using (MediaRoutingContext.Begin(prompt)) effective = MediaCheckpointResolution.ResolveForJob("image");
         string templatePath = MediaCheckpointResolution.TemplatePathFor(effective);
         if (!File.Exists(templatePath)) throw new InvalidOperationException("Missing workflow template: " + templatePath);
         JsonObject request = (JsonObject)JsonNode.Parse(await File.ReadAllTextAsync(templatePath, ct).ConfigureAwait(false))!;
@@ -276,7 +277,8 @@ public sealed class ManagedComfyImageRaceEngine
                 throw new InvalidOperationException("ComfyUI race output did not contain a filename.");
             string subfolder = asset.TryGetProperty("subfolder", out JsonElement subElement)
                 ? subElement.GetString() ?? string.Empty : string.Empty;
-            return Path.Combine(LocalAiPaths.ComfyOutputRoot, subfolder, filename);
+            int usedSteps = request["prompt"]?["8"]?["inputs"]?["steps"]?.GetValue<int>() ?? SamplerSteps;
+            return (Path.Combine(LocalAiPaths.ComfyOutputRoot, subfolder, filename), usedSteps);
         }
 
         throw new TimeoutException("Timed out waiting for ComfyUI Engine Race generation to complete.");

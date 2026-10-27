@@ -10,9 +10,35 @@ public sealed class MediaHubPresenterTests
 {
     private const long Gib = 1024L * 1024 * 1024;
 
-    private static MediaCatalogueResponse Catalogue(params string[] installed) =>
-        MediaCatalogueView.Build(MediaCatalogue.Shipped, new MediaHardware(24 * Gib, 64 * Gib), "test PC", "standard",
+    // A 16 GB card: Z-Image bf16 fits, Qwen-Image fp8 (about 20 GB) needs offloading, so the best fit stays Z-Image.
+    private static MediaCatalogueResponse Catalogue(params string[] installed) => Catalogue(16, installed);
+
+    private static MediaCatalogueResponse Catalogue(int vramGb, params string[] installed) =>
+        MediaCatalogueView.Build(MediaCatalogue.Shipped, new MediaHardware(vramGb * Gib, 64 * Gib), "test PC", "standard",
             new HashSet<string>(installed, StringComparer.OrdinalIgnoreCase), _ => null);
+
+    [Fact]
+    public void Qwen_image_is_downloadable_with_its_pinned_listing_and_is_the_best_fit_on_a_24_gb_card()
+    {
+        var model = MediaHubPresenter.Build(Catalogue(24), "standard");
+        MediaHubCard best = model.Single(m => m.CapabilityId == "image.generate").Best!;
+        Assert.Equal("qwen-image-fp8", best.VariantId);
+        Assert.Equal(MediaHubAction.Download, best.Action);
+        RecommendedCheckpoint dl = MediaHubPresenter.ToDownload(best.Entry)!;
+        Assert.Equal("Comfy-Org/Qwen-Image_ComfyUI", dl.HuggingFaceRepoId);
+        Assert.Equal("qwen_image_fp8_e4m3fn.safetensors", dl.FileName);
+        Assert.Equal("image", dl.Type);
+        Assert.Equal(20_430_635_136, dl.EstimatedSizeBytes);
+        Assert.Equal("https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/1f12b17be14c89b026c51a91d67c32f84bb047bc/split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors",
+            dl.DownloadUrl);
+
+        // On 16 GB it is still listed and downloadable, as an alternative that runs with offloading.
+        MediaHubCard alt = Assert.Single(
+            MediaHubPresenter.Build(Catalogue(16), "standard").Single(m => m.CapabilityId == "image.generate").Alternatives,
+            a => a.VariantId == "qwen-image-fp8");
+        Assert.Equal(MediaHubAction.Download, alt.Action);
+        Assert.Equal("offload", alt.Entry.FitClass);
+    }
 
     [Fact]
     public void Each_capability_lists_the_best_fit_first_with_fit_size_licence_and_declared_tier()
@@ -34,7 +60,7 @@ public sealed class MediaHubPresenterTests
     public void Resolver_only_models_are_visible_but_never_downloadable_and_say_why()
     {
         var model = MediaHubPresenter.Build(Catalogue(), "standard");
-        MediaHubCard qwen = model.Single(m => m.CapabilityId == "image.edit").Alternatives.Single(a => a.VariantId == "qwen-image-edit-fp8");
+        MediaHubCard qwen = model.Single(m => m.CapabilityId == "video.generate").Alternatives.Single(a => a.VariantId == "wan2.2-i2v-14b-fp8");
         Assert.Equal(MediaHubAction.None, qwen.Action);
         Assert.Contains("Not runnable by PaRuX yet", qwen.ActionLabel);
         Assert.Contains("Listed only", qwen.Status);
@@ -43,10 +69,18 @@ public sealed class MediaHubPresenterTests
     }
 
     [Fact]
-    public void Uncensored_lane_is_empty_until_a_repository_declared_entry_exists_and_says_so()
+    public void Uncensored_lane_lists_only_repository_declared_image_entries_and_says_so_elsewhere()
     {
         var model = MediaHubPresenter.Build(Catalogue(), "uncensored");
-        Assert.All(model, m => { Assert.Null(m.Best); Assert.Empty(m.Alternatives); Assert.Contains("uncensored", m.EmptyMessage); });
+        MediaHubCapabilityModel img = model.Single(m => m.CapabilityId == "image.generate");
+        Assert.NotNull(img.Best);
+        Assert.All(img.Alternatives.Concat(new[] { img.Best! }), c =>
+        {
+            Assert.Equal("uncensored", c.Entry.Lane);
+            Assert.Contains(c.Entry.Evidence, line => line.StartsWith("lane: uncensored (", StringComparison.Ordinal));
+        });
+        Assert.All(model.Where(m => m.CapabilityId != "image.generate"),
+            m => { Assert.Null(m.Best); Assert.Empty(m.Alternatives); Assert.Contains("uncensored", m.EmptyMessage); });
     }
 
     [Fact]

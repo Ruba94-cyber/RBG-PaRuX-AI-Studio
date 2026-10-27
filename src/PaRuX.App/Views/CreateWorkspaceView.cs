@@ -78,8 +78,9 @@ namespace PaRuX.Views
 
         public void OnShown()
         {
-            _status.Text = "Checking what image generation needs on this PC.";
+            _status.Text = CreateSetupStatusLine.Checking;
             SetProvenance(null);
+            foreach (MediaModelRow row in new[] { _imageModelRow, _videoModelRow, _editModelRow }) _ = row.RefreshAsync();
             foreach (MediaSetupCard card in _setupCards) card.StartPolling();
         }
 
@@ -201,10 +202,8 @@ namespace PaRuX.Views
             if (type == "image")
                 card.StatusChanged += status =>
                 {
-                    if (_operations.IsBusy || _operationMessageSticky) return;
-                    _status.Text = status.Ready
-                        ? "Create is ready. Every generation runs locally through PaRuX Core."
-                        : "Image generation needs a one-time setup. Use the setup card in the Image section; everything runs and stays on this PC.";
+                    if (_operations.IsBusy || _operationMessageSticky || !CreateSetupStatusLine.MayReplace(_status.Text)) return;
+                    _status.Text = CreateSetupStatusLine.For(status.Ready);
                 };
             _setupCards.Add(card);
             return card;
@@ -214,6 +213,9 @@ namespace PaRuX.Views
         {
             var panel = new StackPanel { Spacing = 8 };
             panel.Children.Add(NewSetupCard("image", "image generation"));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_imagePrompt, "Create_Image_Prompt_Box");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_imageWidth, "Create_Image_Width_Box");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_imageHeight, "Create_Image_Height_Box");
             panel.Children.Add(_imagePrompt);
             panel.Children.Add(ExampleChips(_imagePrompt, "Create_Image_Example",
                 "A cozy cabin in a snowy forest at dusk, warm light in the windows",
@@ -221,6 +223,7 @@ namespace PaRuX.Views
                 "Watercolor portrait of an old sailor with a pipe",
                 "Isometric pixel-art city at night, neon signs"));
             panel.Children.Add(_enhanceImage);
+            panel.Children.Add(_imageModelRow);
             var dimensions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             dimensions.Children.Add(Labeled("Width", _imageWidth));
             dimensions.Children.Add(Labeled("Height", _imageHeight));
@@ -234,6 +237,10 @@ namespace PaRuX.Views
             return panel;
         }
 
+        // Model + content lane per generating tab. Edit follows its mode: instruction edits use the edit checkpoint, variations the image one.
+        private readonly MediaModelRow _imageModelRow = new MediaModelRow("image", "Create_Image");
+        private readonly MediaModelRow _videoModelRow = new MediaModelRow("video", "Create_Video");
+        private readonly MediaModelRow _editModelRow = new MediaModelRow("edit", "Create_Edit");
         private readonly CheckBox _enhanceImage = MediaPromptEnhancerUi.CreateToggle();
         private readonly CheckBox _enhanceVideo = MediaPromptEnhancerUi.CreateToggle("_Video");
         private IReadOnlyDictionary<string, string>? _pendingEnhancementDetails;
@@ -256,12 +263,16 @@ namespace PaRuX.Views
         {
             var panel = new StackPanel { Spacing = 8 };
             panel.Children.Add(NewSetupCard("video", "video generation"));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_videoPrompt, "Create_Video_Prompt_Box");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_videoWidth, "Create_Video_Width_Box");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_videoHeight, "Create_Video_Height_Box");
             panel.Children.Add(_videoPrompt);
             panel.Children.Add(ExampleChips(_videoPrompt, "Create_Video_Example",
                 "Waves rolling onto a beach at sunset, cinematic, slow motion",
                 "A paper boat drifting down a rain-soaked street",
                 "Clouds racing over a mountain ridge, time-lapse"));
             panel.Children.Add(_enhanceVideo);
+            panel.Children.Add(_videoModelRow);
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             row.Children.Add(Labeled("Width", _videoWidth));
             row.Children.Add(Labeled("Height", _videoHeight));
@@ -353,6 +364,7 @@ namespace PaRuX.Views
             panel.Children.Add(choose);
             panel.Children.Add(_editSourceLabel);
             panel.Children.Add(_editPrompt);
+            panel.Children.Add(_editModelRow);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_variationStrengthPanel, "Create_EditVariationStrength_Panel");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_editStrength, "Create_EditVariationStrength_NumberBox");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_editStrength, "Variation strength");
@@ -362,6 +374,8 @@ namespace PaRuX.Views
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_editRunButton, "Create_Edit_Run_Button");
             _editRunButton.Click += async (_, _) => await GenerateMediaAsync(SelectedEditType());
             panel.Children.Add(_editRunButton);
+            panel.Children.Add(new TextBlock { Text = "Or cut the subject out and keep a transparent background:", Opacity = 0.7, TextWrapping = TextWrapping.Wrap });
+            panel.Children.Add(BuildCutoutControls());
             UpdateEditModeDescription();
             return panel;
         }
@@ -373,6 +387,7 @@ namespace PaRuX.Views
         private void UpdateEditModeDescription()
         {
             bool variation = SelectedEditType() == "img2img";
+            _ = _editModelRow.SetTypeAsync(variation ? "image" : "edit");
             _variationStrengthPanel.Visibility = variation ? Visibility.Visible : Visibility.Collapsed;
             _editRunButton.Content = variation ? "Create variation" : "Edit image";
             _editModeDescription.Text = variation
@@ -480,8 +495,10 @@ namespace PaRuX.Views
 
                 ticket = BeginOperation(type == "video" ? "Generating video…" : type == "image" ? "Generating image…" : "Editing image…");
                 if (ticket == null) return;
+                MediaJobProvenance? jobProvenance = null;
                 var progress = new Progress<MediaJobStatus>(job =>
                 {
+                    if (job.Provenance != null) jobProvenance = job.Provenance;
                     _progress.Value = Math.Clamp(job.ProgressPercent, 0, 100);
                     string eta = job.EtaSeconds.HasValue ? " · ETA ~" + job.EtaSeconds.Value + "s" : string.Empty;
                     _status.Text = job.Stage + " · " + job.ProgressPercent + "%" + eta;
@@ -491,12 +508,15 @@ namespace PaRuX.Views
                 _lastOutput.Text = "Output: " + path;
                 ShowResult(path);
                 _status.Text = "Generation completed locally and registered in Artifact Workspace.";
-                string modelName = !string.IsNullOrWhiteSpace(asset.FileName) ? asset.FileName : Path.GetFileName(path);
+                // The model the router/override actually chose comes from the server's job provenance; the output file name is only a fallback.
+                string modelName = !string.IsNullOrWhiteSpace(jobProvenance?.ModelFileName) ? jobProvenance!.ModelFileName!
+                    : !string.IsNullOrWhiteSpace(asset.FileName) ? asset.FileName : Path.GetFileName(path);
                 SetProvenance(new MediaProvenanceRecord
                 {
                     EngineFamily = "Local Media Engine",
                     Model = modelName,
                     IsLocal = true,
+                    SelectionReason = jobProvenance?.ModelSelectionReason,
                     AdditionalDetails = _pendingEnhancementDetails
                 });
                 _pendingEnhancementDetails = null;

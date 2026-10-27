@@ -192,7 +192,7 @@ namespace PaRuX.Services
             {
                 string text = input.Trim();
                 if (IsNativeCodeCommand(text)) return RouteKind.CodeHandoff;
-                if (ImageEditRx.IsMatch(text)) return RouteKind.ImageEdit;
+                if (ImageEditRx.IsMatch(text) || CutoutPhrasing.IsBackgroundRemoval(text)) return RouteKind.ImageEdit;
                 if (VideoRx.IsMatch(text)) return RouteKind.Video;
                 if (BinaryAnalysisRx.IsMatch(text)) return RouteKind.BinaryAnalysis;
             }
@@ -215,9 +215,9 @@ namespace PaRuX.Services
             MediaPhrasing.Kind phrased = MediaPhrasing.Detect(text);
             bool howTo = MediaPhrasing.IsNotARequest(text);
             if (phrased == MediaPhrasing.Kind.Music) return RouteKind.Music;
-            if (phrased == MediaPhrasing.Kind.Video && !ImageEditRx.IsMatch(text)) return RouteKind.Video;
+            if (phrased == MediaPhrasing.Kind.Video && !ImageEditRx.IsMatch(text) && !CutoutPhrasing.IsBackgroundRemoval(text)) return RouteKind.Video;
             if (!howTo && ImageRx.IsMatch(text) || phrased == MediaPhrasing.Kind.Image) return RouteKind.Image;
-            if (ImageEditRx.IsMatch(text)) return RouteKind.ImageEdit;
+            if (ImageEditRx.IsMatch(text) || CutoutPhrasing.IsBackgroundRemoval(text)) return RouteKind.ImageEdit;
             if (!howTo && VideoRx.IsMatch(text)) return RouteKind.Video;
             if (BinaryAnalysisRx.IsMatch(text)) return RouteKind.BinaryAnalysis;
             if (CodeDiscussionRx.IsMatch(text)) return RouteKind.ChatNormal;

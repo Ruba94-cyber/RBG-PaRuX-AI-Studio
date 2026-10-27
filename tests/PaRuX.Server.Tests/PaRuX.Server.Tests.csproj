@@ -23,6 +23,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Fixtures\performance-stream\*.sse" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\comfy-node-specs.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\comfy-combo-options.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\PaRuX.Server\PaRuX.Server.csproj" />
@@ -45,6 +47,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\ManagedRuntimeEndpoint.cs" Link="Runtime\ManagedRuntimeEndpoint.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\RouterService.cs" Link="Routing\RouterService.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaPhrasing.cs" Link="Routing\MediaPhrasing.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CutoutPhrasing.cs" Link="Routing\CutoutPhrasing.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatMediaJobReconciler.cs" Link="Chat\ChatMediaJobReconciler.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatRenderWindowPolicy.cs" Link="Chat\ChatRenderWindowPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatModelRouteInfo.cs" Link="Chat\ChatModelRouteInfo.cs" />
@@ -55,6 +58,9 @@
     <Compile Include="..\..\src\PaRuX.App\Services\CandidateEvaluationStatusText.cs" Link="ModelHub\CandidateEvaluationStatusText.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\DiscoveryRefreshStatusPresenter.cs" Link="ModelHub\DiscoveryRefreshStatusPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MaintenancePresenter.cs" Link="Maintenance\MaintenancePresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\WavSilenceDetector.cs" Link="Chat\WavSilenceDetector.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\SpeechTextPreparer.cs" Link="Chat\SpeechTextPreparer.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\VoiceRecordingSession.cs" Link="Chat\VoiceRecordingSession.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ProjectWorkspaceSession.cs" Link="Projects\ProjectWorkspaceSession.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\DocumentTextExtractor.cs" Link="Documents\DocumentTextExtractor.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\AppPaths.cs" Link="CodingAgent\AppPaths.cs" />
@@ -217,6 +223,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\OnboardingAutoSetup.cs" Link="Onboarding\OnboardingAutoSetup.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\OnboardingAutoSetupPresenter.cs" Link="Onboarding\OnboardingAutoSetupPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaSetupPresenter.cs" Link="Media\MediaSetupPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaHubSelectionPresenter.cs" Link="ModelHub\MediaHubSelectionPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\BundledRuntimeOverviewPresenter.cs" Link="Onboarding\BundledRuntimeOverviewPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ComponentLifecyclePresenter.cs" Link="Lifecycle\ComponentLifecyclePresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\UserFailureRecoveryMapper.cs" Link="Diagnostics\UserFailureRecoveryMapper.cs" />
@@ -240,6 +247,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryItem.cs" Link="MediaGallery\MediaGalleryItem.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryItemMapper.cs" Link="MediaGallery\MediaGalleryItemMapper.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaProvenanceFormatter.cs" Link="MediaGallery\MediaProvenanceFormatter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaModelPickerPresenter.cs" Link="MediaGallery\MediaModelPickerPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryBrowser.cs" Link="MediaGallery\MediaGalleryBrowser.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryDeleteCoordinator.cs" Link="MediaGallery\MediaGalleryDeleteCoordinator.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaEditSourceBridge.cs" Link="MediaGallery\MediaEditSourceBridge.cs" />

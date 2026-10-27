@@ -110,14 +110,18 @@ internal static class MediaCapabilityRouting
                 return keepDefault with { Trace = kept, Explanation = $"Automatic: {capability} uses the checkpoint you activated." };
             }
             MediaRoutingFacts facts = (FactsOverride ?? LiveFacts)(type);
-            MediaSelection? sel = MediaAutomaticPicker.Pick(capability, facts);
-            if (sel?.Automatic is { } pick)
+            // The prompt and the content lane steer the choice (see MediaModelRouter). Outside a request there is no prompt.
+            MediaRouteResult? route = MediaAutomaticPicker.Route(capability, facts, MediaRoutingContext.CurrentPrompt, MediaContentLaneStore.Get());
+            if (route?.Chosen is { } pick)
             {
                 string file = facts.InstalledFiles.First(f => string.Equals(f, pick.Variant.FileName, StringComparison.OrdinalIgnoreCase));
-                var trace = new List<string>(sel.Trace) { $"automatic_pick:{file}:fit={pick.Fit.Code}:declared_tier={pick.Variant.Tier}" };
-                return new(capability, ScopedRouteMode.Automatic, file, true, null, trace, sel.Explanation);
+                var trace = new List<string>(route.Trace) { $"automatic_pick:{file}:fit={pick.Fit.Code}:declared_tier={pick.Variant.Tier}" };
+                return new(capability, ScopedRouteMode.Automatic, file, true, null, trace, "Automatic: " + route.Reason);
             }
-            if (sel is not null) return keepDefault with { Trace = sel.Trace.ToList(), Explanation = sel.Explanation };
+            if (route is { Code: "no_uncensored_model_installed" })
+                // Never fall back to a Standard model when the user chose the Uncensored lane.
+                return new(capability, ScopedRouteMode.Automatic, null, false, route.Code, route.Trace.ToList(), "Automatic: " + route.Reason);
+            if (route is not null) return keepDefault with { Trace = route.Trace.ToList(), Explanation = "Automatic: " + route.Reason };
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { }
         return keepDefault;

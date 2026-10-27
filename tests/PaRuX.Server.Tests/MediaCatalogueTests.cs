@@ -73,9 +73,9 @@ public sealed class MediaCatalogueTests : IDisposable
     public void Shipped_catalogue_loads_and_marks_only_validated_families_supported()
     {
         MediaCatalogue c = MediaCatalogue.Shipped;
-        Assert.Equal(new[] { "flux2-klein", "wan2.2-ti2v-5b", "z-image" },
+        Assert.Equal(new[] { "chroma", "flux1-schnell", "flux2-klein", "qwen-image", "qwen-image-edit", "realvisxl-v5", "sdxl", "sdxl-anime", "wan2.2-ti2v-5b", "z-image" },
             c.Families.Where(f => f.IsSupported).Select(f => f.Id).OrderBy(x => x, StringComparer.Ordinal).ToArray());
-        foreach (string id in new[] { "qwen-image", "qwen-image-edit", "wan2.2-14b", "ltx-video", "ace-step" })
+        foreach (string id in new[] { "qwen-image-gguf", "wan2.2-14b", "ltx-video", "ace-step" })
         {
             MediaCatalogueFamily f = c.Families.Single(x => x.Id == id);
             Assert.Equal("resolver_only", f.Support);
@@ -101,6 +101,46 @@ public sealed class MediaCatalogueTests : IDisposable
             if (v.DownloadUrl is not null) Assert.StartsWith("https://huggingface.co/", v.DownloadUrl);
             if (!f.IsSupported) Assert.False(v.ListingVerified && v.Bundled);
         }
+    }
+
+    [Fact]
+    public void Qwen_image_is_pinned_to_one_commit_with_sizes_and_digests_read_from_the_repository_listing()
+    {
+        MediaCatalogueFamily family = MediaCatalogue.Shipped.Families.Single(f => f.Id == "qwen-image");
+        RegistryFamily registry = MediaCompanionRegistry.Shipped.FindFamily(family.RegistryFamily!)!;
+        MediaCatalogueVariant v = Assert.Single(family.Variants);
+
+        Assert.True(family.IsSupported);
+        Assert.True(v.ListingVerified);
+        Assert.Equal("exact_listing", v.SizeBasis);
+        Assert.Equal(20_430_635_136, v.SizeBytes);
+        Assert.Equal("98763a127701eb6fb59096f7742cb3aa7d64ed510b9f4e882d8351f8176e3ce3", v.Sha256);
+        Assert.NotNull(v.Revision);
+        Assert.NotNull(v.DownloadUrl);
+        // The checkpoint and both companions come from the same commit of the same repository, so they are a matching set.
+        Assert.All(registry.Companions, c => { Assert.True(c.Source.IsPinned); Assert.Equal(v.Revision, c.Source.Revision); Assert.Equal(v.Repository, c.Source.Repository); });
+        AssertEncoderAndVaeSizesMatch(family, registry);
+
+        // Qwen-Image-Edit is the same architecture in its own repository: pinned to its own commit, sharing the companions.
+        MediaCatalogueFamily edit = MediaCatalogue.Shipped.Families.Single(f => f.Id == "qwen-image-edit");
+        MediaCatalogueVariant e = Assert.Single(edit.Variants);
+        Assert.True(edit.IsSupported);
+        Assert.Equal("qwen-image", edit.RegistryFamily);
+        Assert.Equal("image.edit", edit.Capability);
+        Assert.True(e.ListingVerified);
+        Assert.Equal("Comfy-Org/Qwen-Image-Edit_ComfyUI", e.Repository);
+        Assert.Equal(20_430_635_136, e.SizeBytes);
+        Assert.Equal("393c6743d1de2e9031b5197027b36116f2096958ccc0223526d34e1860266021", e.Sha256);
+        Assert.Equal("f68ace85e60b4a02a323e394253731947657b7d2", e.Revision);
+        AssertEncoderAndVaeSizesMatch(edit, registry);
+    }
+
+    private static void AssertEncoderAndVaeSizesMatch(MediaCatalogueFamily family, RegistryFamily registry)
+    {
+        // The fit estimator's text-encoder and VAE sizes are the pinned companion files' sizes in GiB, rounded up (conservative).
+        double GiB(string role) => registry.Companions.Single(c => c.Role == role).Source.SizeBytes!.Value / (1024.0 * 1024 * 1024);
+        Assert.InRange(family.TextEncoderGb - GiB("text_encoder"), 0.0, 0.1);
+        Assert.InRange(family.VaeGb - GiB("vae"), 0.0, 0.05);
     }
 
     [Fact]
@@ -134,6 +174,34 @@ public sealed class MediaCatalogueTests : IDisposable
         Assert.Throws<InvalidDataException>(() => MediaCatalogue.Parse(Doc(family.Replace("V ]", GoodVariant + " ]")), MediaCompanionRegistry.Shipped));
     }
 
+    [Fact]
+    public void Parse_rejects_a_supported_family_whose_registry_family_does_not_run_its_capability()
+    {
+        // z-image runs image and img2img only: offering it under image.edit would list a download the edit workflow then refuses.
+        string doc = """
+            { "schemaVersion": 1, "catalogueVersion": 1,
+              "capabilities": [ { "id": "image.edit", "label": "E", "defaultJob": { "megapixels": 1, "frames": 1, "seconds": 0 } } ],
+              "families": [ { "id": "f", "displayName": "F", "capability": "image.edit", "support": "supported", "registryFamily": "z-image",
+                              "parametersBillion": 1, "textEncoderGb": 0, "vaeGb": 0, "variants": [ V ] } ] }
+            """.Replace("V ]", GoodVariant + " ]");
+
+        var error = Assert.Throws<InvalidDataException>(() => MediaCatalogue.Parse(doc, MediaCompanionRegistry.Shipped));
+        Assert.Contains("is not a pipeline", error.Message);
+        // The same family under its own capability is accepted.
+        MediaCatalogue.Parse(Doc("{ \"id\": \"f\", \"displayName\": \"F\", \"capability\": \"image.generate\", \"support\": \"supported\", \"registryFamily\": \"z-image\", \"parametersBillion\": 1, \"textEncoderGb\": 0, \"vaeGb\": 0, \"variants\": [ "
+            + GoodVariant + " ] }"), MediaCompanionRegistry.Shipped);
+    }
+
+    [Fact]
+    public void Every_shipped_supported_family_maps_to_a_registry_family_that_runs_its_capability()
+    {
+        foreach (MediaCatalogueFamily family in MediaCatalogue.Shipped.Families.Where(f => f.IsSupported))
+        {
+            RegistryFamily registry = MediaCompanionRegistry.Shipped.FindFamily(family.RegistryFamily!)!;
+            Assert.Contains(MediaCatalogue.PipelineOf(family.Capability)!, registry.Pipelines);
+        }
+    }
+
     [Theory]
     [InlineData("\"lane\": \"standard\"", "\"lane\": \"uncensored\"")]
     [InlineData("\"sizeBytes\": null", "\"sizeBytes\": 5")]
@@ -165,10 +233,23 @@ public sealed class MediaCatalogueTests : IDisposable
     [Fact]
     public void Roomy_pc_recommends_the_highest_declared_tier_that_fits_and_never_a_resolver_only_model()
     {
+        // A 24 GB card holds Qwen-Image fp8 (declared tier 5) entirely, so it outranks the tier-4 Z-Image bf16 there.
         MediaSelection s = Sel("image.generate", Hw(24, 64), Files());
-        Assert.Equal("z-image-turbo-bf16", s.Recommended!.Variant.Id);
+        Assert.Equal("qwen-image-fp8", s.Recommended!.Variant.Id);
+        Assert.Equal(MediaFitClass.Fits, s.Recommended.Fit.Class);
         Assert.True(s.Recommended.Family.IsSupported);
         Assert.Null(s.Automatic);
+    }
+
+    [Fact]
+    public void On_a_16_gb_card_qwen_image_needs_offloading_so_the_z_image_that_fits_is_recommended()
+    {
+        MediaSelection s = Sel("image.generate", Hw(16, 64), Files());
+        Assert.Equal("z-image-turbo-bf16", s.Recommended!.Variant.Id);
+        Assert.Equal(MediaFitClass.Fits, s.Recommended.Fit.Class);
+        MediaEvaluatedVariant qwen = s.Ranked.Single(v => v.Variant.Id == "qwen-image-fp8");
+        Assert.Equal(MediaFitClass.Offload, qwen.Fit.Class);
+        Assert.True(qwen.Selectable);
     }
 
     [Fact]
@@ -183,8 +264,8 @@ public sealed class MediaCatalogueTests : IDisposable
     public void Automatic_picks_the_best_installed_eligible_variant()
     {
         ISet<string> both = Files("z_image_turbo_bf16.safetensors", "z_image_turbo_int8_convrot.safetensors");
-        Assert.Equal("z_image_turbo_bf16.safetensors", Sel("image.generate", Hw(24, 64), both).Automatic!.Variant.FileName);
-        MediaSelection noBf16 = Sel("image.generate", Hw(24, 64), both, eligible: f => !f.Contains("bf16"));
+        Assert.Equal("z_image_turbo_bf16.safetensors", Sel("image.generate", Hw(16, 64), both).Automatic!.Variant.FileName);
+        MediaSelection noBf16 = Sel("image.generate", Hw(16, 64), both, eligible: f => !f.Contains("bf16"));
         Assert.Equal("z_image_turbo_int8_convrot.safetensors", noBf16.Automatic!.Variant.FileName);
         Assert.Equal("z_image_turbo_bf16.safetensors", noBf16.Recommended!.Variant.FileName);
     }
@@ -194,7 +275,11 @@ public sealed class MediaCatalogueTests : IDisposable
     {
         Assert.Null(Sel("image.generate", Hw(24, 64), Files("my_own_model.safetensors")).Automatic);
         Assert.Null(Sel("image.generate", Hw(3, 8), Files("z_image_turbo_nvfp4.safetensors")).Automatic);
-        Assert.Null(Sel("image.generate", Hw(24, 64), Files("qwen_image_fp8_e4m3fn.safetensors")).Automatic);
+        // The GGUF Qwen-Image build stays resolver_only (PaRuX has no validated GGUF loader graph), so it is never picked.
+        Assert.Null(Sel("image.generate", Hw(24, 64), Files("Qwen_Image-Q4_K_M.gguf")).Automatic);
+        // The supported fp8 build is picked once installed and runnable.
+        Assert.Equal("qwen_image_fp8_e4m3fn.safetensors",
+            Sel("image.generate", Hw(24, 64), Files("qwen_image_fp8_e4m3fn.safetensors")).Automatic!.Variant.FileName);
     }
 
     [Fact]
@@ -211,7 +296,10 @@ public sealed class MediaCatalogueTests : IDisposable
     public void Uncensored_lane_without_installed_entries_falls_back_to_standard_and_says_so()
     {
         MediaSelection s = Sel("image.generate", Hw(24, 64), Files("z_image_turbo_bf16.safetensors"), lane: "uncensored");
-        Assert.Null(s.Recommended);
+        // Uncensored entries exist (each backed by laneEvidence), so one is recommended for download; none is installed,
+        // so Automatic still uses the installed standard model.
+        Assert.Equal("uncensored", s.Recommended!.Variant.Lane);
+        Assert.False(string.IsNullOrWhiteSpace(s.Recommended.Variant.LaneEvidence));
         Assert.Equal("z_image_turbo_bf16.safetensors", s.Automatic!.Variant.FileName);
         Assert.Contains(s.Trace, t => t.StartsWith("no_installed_uncensored", StringComparison.Ordinal));
     }
@@ -229,7 +317,7 @@ public sealed class MediaCatalogueTests : IDisposable
     [Fact]
     public void View_has_one_recommendation_per_capability_with_reason_fit_size_and_licence()
     {
-        MediaCatalogueResponse r = MediaCatalogueView.Build(MediaCatalogue.Shipped, Hw(24, 64), "test", "standard", Files(), NoSpeed);
+        MediaCatalogueResponse r = MediaCatalogueView.Build(MediaCatalogue.Shipped, Hw(16, 64), "test", "standard", Files(), NoSpeed);
         Assert.Equal(5, r.Capabilities.Count);
         foreach (MediaCatalogueCapabilityDto cap in r.Capabilities)
             Assert.True(cap.Entries.Count(e => e.IsRecommended) <= 1);
@@ -266,19 +354,19 @@ public sealed class MediaCatalogueTests : IDisposable
     public void Maintenance_proposes_only_runnable_verified_better_models_and_never_downloads()
     {
         Func<string, Func<string, double?>> speeds = _ => NoSpeed;
-        var none = MediaMaintenanceProposals.Propose(MediaCatalogue.Shipped, Hw(24, 64), Files(), speeds, new HashSet<string>());
+        var none = MediaMaintenanceProposals.Propose(MediaCatalogue.Shipped, Hw(16, 64), Files(), speeds, new HashSet<string>());
         MaintenanceProposal img = Assert.Single(none, p => p.Capability == "image.generate");
         Assert.Equal("media_candidate", img.Kind);
         Assert.Equal("z-image-turbo-bf16", img.Key);
         Assert.Contains("Review in Model Hub", img.Detail);
         Assert.DoesNotContain(none, p => p.Key.StartsWith("qwen", StringComparison.Ordinal) || p.Key.StartsWith("wan2.2-14b", StringComparison.Ordinal));
 
-        var upgrade = MediaMaintenanceProposals.Propose(MediaCatalogue.Shipped, Hw(24, 64), Files("z_image_turbo_int8_convrot.safetensors"), speeds, new HashSet<string>());
+        var upgrade = MediaMaintenanceProposals.Propose(MediaCatalogue.Shipped, Hw(16, 64), Files("z_image_turbo_int8_convrot.safetensors"), speeds, new HashSet<string>());
         Assert.Contains("better than installed", Assert.Single(upgrade, p => p.Capability == "image.generate").Reason);
 
-        Assert.DoesNotContain(MediaMaintenanceProposals.Propose(MediaCatalogue.Shipped, Hw(24, 64), Files("z_image_turbo_bf16.safetensors"), speeds, new HashSet<string>()),
+        Assert.DoesNotContain(MediaMaintenanceProposals.Propose(MediaCatalogue.Shipped, Hw(16, 64), Files("z_image_turbo_bf16.safetensors"), speeds, new HashSet<string>()),
             p => p.Capability == "image.generate");
-        Assert.DoesNotContain(MediaMaintenanceProposals.Propose(MediaCatalogue.Shipped, Hw(24, 64), Files(), speeds, new HashSet<string> { "z-image-turbo-bf16" }),
+        Assert.DoesNotContain(MediaMaintenanceProposals.Propose(MediaCatalogue.Shipped, Hw(16, 64), Files(), speeds, new HashSet<string> { "z-image-turbo-bf16" }),
             p => p.Capability == "image.generate");
     }
 

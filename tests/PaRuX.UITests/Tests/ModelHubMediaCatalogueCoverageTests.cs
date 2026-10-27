@@ -24,6 +24,12 @@ public sealed class ModelHubMediaCatalogueCoverageTests
         nameof(Media_section_offers_standard_and_uncensored_lanes), app =>
         {
             new MainWindowPage(app.MainWindow).OpenModelHub();
+            // The media catalogue lives on the Media tab of the Model Hub selector bar.
+            AutomationElement? mediaTab = null;
+            UiWait.For(() => (mediaTab = app.MainWindow.FindFirstDescendant(cf => cf.ByAutomationId("ModelHub_Tab_Media"))) != null,
+                "Model Hub Media tab");
+            if (mediaTab!.Patterns.SelectionItem.PatternOrDefault != null) mediaTab.Patterns.SelectionItem.Pattern.Select();
+            else mediaTab.Click();
             UiWait.ById(app.MainWindow, "ModelHub_MediaLane_Standard", ControlType.Button);
             UiWait.ById(app.MainWindow, "ModelHub_MediaLane_Uncensored", ControlType.Button);
         });

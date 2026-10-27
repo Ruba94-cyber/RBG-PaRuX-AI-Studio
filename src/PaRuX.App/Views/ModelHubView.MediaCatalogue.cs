@@ -75,19 +75,23 @@ namespace PaRuX.Views
                     Margin = new Thickness(0, 12, 0, 0)
                 });
                 _media.Children.Add(new TextBlock { Text = cap.AutomaticLine, TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.72 });
+                string? capType = MediaSelectionPresenter.TypeFor(cap.CapabilityId);
+                MediaCheckpointStatus? capCurrent = capType == null ? null
+                    : current.FirstOrDefault(s => string.Equals(s.Type, capType, StringComparison.OrdinalIgnoreCase));
+                if (capType != null) _media.Children.Add(BuildMediaSelectionHeader(capType, capCurrent));
                 if (cap.EmptyMessage.Length > 0)
                     _media.Children.Add(new TextBlock { Text = cap.EmptyMessage, TextWrapping = TextWrapping.Wrap, Opacity = 0.8 });
-                if (cap.Best != null) _media.Children.Add(BuildMediaCatalogueCard(cap.Best));
+                if (cap.Best != null) _media.Children.Add(BuildMediaCatalogueCard(cap.Best, capCurrent));
                 if (cap.Alternatives.Count > 0)
                 {
                     _media.Children.Add(new TextBlock { Text = "Alternatives", FontSize = 12, Opacity = 0.7, Margin = new Thickness(0, 6, 0, 0) });
-                    foreach (MediaHubCard alt in cap.Alternatives) _media.Children.Add(BuildMediaCatalogueCard(alt));
+                    foreach (MediaHubCard alt in cap.Alternatives) _media.Children.Add(BuildMediaCatalogueCard(alt, capCurrent));
                 }
             }
             return true;
         }
 
-        private UIElement BuildMediaCatalogueCard(MediaHubCard card)
+        private UIElement BuildMediaCatalogueCard(MediaHubCard card, MediaCheckpointStatus? current)
         {
             var panel = new StackPanel { Spacing = 4, Margin = new Thickness(0, 6, 0, 0) };
             panel.Children.Add(new TextBlock
@@ -100,6 +104,20 @@ namespace PaRuX.Views
             panel.Children.Add(new TextBlock { Text = card.Reason, TextWrapping = TextWrapping.Wrap, Opacity = 0.76 });
             if (card.Status.Length > 0)
                 panel.Children.Add(new TextBlock { Text = card.Status, TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.72 });
+
+            MediaSelectionModel selection = MediaSelectionPresenter.ForCard(card.Entry, current);
+            if (selection.ShowUse)
+            {
+                if (selection.ActiveLine.Length > 0)
+                    panel.Children.Add(new TextBlock { Text = selection.ActiveLine, FontSize = 12, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+                var use = new Button { Content = selection.UseLabel, IsEnabled = selection.UseEnabled };
+                AutomationProperties.SetName(use, "Use " + card.Title);
+                AutomationProperties.SetAutomationId(use, "ModelHub_UseModel_" + card.VariantId);
+                string useType = MediaSelectionPresenter.TypeFor(card.Entry.CapabilityId)!;
+                string useFile = card.Entry.FileName;
+                use.Click += async (_, _) => await UseMediaCheckpointAsync(useType, useFile, card.Title, use);
+                panel.Children.Add(use);
+            }
 
             RecommendedCheckpoint? download = MediaHubPresenter.ToDownload(card.Entry);
             if (card.Action == MediaHubAction.Download && download != null)
@@ -120,6 +138,53 @@ namespace PaRuX.Views
                 panel.Children.Add(new TextBlock { Text = card.ActionLabel, FontSize = 12, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             }
             return panel;
+        }
+
+        /// <summary>Per capability: which model is active and the "Automatic" choice that clears the pinned override.</summary>
+        private UIElement BuildMediaSelectionHeader(string type, MediaCheckpointStatus? current)
+        {
+            (string activeLine, bool automaticEnabled, string automaticLabel) = MediaSelectionPresenter.ForCapability(current);
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+            var line = new TextBlock { Text = activeLine, TextWrapping = TextWrapping.Wrap, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
+            AutomationProperties.SetAutomationId(line, "ModelHub_ActiveModel_" + type);
+            var automatic = new Button { Content = automaticLabel, IsEnabled = automaticEnabled };
+            AutomationProperties.SetName(automatic, "Use Automatic model for " + type);
+            AutomationProperties.SetAutomationId(automatic, "ModelHub_Automatic_" + type);
+            automatic.Click += async (_, _) =>
+            {
+                automatic.IsEnabled = false;
+                try
+                {
+                    await MediaCheckpointsClient.Current.ResetCheckpointAsync(type, CancellationToken.None);
+                    _status.Text = "Automatic mode restored for " + type + ".";
+                    await RefreshAllAsync();
+                }
+                catch (Exception ex)
+                {
+                    _status.Text = "Could not restore Automatic: " + CustomCheckpointPresenter.ExtractServerError(ex.Message);
+                    automatic.IsEnabled = true;
+                }
+            };
+            row.Children.Add(automatic);
+            row.Children.Add(line);
+            return row;
+        }
+
+        private async Task UseMediaCheckpointAsync(string type, string fileName, string title, Button button)
+        {
+            button.IsEnabled = false;
+            try
+            {
+                await MediaCheckpointsClient.Current.SetCheckpointAsync(type, fileName, CancellationToken.None);
+                _status.Text = title + " is now used for " + type + ".";
+                await RefreshAllAsync();
+            }
+            catch (Exception ex)
+            {
+                // The server refuses a family the workflow cannot run with a typed reason; show it as is.
+                _status.Text = "Could not use " + title + ": " + CustomCheckpointPresenter.ExtractServerError(ex.Message);
+                button.IsEnabled = true;
+            }
         }
 
         private async Task InstallMediaCheckpointForAutomaticAsync(RecommendedCheckpoint checkpoint)

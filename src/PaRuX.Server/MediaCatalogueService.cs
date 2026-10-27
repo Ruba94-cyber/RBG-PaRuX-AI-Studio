@@ -130,6 +130,20 @@ internal static class MediaCatalogueLive
 /// <summary>Automatic capability mode for media: picks the best installed, runnable, fitting catalogue model.</summary>
 internal static class MediaAutomaticPicker
 {
+    /// <summary>Per-request routing: the prompt and the content lane steer the choice among installed, runnable, fitting models. Never throws.</summary>
+    internal static MediaRouteResult? Route(string capability, MediaRoutingFacts facts, string? prompt, string lane)
+    {
+        try
+        {
+            var (hw, _, digest) = MediaCatalogueLive.DetectHardware();
+            var installed = new HashSet<string>(facts.InstalledFiles, StringComparer.OrdinalIgnoreCase);
+            return MediaModelRouter.Route(MediaCatalogue.Shipped, capability, prompt, lane, hw, installed,
+                MediaCatalogueLive.SpeedLookup(capability, digest),
+                file => MediaCapabilityRouting.IsEligible(file, facts));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { return null; }
+    }
+
     /// <summary>Returns the checkpoint file Automatic would use, or null to keep the workflow default. Never throws.</summary>
     internal static MediaSelection? Pick(string capability, MediaRoutingFacts facts, string lane = "standard")
     {

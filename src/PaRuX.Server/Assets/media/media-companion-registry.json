@@ -22,6 +22,9 @@
         "img2img"
       ],
       "templateFile": "z-image-smoke-api.json",
+      "pipelineTemplates": {
+        "img2img": "z-image-img2img-api.json"
+      },
       "mainLoader": {
         "node": "1",
         "classType": "UNETLoader",
@@ -297,14 +300,43 @@
     {
       "id": "qwen-image",
       "displayName": "Qwen-Image",
-      "support": "resolver_only",
-      "reason": "PaRuX has no Qwen-Image workflow template. Its companions are listed only so the resolver does not confuse it with another family; nothing here is installable.",
-      "pipelines": [],
-      "requiredNodes": [],
+      "support": "supported",
+      "pipelines": [
+        "image",
+        "edit"
+      ],
+      "templateFile": "qwen-image-api.json",
+      "pipelineTemplates": {
+        "edit": "qwen-image-edit-api.json"
+      },
+      "mainLoader": {
+        "node": "1",
+        "classType": "UNETLoader",
+        "input": "unet_name",
+        "folder": "diffusion_models"
+      },
+      "requiredNodes": [
+        "UNETLoader",
+        "CLIPLoader",
+        "VAELoader",
+        "CLIPTextEncode",
+        "EmptySD3LatentImage",
+        "ModelSamplingAuraFlow",
+        "KSampler",
+        "VAEDecode",
+        "SaveImage",
+        "LoadImage",
+        "ImageScaleToTotalPixels",
+        "VAEEncode",
+        "TextEncodeQwenImageEdit",
+        "CFGNorm"
+      ],
       "signature": {
         "requiredStems": [
           "transformer_blocks.",
-          "time_text_embed."
+          "time_text_embed.",
+          "txt_norm.",
+          "img_in."
         ],
         "forbiddenStems": [
           "double_blocks.",
@@ -319,28 +351,28 @@
           "fileName": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
           "clipType": "qwen_image",
           "sharedWith": [],
-          "notes": "File name not verified against the upstream repository.",
           "source": {
-            "repository": null,
-            "path": null,
-            "revision": null,
-            "sizeBytes": null,
-            "sha256": null
-          }
+            "repository": "Comfy-Org/Qwen-Image_ComfyUI",
+            "path": "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+            "revision": "1f12b17be14c89b026c51a91d67c32f84bb047bc",
+            "sizeBytes": 9384670680,
+            "sha256": "cb5636d852a0ea6a9075ab1bef496c0db7aef13c02350571e388aea959c5c0b4"
+          },
+          "license": "apache-2.0"
         },
         {
           "role": "vae",
           "folder": "vae",
           "fileName": "qwen_image_vae.safetensors",
           "sharedWith": [],
-          "notes": "File name not verified against the upstream repository.",
           "source": {
-            "repository": null,
-            "path": null,
-            "revision": null,
-            "sizeBytes": null,
-            "sha256": null
-          }
+            "repository": "Comfy-Org/Qwen-Image_ComfyUI",
+            "path": "split_files/vae/qwen_image_vae.safetensors",
+            "revision": "1f12b17be14c89b026c51a91d67c32f84bb047bc",
+            "sizeBytes": 253806246,
+            "sha256": "a70580f0213e67967ee9c95f05bb400e8fb08307e017a924bf3441223e023d1f"
+          },
+          "license": "apache-2.0"
         }
       ]
     },

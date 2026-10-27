@@ -885,7 +885,11 @@ namespace PaRuX.Views
             if (UnprovenReadinessText != null)
                 UnprovenReadinessText.Text = unprovenList;
             if (UnprovenReadinessCard != null)
+            {
                 UnprovenReadinessCard.Visibility = Visibility.Visible;
+                // The page is long (automatic setup card, components, first model), so the card sits below the fold: scroll to it.
+                UnprovenReadinessCard.StartBringIntoView();
+            }
             if (SetupSummaryText != null)
                 SetupSummaryText.Text = "Readiness is unproven: " + string.Join("; ", unprovenItems);
 

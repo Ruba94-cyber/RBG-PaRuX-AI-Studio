@@ -24,8 +24,11 @@ internal sealed record MediaCatalogueVariant(
 
 internal sealed record MediaCatalogueFamily(
     string Id, string DisplayName, string Capability, string Support, string? Reason, string? RegistryFamily,
-    double ParametersBillion, double TextEncoderGb, double VaeGb, IReadOnlyList<MediaCatalogueVariant> Variants)
+    double ParametersBillion, double TextEncoderGb, double VaeGb, IReadOnlyList<MediaCatalogueVariant> Variants,
+    IReadOnlyList<string>? DeclaredStrengths = null)
 {
+    /// <summary>What this family is declared to be good at (see <see cref="MediaCatalogue.Strengths"/>); empty when undeclared.</summary>
+    internal IReadOnlyList<string> Strengths => DeclaredStrengths ?? Array.Empty<string>();
     internal bool IsSupported => Support == "supported";
 }
 
@@ -39,6 +42,8 @@ internal sealed class MediaCatalogue
     public const string ResourceName = "PaRuX.Server.Assets.media.media-catalogue.json";
     internal const int SupportedSchemaVersion = 1;
     internal static readonly string[] Lanes = { "standard", "uncensored" };
+    /// <summary>Closed vocabulary for the optional per-family "strengths" array; the prompt hints in MediaPromptStyleHints use the same ids.</summary>
+    internal static readonly string[] Strengths = { "photoreal", "anime", "illustration", "text-rendering", "fast", "editing", "cinematic" };
     internal static readonly string[] CapabilityIds = { "image.generate", "image.edit", "video.generate", "audio.music", "audio.speak" };
     private static readonly Regex IdPattern = new(@"^[a-z0-9][a-z0-9.\-]{0,59}$", RegexOptions.CultureInvariant);
     private static readonly Regex SamplerNamePattern = new(@"^[a-z0-9_]{1,40}$", RegexOptions.CultureInvariant);
@@ -70,6 +75,15 @@ internal sealed class MediaCatalogue
                 if (string.Equals(variant.FileName, fileName, StringComparison.OrdinalIgnoreCase)) return (family, variant);
         return null;
     }
+    /// <summary>The media job type (companion-registry pipeline) a ComfyUI capability is submitted as. Null for the audio
+    /// capabilities, which PaRuX does not run through the media workflow templates.</summary>
+    internal static string? PipelineOf(string capability) => capability switch
+    {
+        "image.generate" => "image",
+        "image.edit" => "edit",
+        "video.generate" => "video",
+        _ => null
+    };
 
     internal MediaCatalogueCapability? CapabilityOf(string id) => Capabilities.FirstOrDefault(c => c.Id == id);
 
@@ -116,6 +130,11 @@ internal sealed class MediaCatalogue
                 RegistryFamily? rf = registry.Families.FirstOrDefault(x => x.Id == regFamily);
                 if (rf is null || !rf.IsSupported || string.IsNullOrEmpty(rf.TemplateFile))
                     throw new InvalidDataException($"{where}: a supported family must map to a supported companion-registry family with a workflow template.");
+                // The registry family must actually run the media type this capability is submitted as, or the Hub would
+                // offer a download whose file the workflow gate then refuses.
+                string? pipeline = PipelineOf(cap);
+                if (pipeline is null || !rf.Pipelines.Contains(pipeline, StringComparer.Ordinal))
+                    throw new InvalidDataException($"{where}: capability \"{cap}\" is not a pipeline the companion-registry family \"{rf.Id}\" runs.");
             }
             else if (string.IsNullOrWhiteSpace(reason))
                 throw new InvalidDataException($"{where}: a resolver_only family must state an honest reason.");
@@ -169,7 +188,7 @@ internal sealed class MediaCatalogue
                 if (v.TryGetProperty("sampling", out JsonElement sm))
                 {
                     if (sm.ValueKind != JsonValueKind.Object) throw new InvalidDataException($"{vw}: sampling must be an object.");
-                    int? steps = sm.TryGetProperty("steps", out JsonElement st) && st.ValueKind == JsonValueKind.Number ? st.GetInt32() : null;
+                    int? steps = sm.TryGetProperty("steps", out JsonElement stepsEl) && stepsEl.ValueKind == JsonValueKind.Number ? stepsEl.GetInt32() : null;
                     double? cfg = sm.TryGetProperty("cfg", out JsonElement cf) && cf.ValueKind == JsonValueKind.Number ? cf.GetDouble() : null;
                     string? sampler = OptStr(sm, "sampler");
                     string? scheduler = OptStr(sm, "scheduler");
@@ -186,8 +205,20 @@ internal sealed class MediaCatalogue
                     verified, bundled, Str(v, "baseCompat", vw), extra, revision, sha256, sampling, promptPrefix));
             }
             if (variants.Count == 0) throw new InvalidDataException($"{where}: has no variants.");
+            var strengths = new List<string>();
+            if (f.TryGetProperty("strengths", out JsonElement st))
+            {
+                if (st.ValueKind != JsonValueKind.Array) throw new InvalidDataException($"{where}: strengths must be an array.");
+                foreach (JsonElement e in st.EnumerateArray())
+                {
+                    string? sv = e.ValueKind == JsonValueKind.String ? e.GetString() : null;
+                    if (sv is null || !Strengths.Contains(sv)) throw new InvalidDataException($"{where}: unknown strength \"{sv}\".");
+                    if (strengths.Contains(sv)) throw new InvalidDataException($"{where}: duplicate strength \"{sv}\".");
+                    strengths.Add(sv);
+                }
+            }
             families.Add(new(fid, Str(f, "displayName", where), cap, support, reason, regFamily, paramsB,
-                Dbl(f, "textEncoderGb", where), Dbl(f, "vaeGb", where), variants));
+                Dbl(f, "textEncoderGb", where), Dbl(f, "vaeGb", where), variants, strengths));
         }
         return new MediaCatalogue(version, caps, families);
     }

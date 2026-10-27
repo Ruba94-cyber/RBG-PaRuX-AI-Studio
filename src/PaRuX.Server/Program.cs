@@ -194,6 +194,7 @@ builder.Services.AddHostedService(services => services.GetRequiredService<Candid
 builder.Services.AddSingleton<ModelCompareService>();
 builder.Services.AddSingleton<GroupChatService>();
 builder.Services.AddSingleton<ThreedService>();
+builder.Services.AddSingleton<CutoutService>();
 builder.Services.AddSingleton<MusicService>();
 builder.Services.AddSingleton<TaskStore>();
 builder.Services.AddSingleton<AgentOrchestrator>();
@@ -2665,6 +2666,7 @@ app.MapPost("/api/v1/models/roles/auto-assign", async (
 
 AutoMaintenanceEndpoints.Map(app);
 MediaCatalogueEndpoints.Map(app);
+MediaLaneEndpoints.Map(app);
 RuntimeSuggestionEndpoints.Map(app);
 
 app.MapGet("/api/v1/models/budget", async (ModelDownloadService models) => Results.Ok(await models.GetBudgetAsync()));
@@ -3487,7 +3489,8 @@ static MediaCheckpointStatus DescribeCheckpoint(string type)
         Template = effective.TemplateFile,
         ReplacesInputs = effective.ReplacesInputs.ToList(),
         Family = effective.IsOverridden ? MediaCheckpointResolution.FamilyOfInstalledFile(effective.File) : null,
-        ClearedOverrideFile = effective.ClearedOverrideFile
+        ClearedOverrideFile = effective.ClearedOverrideFile,
+        CompatibleFiles = MediaCheckpointResolution.CompatibleFiles(type)
     };
 }
 
@@ -3520,6 +3523,17 @@ app.MapPost("/api/v1/media/checkpoints/{type}/reset", (string type) =>
 }).RequireDesktopOwner();
 
 app.MapGet("/api/v1/media/checkpoints/recommended", () => Results.Ok(RecommendedCheckpointsService.List));
+
+// Add-your-own checkpoint from Hugging Face: the server reads the repository listing and returns the pinned commit, the
+// real size and the resolve URL it built itself. Read-only; the client then starts the normal consent-gated download.
+var hfCheckpointResolver = new HuggingFaceCheckpointResolver(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+app.MapGet("/api/v1/media/checkpoints/huggingface/resolve", async (string repoId, string filePath, CancellationToken ct) =>
+{
+    try { return Results.Ok(await hfCheckpointResolver.ResolveAsync(repoId, filePath, ct)); }
+    catch (InvalidDataException ex) { return Results.BadRequest(new { error = ex.Message }); }
+    catch (HttpRequestException ex) { return Results.Json(new { error = "Could not reach Hugging Face: " + ex.Message }, statusCode: StatusCodes.Status502BadGateway); }
+    catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return Results.Json(new { error = "Hugging Face did not answer in time." }, statusCode: StatusCodes.Status504GatewayTimeout); }
+});
 
 // Companion plan for the checkpoint the next job of this type will load: what is installed, what is missing,
 // and the plan hash a fetch must present. Read-only; nothing is downloaded here.
@@ -3667,6 +3681,41 @@ app.MapPost("/api/v1/threed/generate", async (ThreedGenerateRequest request, Thr
         return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 });
+
+// Local background removal (BiRefNet-lite ONNX in a managed Python runtime): returns a transparent PNG as a MediaAsset.
+app.MapGet("/api/v1/cutout/engine", async (CutoutService cutout, CancellationToken ct) =>
+    Results.Ok(await cutout.GetStatusAsync(ct)));
+
+app.MapPost("/api/v1/cutout/engine/install", async (CutoutService cutout, CancellationToken ct) =>
+{
+    try
+    {
+        string log = await cutout.InstallEngineAsync(ct);
+        return Results.Ok(new { installed = true, log });
+    }
+    catch (Exception exception) when (exception is InvalidOperationException or InvalidDataException or IOException or HttpRequestException)
+    {
+        return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+}).RequireDesktopOwner();
+
+app.MapPost("/api/v1/cutout/remove", async (CutoutRemoveRequest request, CutoutService cutout, LocalRuntimeService runtime, CancellationToken ct) =>
+{
+    try
+    {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, runtime.GamingCancellationToken);
+        return Results.Ok(await cutout.RemoveBackgroundAsync(request, linked.Token));
+    }
+    catch (InvalidDataException exception) { return Results.BadRequest(new { error = exception.Message }); }
+    catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+    {
+        return Results.Conflict(new { error = "Gaming Mode activated; background removal was stopped." });
+    }
+    catch (Exception exception) when (exception is not OperationCanceledException)
+    {
+        return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+}).RequireDesktopOwner();
 
 // Local music (ACE-Step 1.5 through the managed ComfyUI): returns the saved FLAC as a MediaAsset.
 app.MapPost("/api/v1/music/generate", async (MusicGenerateRequest request, MusicService music, LocalRuntimeService runtime, CancellationToken ct) =>

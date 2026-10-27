@@ -35,6 +35,8 @@ internal static class ConfigAssets
     {
         UiConfigFileName,
         "z-image-smoke-api.json",
+        "qwen-image-api.json",
+        "qwen-image-edit-api.json",
         "z-image-img2img-api.json",
         "sdxl-checkpoint-api.json",
         "flux1-schnell-api.json",
