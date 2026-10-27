@@ -8,10 +8,14 @@ internal sealed record MediaJobShape(double Megapixels, int Frames, double Secon
 
 internal sealed record MediaCatalogueCapability(string Id, string Label, MediaJobShape DefaultJob);
 
+/// <summary>Sampler settings a checkpoint's own model card recommends. Each field is optional; an absent one keeps the template value.</summary>
+internal sealed record MediaSamplingHint(int? Steps, double? Cfg, string? Sampler, string? Scheduler);
+
 internal sealed record MediaCatalogueVariant(
     string Id, string Title, string Lane, string? LaneEvidence, string Precision, string? Repository, string? Path,
     string FileName, long? SizeBytes, string SizeBasis, string License, int Tier, bool ListingVerified, bool Bundled,
-    string BaseCompat, IReadOnlyList<string> AdditionalFiles, string? Revision = null, string? Sha256 = null)
+    string BaseCompat, IReadOnlyList<string> AdditionalFiles, string? Revision = null, string? Sha256 = null,
+    MediaSamplingHint? Sampling = null, string? PromptPrefix = null)
 {
     /// <summary>Pinned to the listed commit when the catalogue records one, so the bytes cannot change under the recorded size.</summary>
     internal string? DownloadUrl => Repository is not null && Path is not null
@@ -37,6 +41,7 @@ internal sealed class MediaCatalogue
     internal static readonly string[] Lanes = { "standard", "uncensored" };
     internal static readonly string[] CapabilityIds = { "image.generate", "image.edit", "video.generate", "audio.music", "audio.speak" };
     private static readonly Regex IdPattern = new(@"^[a-z0-9][a-z0-9.\-]{0,59}$", RegexOptions.CultureInvariant);
+    private static readonly Regex SamplerNamePattern = new(@"^[a-z0-9_]{1,40}$", RegexOptions.CultureInvariant);
     private static readonly Regex RepoPattern = new(@"^[A-Za-z0-9][A-Za-z0-9._\-]*/[A-Za-z0-9][A-Za-z0-9._\-]*$", RegexOptions.CultureInvariant);
     private static readonly Lazy<MediaCatalogue> ShippedCatalogue = new(LoadShipped);
 
@@ -55,6 +60,15 @@ internal sealed class MediaCatalogue
         if (s is null) throw new InvalidDataException("The embedded media catalogue is missing.");
         using var r = new StreamReader(s);
         return Parse(r.ReadToEnd(), MediaCompanionRegistry.Shipped);
+    }
+
+    /// <summary>The catalogue variant listed under this file name, or null (a file the catalogue does not list).</summary>
+    internal (MediaCatalogueFamily Family, MediaCatalogueVariant Variant)? FindByFileName(string fileName)
+    {
+        foreach (MediaCatalogueFamily family in Families)
+            foreach (MediaCatalogueVariant variant in family.Variants)
+                if (string.Equals(variant.FileName, fileName, StringComparison.OrdinalIgnoreCase)) return (family, variant);
+        return null;
     }
 
     internal MediaCatalogueCapability? CapabilityOf(string id) => Capabilities.FirstOrDefault(c => c.Id == id);
@@ -151,8 +165,25 @@ internal sealed class MediaCatalogue
                 var extra = new List<string>();
                 if (v.TryGetProperty("additionalFiles", out JsonElement af))
                     foreach (JsonElement e in af.EnumerateArray()) extra.Add(e.GetString() ?? string.Empty);
+                MediaSamplingHint? sampling = null;
+                if (v.TryGetProperty("sampling", out JsonElement sm))
+                {
+                    if (sm.ValueKind != JsonValueKind.Object) throw new InvalidDataException($"{vw}: sampling must be an object.");
+                    int? steps = sm.TryGetProperty("steps", out JsonElement st) && st.ValueKind == JsonValueKind.Number ? st.GetInt32() : null;
+                    double? cfg = sm.TryGetProperty("cfg", out JsonElement cf) && cf.ValueKind == JsonValueKind.Number ? cf.GetDouble() : null;
+                    string? sampler = OptStr(sm, "sampler");
+                    string? scheduler = OptStr(sm, "scheduler");
+                    if (steps is < 1 or > 200) throw new InvalidDataException($"{vw}: sampling.steps must be 1-200.");
+                    if (cfg is < 0 or > 30) throw new InvalidDataException($"{vw}: sampling.cfg must be 0-30.");
+                    if (sampler is not null && !SamplerNamePattern.IsMatch(sampler)) throw new InvalidDataException($"{vw}: sampling.sampler is not a sampler name.");
+                    if (scheduler is not null && !SamplerNamePattern.IsMatch(scheduler)) throw new InvalidDataException($"{vw}: sampling.scheduler is not a scheduler name.");
+                    sampling = new MediaSamplingHint(steps, cfg, sampler, scheduler);
+                }
+                string? promptPrefix = OptStr(v, "promptPrefix");
+                if (promptPrefix is not null && (promptPrefix.Length > 200 || promptPrefix.Any(char.IsControl)))
+                    throw new InvalidDataException($"{vw}: promptPrefix must be one line of at most 200 characters.");
                 variants.Add(new(vid, Str(v, "title", vw), lane, laneEvidence, precision, repo, path, fileName, size, sizeBasis, license, tier,
-                    verified, bundled, Str(v, "baseCompat", vw), extra, revision, sha256));
+                    verified, bundled, Str(v, "baseCompat", vw), extra, revision, sha256, sampling, promptPrefix));
             }
             if (variants.Count == 0) throw new InvalidDataException($"{where}: has no variants.");
             families.Add(new(fid, Str(f, "displayName", where), cap, support, reason, regFamily, paramsB,

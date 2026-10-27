@@ -135,7 +135,7 @@ internal static class MediaCapabilityRouting
 
     private static string Describe(string code) => code switch
     {
-        "missing" => "the file is not installed in the diffusion_models folder.",
+        "missing" => "the file is not installed in the diffusion_models or checkpoints folder.",
         "wrong_family" => "its model family cannot run this workflow.",
         "companion_files_missing" => "its required companion files are not installed.",
         "hardware_unfit" => "it is larger than this machine's memory.",
@@ -217,7 +217,7 @@ internal static class MediaCapabilityRouting
             .Append("diffusion_models").Distinct(StringComparer.Ordinal).ToArray();
         return new MediaRoutingFacts(files, file =>
         {
-            string path = Path.Combine(LocalAiPaths.DiffusionModelsPath, file);
+            string path = LocalAiPaths.MainModelPath(file);
             MediaFamilyDetection detection = MediaFamilyDetector.DetectFile(path, registry);
             bool allowed = detection.FamilyId is not null
                 && registry.SupportedFor(type).Any(f => string.Equals(f.Id, detection.FamilyId, StringComparison.Ordinal));

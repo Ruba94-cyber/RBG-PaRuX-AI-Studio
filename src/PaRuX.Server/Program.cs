@@ -3562,8 +3562,9 @@ app.MapPost("/api/v1/media/checkpoints/activate", (ActivateCheckpointRequest req
     {
         // Family gate BEFORE the file is moved: a refused file stays where the download put it.
         MediaCheckpointResolution.EnsureFamilyAllowed(request.Type, source, out familyRefusal);
-        Directory.CreateDirectory(LocalAiPaths.DiffusionModelsPath);
-        string destination = Path.Combine(LocalAiPaths.DiffusionModelsPath, request.FileName);
+        string destinationFolder = MediaCheckpointResolution.DestinationFolderFor(source);
+        Directory.CreateDirectory(destinationFolder);
+        string destination = Path.Combine(destinationFolder, request.FileName);
         if (!File.Exists(destination))
         {
             try { File.Move(source, destination); }

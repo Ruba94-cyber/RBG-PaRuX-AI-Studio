@@ -198,19 +198,20 @@ public sealed class ManagedComfyImageRaceEngine
         CancellationToken ct)
     {
         ConfigAssets.EnsureAll();
-        string templatePath = LocalAiPaths.ImageWorkflowTemplate;
+        MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob("image");
+        string templatePath = MediaCheckpointResolution.TemplatePathFor(effective);
         if (!File.Exists(templatePath)) throw new InvalidOperationException("Missing workflow template: " + templatePath);
         JsonObject request = (JsonObject)JsonNode.Parse(await File.ReadAllTextAsync(templatePath, ct).ConfigureAwait(false))!;
         request["client_id"] = "parux-race-" + Guid.NewGuid().ToString("N");
 
-        SetIn(request, "4", "text", prompt);
+        SetIn(request, "4", "text", MediaImageGraph.WithPromptPrefix(prompt, effective));
         SetIn(request, "8", "seed", seed);
-        SetIn(request, "8", "steps", SamplerSteps);
+        // The race step count is Z-Image's; another family keeps its own template (or catalogue) sampler settings.
+        if (effective.FamilyId is null or "z-image") SetIn(request, "8", "steps", SamplerSteps);
         SetIn(request, "6", "width", width);
         SetIn(request, "6", "height", height);
         SetIn(request, "10", "filename_prefix", "LocalAI_images/PaRuX_EngineRace");
-        MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob("image");
-        if (effective.IsOverridden) SetIn(request, MediaCheckpointResolution.UnetNode, "unet_name", effective.File);
+        MediaImageGraph.ApplyEffective(request, effective);
         // Registry-resolved companion names apply here too, so the race graph matches the sequential media path.
         ComfyWorkflowRunner.ApplyResolvedCompanionChoices(request, "image");
         // Same live preflight as the sequential media path, so the race refuses a missing file or node with

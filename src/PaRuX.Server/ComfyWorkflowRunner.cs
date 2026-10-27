@@ -104,15 +104,18 @@ public sealed class ComfyWorkflowRunner
         await EnsureMediaReadyAsync(ct);
         try
         {
+            // The active checkpoint decides the template: Z-Image by default, or the SDXL / FLUX.1 schnell / Chroma graph when one of those is active.
+            MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob("image");
             string refinedPrompt = await RefineUnlessReviewedAsync(skipPromptRefinement, prompt, RefinePromptAsync, ct);
-            string path = await SubmitAndWaitAsync(LocalAiPaths.ImageWorkflowTemplate, request =>
+            refinedPrompt = MediaImageGraph.WithPromptPrefix(refinedPrompt, effective);
+            string path = await SubmitAndWaitAsync(MediaCheckpointResolution.TemplatePathFor(effective), request =>
             {
                 SetIn(request, "4", "text", refinedPrompt);
                 SetIn(request, "8", "seed", seed);
                 SetIn(request, "6", "width", width);
                 SetIn(request, "6", "height", height);
                 SetIn(request, "10", "filename_prefix", "LocalAI_images/AI_Studio");
-                ApplyCheckpointOverrideIfSet(request, "image");
+                MediaImageGraph.ApplyEffective(request, effective);
             }, saveNode: "10", timeout: TimeSpan.FromMinutes(10), ct, progressPercent, mediaType: "image");
             return new MediaResult(path, seed, width, height, 0, 0, 0);
         }
@@ -147,6 +150,9 @@ public sealed class ComfyWorkflowRunner
         await EnsureMediaReadyAsync(ct);
         try
         {
+            // The img2img graph is Z-Image's. An active SDXL / FLUX.1 / Chroma checkpoint has no img2img graph yet, so this resolves to
+            // the Z-Image default (and refuses by name when it is not installed) instead of pushing a wrong-family file into the graph.
+            MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForImg2Img();
             string refinedPrompt = await RefinePromptAsync(prompt, ct);
             string uploadedName = await UploadImageAsync(sourceImage, sourceFileName, ct);
             string path = await SubmitAndWaitAsync(LocalAiPaths.Img2ImgWorkflowTemplate, request =>
@@ -156,7 +162,7 @@ public sealed class ComfyWorkflowRunner
                 SetIn(request, "9", "seed", seed);
                 SetIn(request, "9", "denoise", Math.Clamp(strength, 0.05, 1.0));
                 SetIn(request, "11", "filename_prefix", "LocalAI_images/AI_Studio_img2img");
-                ApplyCheckpointOverrideIfSet(request, "image");
+                if (effective.IsOverridden) SetIn(request, MediaCheckpointResolution.UnetNode, "unet_name", effective.File);
             }, saveNode: "11", timeout: TimeSpan.FromMinutes(10), ct, mediaType: "img2img");
             return new MediaResult(path, seed, 0, 0, 0, 0, 0);
         }
@@ -482,9 +488,9 @@ public sealed class ComfyWorkflowRunner
     {
         ArgumentNullException.ThrowIfNull(request);
         string type = (request.Type ?? string.Empty).Trim().ToLowerInvariant();
-        string checkpointType = type == "img2img" ? "image" : type;
-        if (checkpointType is "image" or "video" or "edit")
-            return MediaCheckpointResolution.FileNameForProvenance(checkpointType);
+        if (type == "img2img") return MediaCheckpointResolution.FileNameForImg2ImgProvenance();
+        if (type is "image" or "video" or "edit")
+            return MediaCheckpointResolution.FileNameForProvenance(type);
 
         string? templatePath = type switch
         {
@@ -879,7 +885,7 @@ public sealed class ComfyWorkflowRunner
     {
         MediaCompanionRegistry registry = MediaCompanionRegistry.Shipped;
         string mainFileName = MediaCompanionGraph.ReadMainFileName(request, type, registry);
-        string checkpointPath = Path.Combine(LocalAiPaths.DiffusionModelsPath, mainFileName);
+        string checkpointPath = LocalAiPaths.MainModelPath(mainFileName);
         // A missing main checkpoint gets the same typed refusal as the live preflight, not a raw family error.
         if (!File.Exists(checkpointPath)) throw new MediaDependencyException(ComfyLivePreflight.MissingFileByName(mainFileName));
         MediaFamilyDetection detection = MediaFamilyDetector.DetectFile(checkpointPath, registry);
