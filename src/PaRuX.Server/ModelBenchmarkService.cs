@@ -8,6 +8,9 @@ namespace PaRuX.Server;
 public interface IModelDownloadCompletionHandler
 {
     void OnGgufDownloaded(string modelPath, string label);
+
+    /// <summary>A media checkpoint (image/video diffusion weights) finished downloading and verifying. Default: nothing to do.</summary>
+    void OnMediaCheckpointDownloaded(string modelPath, string label) { }
 }
 
 public interface IModelBenchmarkRunner

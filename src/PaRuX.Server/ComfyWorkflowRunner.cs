@@ -104,10 +104,10 @@ public sealed class ComfyWorkflowRunner
         await EnsureMediaReadyAsync(ct);
         try
         {
-            string refinedPrompt = await RefineUnlessReviewedAsync(skipPromptRefinement, prompt, RefinePromptAsync, ct);
-            // One resolution per job: it picks the checkpoint AND the graph of that checkpoint's family. Every image
-            // template shares the node contract patched below (4 prompt, 8 sampler seed, 6 latent size, 10 save).
+            // The active checkpoint decides the template: Z-Image by default, or the SDXL / FLUX.1 schnell / Chroma graph when one of those is active.
             MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob("image");
+            string refinedPrompt = await RefineUnlessReviewedAsync(skipPromptRefinement, prompt, RefinePromptAsync, ct);
+            refinedPrompt = MediaImageGraph.WithPromptPrefix(refinedPrompt, effective);
             string path = await SubmitAndWaitAsync(MediaCheckpointResolution.TemplatePathFor(effective), request =>
             {
                 SetIn(request, "4", "text", refinedPrompt);
@@ -153,6 +153,9 @@ public sealed class ComfyWorkflowRunner
         await EnsureMediaReadyAsync(ct);
         try
         {
+            // The img2img graph is Z-Image's. An active SDXL / FLUX.1 / Chroma checkpoint has no img2img graph yet, so this resolves to
+            // the Z-Image default (and refuses by name when it is not installed) instead of pushing a wrong-family file into the graph.
+            MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForImg2Img();
             string refinedPrompt = await RefinePromptAsync(prompt, ct);
             string uploadedName = await UploadImageAsync(sourceImage, sourceFileName, ct);
             string path = await SubmitAndWaitAsync(LocalAiPaths.Img2ImgWorkflowTemplate, request =>
@@ -162,7 +165,7 @@ public sealed class ComfyWorkflowRunner
                 SetIn(request, "9", "seed", seed);
                 SetIn(request, "9", "denoise", Math.Clamp(strength, 0.05, 1.0));
                 SetIn(request, "11", "filename_prefix", "LocalAI_images/AI_Studio_img2img");
-                ApplyCheckpointOverrideIfSet(request, "image");
+                if (effective.IsOverridden) SetIn(request, MediaCheckpointResolution.UnetNode, "unet_name", effective.File);
             }, saveNode: "11", timeout: TimeSpan.FromMinutes(10), ct, mediaType: "img2img");
             return new MediaResult(path, seed, 0, 0, 0, 0, 0);
         }
@@ -268,7 +271,6 @@ public sealed class ComfyWorkflowRunner
         string jobId = Guid.NewGuid().ToString("N");
         // Every ComfyUI submission of this job, so a cancel between clips can confirm nothing is still queued.
         var clientIds = new List<string>();
-        VideoCheckpointStaging staging = VideoCheckpointStaging.None;
         try
         {
             string refinedPrompt = await RefineUnlessReviewedAsync(skipPromptRefinement, prompt, RefinePromptAsync, ct);
@@ -283,7 +285,6 @@ public sealed class ComfyWorkflowRunner
             VideoFamilyObserver.Value?.Invoke(contract.FamilyId);
             VideoClipPlanObserver.Value?.Invoke(jobId, videoPrompt, requestedFrames, clipFrameCounts);
             Directory.CreateDirectory(frameTempDir);
-            staging = StageCheckpoint(contract, effective);
             // Optional user start image: uploaded once, then attached to clip one the same way clip chaining attaches
             // the previous clip's last frame (AddWanStartImage). Its format and size were checked before queueing.
             string? startImageName = startImage == null ? null
@@ -341,7 +342,6 @@ public sealed class ComfyWorkflowRunner
         {
             try { if (Directory.Exists(frameTempDir)) Directory.Delete(frameTempDir, recursive: true); } catch { }
             if (!completed && resultPath != null) TryDeleteFile(resultPath);
-            staging.Dispose();
             TriggerBackgroundTextRestore();
         }
     }
@@ -383,7 +383,6 @@ public sealed class ComfyWorkflowRunner
             .Where(clip => !string.IsNullOrWhiteSpace(clip.ClientId))
             .Select(clip => clip.ClientId!)
             .ToList();
-        VideoCheckpointStaging staging = VideoCheckpointStaging.None;
         try
         {
             Directory.CreateDirectory(tempDir);
@@ -399,7 +398,6 @@ public sealed class ComfyWorkflowRunner
                     throw new InvalidOperationException("The active video checkpoint is no longer a " + contract.FamilyId
                         + " model, so the remaining clips of this job cannot continue from the saved ones.");
                 videoFamily = VideoFamilyContracts.RegistryFamilyOf(contract);
-                staging = StageCheckpoint(contract, effective);
             }
             for (int i = paths.Count; i < intent.VideoClips.Count; i++)
             {
@@ -434,7 +432,6 @@ public sealed class ComfyWorkflowRunner
         finally
         {
             try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true); } catch { }
-            staging.Dispose();
         }
     }
 
@@ -465,12 +462,6 @@ public sealed class ComfyWorkflowRunner
 
     private static string VideoTemplatePath(VideoFamilyContract contract, RegistryFamily family, bool hasStartImage) =>
         Path.Combine(LocalAiPaths.ConfigDir, contract.TemplateFileFor(family, hasStartImage));
-
-    /// <summary>Exposes the job's checkpoint to ComfyUI's checkpoints folder when the family loads a single-file checkpoint.</summary>
-    private static VideoCheckpointStaging StageCheckpoint(VideoFamilyContract contract, MediaCheckpointEffective effective) =>
-        contract.StagesCheckpointForComfy
-            ? VideoCheckpointStaging.Ensure(Path.Combine(LocalAiPaths.ComfyApp, "models"), effective.File)
-            : VideoCheckpointStaging.None;
 
     private async Task<string> FinalizeVideoAsync(List<string> paths, IReadOnlyList<int> clipFrameCounts,
         int requestedFrames, int fps, CancellationToken ct)
@@ -524,7 +515,8 @@ public sealed class ComfyWorkflowRunner
     /// the template it submitted and the file it loads come from one decision.</summary>
     private static void ApplyResolvedCheckpoint(JsonObject request, MediaCheckpointEffective effective)
     {
-        if (effective.IsOverridden) SetIn(request, MediaCheckpointResolution.UnetNode, "unet_name", effective.File);
+        // The family's own loader input (unet_name, or ckpt_name for a single-file checkpoint) plus its catalogue sampler hints.
+        MediaImageGraph.ApplyEffective(request, effective);
     }
 
     internal static string? ModelSelectionReasonForProvenance(MediaJobRequest request)
@@ -537,9 +529,9 @@ public sealed class ComfyWorkflowRunner
     {
         ArgumentNullException.ThrowIfNull(request);
         string type = (request.Type ?? string.Empty).Trim().ToLowerInvariant();
-        string checkpointType = type == "img2img" ? "image" : type;
-        if (checkpointType is "image" or "video" or "edit")
-            return MediaCheckpointResolution.FileNameForProvenance(checkpointType);
+        if (type == "img2img") return MediaCheckpointResolution.FileNameForImg2ImgProvenance();
+        if (type is "image" or "video" or "edit")
+            return MediaCheckpointResolution.FileNameForProvenance(type);
 
         string? templatePath = type switch
         {
@@ -920,7 +912,7 @@ public sealed class ComfyWorkflowRunner
     {
         MediaCompanionRegistry registry = MediaCompanionRegistry.Shipped;
         string mainFileName = MediaCompanionGraph.ReadMainFileName(request, type, registry);
-        string checkpointPath = Path.Combine(LocalAiPaths.DiffusionModelsPath, mainFileName);
+        string checkpointPath = LocalAiPaths.MainModelPath(mainFileName);
         // A missing main checkpoint gets the same typed refusal as the live preflight, not a raw family error.
         if (!File.Exists(checkpointPath)) throw new MediaDependencyException(ComfyLivePreflight.MissingFileByName(mainFileName));
         MediaFamilyDetection detection = MediaFamilyDetector.DetectFile(checkpointPath, registry);

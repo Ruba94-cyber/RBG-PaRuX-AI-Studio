@@ -330,7 +330,6 @@ public sealed class MediaSetupService
     {
         if (step.Sha256 is null) throw new MediaSetupException(step.Id, step.Title + " has no pinned checksum, so it is not downloaded.");
         string source = Path.Combine(ModelDownloadService.ModelsDirectory, step.FileName!);
-        string destination = Path.Combine(LocalAiPaths.DiffusionModelsPath, step.FileName!);
         // A previous run may have finished the download but not the move; do not download the same file twice.
         if (!File.Exists(source) || new FileInfo(source).Length != step.SizeBytes)
         {
@@ -341,6 +340,11 @@ public sealed class MediaSetupService
             }, step.Sha256, ct);
             await WaitForDownloadsAsync(step, new List<string> { job.Id }, ct);
         }
+        // The download's own header decides the folder (a single-file checkpoint goes to checkpoints, the rest to diffusion_models).
+        // When the staged copy is already gone (an earlier run moved it), the installed file keeps its place.
+        string destination = File.Exists(source)
+            ? Path.Combine(MediaCheckpointResolution.DestinationFolderFor(source), step.FileName!)
+            : LocalAiPaths.MainModelPath(step.FileName!);
         try { MediaCheckpointPlacement.MoveIntoPlace(source, destination, step.SizeBytes); }
         catch (IOException ex) { throw new MediaSetupException(step.Id, step.Title + " could not be installed: " + ex.Message); }
         LocalAiPaths.SetMediaCheckpointOverride(type, step.FileName!);

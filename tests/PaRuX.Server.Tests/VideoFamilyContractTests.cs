@@ -23,6 +23,18 @@ public sealed class VideoFamilyContractTests
     // ---- selection by the family of the active checkpoint ----
 
     [Fact]
+    public void The_resolved_family_id_wins_and_ltx_patches_ckpt_name_not_unet_name()
+    {
+        MediaCheckpointEffective ltx = new("video", "ltxv-t2v-api.json", "my-ltx.safetensors", true, new[] { "x" }, null,
+            FamilyId: "ltx-video", LoaderNode: "1", LoaderClass: "CheckpointLoaderSimple", LoaderInput: "ckpt_name");
+        Assert.Same(VideoFamilyContracts.Ltx, VideoFamilyContracts.For(ltx));
+        JsonObject graph = Template("ltxv-t2v-api.json");
+        VideoFamilyContracts.Ltx.ApplyCheckpoint(graph, ltx);
+        Assert.Equal("my-ltx.safetensors", (string?)graph["prompt"]!["1"]!["inputs"]!["ckpt_name"]);
+        Assert.Null(graph["prompt"]!["1"]!["inputs"]!["unet_name"]);
+    }
+
+    [Fact]
     public void The_contract_follows_the_template_of_the_family_the_checkpoint_belongs_to()
     {
         Assert.Same(VideoFamilyContracts.Wan, VideoFamilyContracts.For(Effective("wan-video-smoke-api.json", overridden: false)));
@@ -49,8 +61,8 @@ public sealed class VideoFamilyContractTests
             Assert.Equal(family.MainLoader!.Node, contract.LoaderNode);
             Assert.Equal(family.MainLoader.ClassType, contract.LoaderClass);
             Assert.Equal(family.MainLoader.Input, contract.LoaderInput);
-            // A single-file checkpoint is read from ComfyUI's checkpoints folder; PaRuX keeps it in diffusion_models.
-            Assert.Equal(contract.LoaderClass == "CheckpointLoaderSimple", contract.StagesCheckpointForComfy);
+            // A single-file checkpoint is read by CheckpointLoaderSimple from ComfyUI's checkpoints folder.
+            Assert.Equal(contract.LoaderClass == "CheckpointLoaderSimple" ? "checkpoints" : "diffusion_models", family.MainLoader.Folder);
             Assert.Equal(contract.StartImageMode == VideoStartImageMode.SeparateTemplate, family.StartImageTemplate is not null);
         }
         Assert.Equal(VideoFamilyContracts.All.Count, VideoFamilyContracts.All.Select(c => c.FamilyId).Distinct().Count());
@@ -157,12 +169,10 @@ public sealed class VideoFamilyContractTests
     }
 
     [Fact]
-    public void Wan_keeps_the_sizes_the_job_asked_for_and_does_not_stage_a_checkpoint()
+    public void Wan_keeps_the_sizes_the_job_asked_for_and_keeps_its_loader()
     {
         Assert.Equal((1280, 720), VideoFamilyContracts.Wan.FitSize(1280, 720));
         Assert.Equal((264, 248), VideoFamilyContracts.Wan.FitSize(264, 248));
-        Assert.False(VideoFamilyContracts.Wan.StagesCheckpointForComfy);
-        Assert.Same(VideoCheckpointStaging.None, VideoCheckpointStaging.None);
         // Without an override the template's own checkpoint stays.
         JsonObject graph = Template("wan-video-smoke-api.json");
         VideoFamilyContracts.Wan.ApplyCheckpoint(graph, Effective("wan-video-smoke-api.json", "other.safetensors", overridden: false));
@@ -423,54 +433,6 @@ public sealed class VideoFamilyContractTests
             (long)(family.TextEncoderGb * 1e9), (long)(family.VaeGb * 1e9), job.Megapixels, job.Frames, job.Seconds);
         MediaFitResult fit = MediaFitEstimator.Estimate(input, new MediaHardware(16L * 1024 * 1024 * 1024, 32L * 1024 * 1024 * 1024));
         Assert.Equal(MediaFitClass.Fits, fit.Class);
-    }
-
-    // ---- exposing a single-file checkpoint to ComfyUI for one job ----
-
-    [Fact]
-    public void Staging_links_the_checkpoint_into_the_checkpoints_folder_and_removes_only_its_own_link()
-    {
-        string root = Path.Combine(Path.GetTempPath(), "parux-staging-" + Guid.NewGuid().ToString("N"));
-        try
-        {
-            Directory.CreateDirectory(Path.Combine(root, "diffusion_models"));
-            string source = Path.Combine(root, "diffusion_models", "ltx.safetensors");
-            File.WriteAllBytes(source, new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 });
-            string link = Path.Combine(root, "checkpoints", "ltx.safetensors");
-
-            using (VideoCheckpointStaging.Ensure(root, "ltx.safetensors"))
-            {
-                Assert.True(File.Exists(link));
-                Assert.Equal(File.ReadAllBytes(source), File.ReadAllBytes(link));
-            }
-            Assert.False(File.Exists(link));
-            Assert.True(File.Exists(source));
-
-            // A file that is already there with the same size is left alone, also when the job ends.
-            File.WriteAllBytes(link, new byte[] { 9, 9, 9, 9, 9, 9, 9, 9 });
-            using (VideoCheckpointStaging.Ensure(root, "ltx.safetensors")) { }
-            Assert.True(File.Exists(link));
-
-            // A same-named file of another size is never overwritten and never silently used.
-            File.WriteAllBytes(link, new byte[] { 1 });
-            Assert.Throws<InvalidOperationException>(() => VideoCheckpointStaging.Ensure(root, "ltx.safetensors"));
-            Assert.Equal(new byte[] { 1 }, File.ReadAllBytes(link));
-        }
-        finally { try { Directory.Delete(root, recursive: true); } catch (IOException) { } }
-    }
-
-    [Fact]
-    public void Staging_refuses_a_missing_checkpoint_with_a_typed_error_and_a_path_like_name()
-    {
-        string root = Path.Combine(Path.GetTempPath(), "parux-staging-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(Path.Combine(root, "diffusion_models"));
-        try
-        {
-            Assert.Throws<MediaDependencyException>(() => VideoCheckpointStaging.Ensure(root, "absent.safetensors"));
-            Assert.Throws<InvalidDataException>(() => VideoCheckpointStaging.Ensure(root, "..\\escape.safetensors"));
-            Assert.Throws<InvalidDataException>(() => VideoCheckpointStaging.Ensure(root, "sub/ltx.safetensors"));
-        }
-        finally { try { Directory.Delete(root, recursive: true); } catch (IOException) { } }
     }
 
     // ---- job record ----

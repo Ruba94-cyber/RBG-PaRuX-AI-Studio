@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
 
 namespace PaRuX.Server;
@@ -47,13 +46,8 @@ internal sealed record VideoFamilyContract(
     int SizeMultiple,
     VideoStartImageMode StartImageMode,
     VideoNodeInput StartImageLatent,
-    string? StartImageLoadNode,
-    bool StagesCheckpointForComfy)
+    string? StartImageLoadNode)
 {
-    /// <summary>Every family keeps its checkpoint in ComfyUI's diffusion_models folder (PaRuX's checkpoint store). A family
-    /// whose loader is CheckpointLoaderSimple reads ComfyUI's checkpoints folder instead, so the file is exposed there for the job.</summary>
-    internal const string StoreFolder = "diffusion_models";
-
     /// <summary>The nearest legal clip length at or above <paramref name="requested"/>: 1 + quantum*n, within the family's range.</summary>
     internal int NormalizeFrameCount(int requested)
     {
@@ -99,7 +93,8 @@ internal sealed record VideoFamilyContract(
     /// <summary>Points the loader at the job's checkpoint file.</summary>
     internal void ApplyCheckpoint(JsonObject request, MediaCheckpointEffective effective)
     {
-        if (effective.IsOverridden) Set(request, new[] { new VideoNodeInput(LoaderNode, LoaderInput) }, effective.File);
+        // The resolution carries the family's own loader (UNETLoader.unet_name, or CheckpointLoaderSimple.ckpt_name for a single-file checkpoint).
+        if (effective.IsOverridden) Set(request, new[] { new VideoNodeInput(effective.LoaderNode, effective.LoaderInput) }, effective.File);
     }
 
     internal string? ApplyStartImage(JsonObject request, string uploadedImageName)
@@ -152,7 +147,7 @@ internal static class VideoFamilyContracts
         FilenamePrefix: new VideoNodeInput("11", "filename_prefix"), OutputNode: "11",
         MinClipFrames: 5, MaxClipFrames: 49, FrameQuantum: 4, SizeMultiple: 1,
         StartImageMode: VideoStartImageMode.AttachToLatent, StartImageLatent: new VideoNodeInput("6", "start_image"),
-        StartImageLoadNode: null, StagesCheckpointForComfy: false);
+        StartImageLoadNode: null);
 
     /// <summary>LTX-Video 2B: one single-file checkpoint (model, VAE) loaded by CheckpointLoaderSimple. Lengths are 8n+1 frames,
     /// sizes multiples of 32. A start image switches to the second template (LTXVImgToVideo); the prompt, seed, size and
@@ -167,7 +162,7 @@ internal static class VideoFamilyContracts
         FilenamePrefix: new VideoNodeInput("11", "filename_prefix"), OutputNode: "11",
         MinClipFrames: 9, MaxClipFrames: 97, FrameQuantum: 8, SizeMultiple: 32,
         StartImageMode: VideoStartImageMode.SeparateTemplate, StartImageLatent: new VideoNodeInput("6", "image"),
-        StartImageLoadNode: "14", StagesCheckpointForComfy: true);
+        StartImageLoadNode: "14");
 
     internal static IReadOnlyList<VideoFamilyContract> All { get; } = new[] { Wan, Ltx };
 
@@ -179,6 +174,7 @@ internal static class VideoFamilyContracts
     internal static VideoFamilyContract For(MediaCheckpointEffective effective)
     {
         ArgumentNullException.ThrowIfNull(effective);
+        if (effective.FamilyId != null && ForFamilyId(effective.FamilyId) is { } byFamily) return byFamily;
         RegistryFamily family = MediaCompanionRegistry.Shipped.Families.FirstOrDefault(candidate =>
                 candidate.IsSupported && candidate.Pipelines.Contains("video", StringComparer.Ordinal)
                 && candidate.AllTemplateFiles.Contains(effective.TemplateFile, StringComparer.Ordinal))
@@ -190,76 +186,4 @@ internal static class VideoFamilyContracts
     internal static RegistryFamily RegistryFamilyOf(VideoFamilyContract contract) =>
         MediaCompanionRegistry.Shipped.FindFamily(contract.FamilyId)
         ?? throw new InvalidOperationException("The registry has no family " + contract.FamilyId + ".");
-}
-
-/// <summary>
-/// Exposes a checkpoint that PaRuX keeps in ComfyUI's diffusion_models folder to ComfyUI's checkpoints folder for the length
-/// of one job, as an NTFS hard link: the same bytes, no copy. Only a family whose graph loads a single-file checkpoint
-/// (CheckpointLoaderSimple) needs it. A link this job created is removed again when the job ends; a file that was already
-/// there is never touched, and a same-named file of another size is refused rather than overwritten.
-/// </summary>
-internal sealed class VideoCheckpointStaging : IDisposable
-{
-    private readonly string? _createdLink;
-
-    private VideoCheckpointStaging(string? createdLink) { _createdLink = createdLink; }
-
-    internal static VideoCheckpointStaging None { get; } = new(null);
-
-    internal static VideoCheckpointStaging Ensure(string modelsRoot, string fileName)
-    {
-        if (string.IsNullOrWhiteSpace(fileName) || !string.Equals(Path.GetFileName(fileName), fileName, StringComparison.Ordinal))
-            throw new InvalidDataException("The checkpoint file name is not a plain file name.");
-        string source = Path.Combine(modelsRoot, VideoFamilyContract.StoreFolder, fileName);
-        string destinationDirectory = Path.Combine(modelsRoot, "checkpoints");
-        string destination = Path.Combine(destinationDirectory, fileName);
-        var sourceInfo = new FileInfo(source);
-        if (!sourceInfo.Exists)
-            throw new MediaDependencyException(ComfyLivePreflight.MissingFile(VideoFamilyContract.StoreFolder, fileName));
-
-        if (File.Exists(destination))
-        {
-            if (new FileInfo(destination).Length == sourceInfo.Length) return None;
-            throw new InvalidOperationException("ComfyUI's checkpoints folder already holds a different file named " + fileName
-                + ". Move it aside so PaRuX can expose the video checkpoint there.");
-        }
-
-        Directory.CreateDirectory(destinationDirectory);
-        if (!TryCreateHardLink(destination, source, out string failure))
-            throw new InvalidOperationException("PaRuX could not expose " + fileName + " to ComfyUI's checkpoints folder (" + failure
-                + "). Copy the file into " + destinationDirectory + " yourself, or keep both folders on one NTFS volume.");
-        return new VideoCheckpointStaging(destination);
-    }
-
-    public void Dispose()
-    {
-        if (_createdLink == null) return;
-        // ComfyUI may still hold the file open for a moment; a link that cannot be removed now is harmless (same bytes, no extra
-        // space) and is recognised as the same file by the next job.
-        try { File.Delete(_createdLink); } catch (IOException) { } catch (UnauthorizedAccessException) { }
-    }
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CreateHardLinkW")]
-    private static extern bool CreateHardLink(string newFileName, string existingFileName, IntPtr reservedSecurityAttributes);
-
-    private static bool TryCreateHardLink(string link, string existing, out string failure)
-    {
-        failure = string.Empty;
-        try
-        {
-            if (OperatingSystem.IsWindows())
-            {
-                if (CreateHardLink(link, existing, IntPtr.Zero)) return true;
-                failure = new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message;
-                return false;
-            }
-            File.CreateSymbolicLink(link, existing);
-            return true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
-        {
-            failure = ex.Message;
-            return false;
-        }
-    }
 }

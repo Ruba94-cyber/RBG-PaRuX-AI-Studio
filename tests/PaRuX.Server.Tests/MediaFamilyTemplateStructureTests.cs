@@ -121,23 +121,23 @@ public sealed class MediaFamilyTemplateStructureTests
         Assert.False(string.IsNullOrWhiteSpace(prompt[main.Node]!["inputs"]![main.Input]!.GetValue<string>()));
         Assert.Equal(MediaCheckpointResolution.UnetNode, main.Node);
 
-        JsonObject Single(string classType) => Assert.Single(
-            prompt.Select(pair => pair.Value!.AsObject()).Where(node => node["class_type"]!.GetValue<string>() == classType).ToArray());
+        JsonObject[] Nodes(string classType) =>
+            prompt.Select(pair => pair.Value!.AsObject()).Where(node => node["class_type"]!.GetValue<string>() == classType).ToArray();
 
-        RegistryCompanion textEncoder = Assert.Single(family.Companions, c => c.Role == "text_encoder");
-        JsonObject clip = Single("CLIPLoader")["inputs"]!.AsObject();
-        Assert.Equal(textEncoder.FileName, clip["clip_name"]!.GetValue<string>());
-        Assert.Equal(textEncoder.ClipType, clip["type"]!.GetValue<string>());
-
-        if (main.ClassType == "CheckpointLoaderSimple")
+        // A single-file checkpoint (SDXL, FLUX.1 schnell) embeds its text encoders and VAE: it declares no companion and its
+        // graph must not load any. A split family declares exactly one of each and its graph loads exactly those files.
+        RegistryCompanion? textEncoder = family.Companions.SingleOrDefault(c => c.Role == "text_encoder");
+        if (textEncoder is null) Assert.Empty(Nodes("CLIPLoader"));
+        else
         {
-            // The checkpoint carries its own VAE: the family registers none and the graph has no VAELoader.
-            Assert.DoesNotContain(family.Companions, c => c.Role == "vae");
-            Assert.DoesNotContain(prompt, pair => ClassOf(prompt, pair.Key) == "VAELoader");
-            return;
+            JsonObject clip = Assert.Single(Nodes("CLIPLoader"))["inputs"]!.AsObject();
+            Assert.Equal(textEncoder.FileName, clip["clip_name"]!.GetValue<string>());
+            Assert.Equal(textEncoder.ClipType, clip["type"]!.GetValue<string>());
         }
-        RegistryCompanion vae = Assert.Single(family.Companions, c => c.Role == "vae");
-        Assert.Equal(vae.FileName, Single("VAELoader")["inputs"]!["vae_name"]!.GetValue<string>());
+
+        RegistryCompanion? vae = family.Companions.SingleOrDefault(c => c.Role == "vae");
+        if (vae is null) Assert.Empty(Nodes("VAELoader"));
+        else Assert.Equal(vae.FileName, Assert.Single(Nodes("VAELoader"))["inputs"]!["vae_name"]!.GetValue<string>());
     }
 
     [Fact]
@@ -169,7 +169,8 @@ public sealed class MediaFamilyTemplateStructureTests
             Assert.Equal("KSampler", ClassOf(prompt, "8"));
             Assert.True(prompt["8"]!["inputs"]!.AsObject().ContainsKey("seed"));
             Assert.True(prompt["8"]!["inputs"]!.AsObject().ContainsKey("steps"));
-            Assert.Equal("EmptySD3LatentImage", ClassOf(prompt, "6"));
+            // SDXL needs the 4-channel EmptyLatentImage; the flow-matching families use the 16-channel EmptySD3LatentImage.
+            Assert.Contains(ClassOf(prompt, "6"), new[] { "EmptySD3LatentImage", "EmptyLatentImage" });
             Assert.True(prompt["6"]!["inputs"]!.AsObject().ContainsKey("width"));
             Assert.True(prompt["6"]!["inputs"]!.AsObject().ContainsKey("height"));
             Assert.Equal("SaveImage", ClassOf(prompt, "10"));

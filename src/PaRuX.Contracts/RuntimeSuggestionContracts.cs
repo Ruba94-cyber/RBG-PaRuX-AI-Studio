@@ -44,8 +44,8 @@ public sealed class MaintenanceSettingsDto
     public int IntervalHours { get; set; } = 24;
     /// <summary>Keep PaRuX-managed runtimes (llama.cpp CUDA/Vulkan/CPU builds) up to date automatically. Default on.</summary>
     public bool KeepRuntimesUpdated { get; set; } = true;
-    /// <summary>Opt-in: measure and tune the ComfyUI media engine for this PC when the machine is idle. Default off.</summary>
-    public bool AutoOptimizeMedia { get; set; }
+    /// <summary>Measure and tune the ComfyUI media engine for this PC when the machine is idle (and right after a media checkpoint download). Default on.</summary>
+    public bool AutoOptimizeMedia { get; set; } = true;
 }
 
 /// <summary>Progress of "Optimize media engine for this PC".</summary>

@@ -86,6 +86,15 @@
       "optional": [],
       "outputs": 1
     },
+    "EmptyLatentImage": {
+      "required": [
+        "batch_size",
+        "height",
+        "width"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
     "EmptySD3LatentImage": {
       "required": [
         "batch_size",
@@ -273,6 +282,15 @@
       "optional": [
         "codec"
       ],
+      "outputs": 1
+    },
+    "T5TokenizerOptions": {
+      "required": [
+        "clip",
+        "min_length",
+        "min_padding"
+      ],
+      "optional": [],
       "outputs": 1
     },
     "TextEncodeQwenImageEdit": {

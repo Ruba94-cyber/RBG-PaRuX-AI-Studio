@@ -24,6 +24,7 @@
   <ItemGroup>
     <None Include="Fixtures\performance-stream\*.sse" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Fixtures\comfy-node-specs.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\comfy-combo-options.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Fixtures\ltx-video-2b-v0.9.5-header.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
@@ -47,6 +48,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\ManagedRuntimeEndpoint.cs" Link="Runtime\ManagedRuntimeEndpoint.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\RouterService.cs" Link="Routing\RouterService.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaPhrasing.cs" Link="Routing\MediaPhrasing.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MicrophoneChooser.cs" Link="Voice\MicrophoneChooser.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CutoutPhrasing.cs" Link="Routing\CutoutPhrasing.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatMediaJobReconciler.cs" Link="Chat\ChatMediaJobReconciler.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatRenderWindowPolicy.cs" Link="Chat\ChatRenderWindowPolicy.cs" />
@@ -223,6 +225,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\OnboardingAutoSetup.cs" Link="Onboarding\OnboardingAutoSetup.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\OnboardingAutoSetupPresenter.cs" Link="Onboarding\OnboardingAutoSetupPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaSetupPresenter.cs" Link="Media\MediaSetupPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelTuningPresenter.cs" Link="Media\ModelTuningPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaHubSelectionPresenter.cs" Link="ModelHub\MediaHubSelectionPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\BundledRuntimeOverviewPresenter.cs" Link="Onboarding\BundledRuntimeOverviewPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ComponentLifecyclePresenter.cs" Link="Lifecycle\ComponentLifecyclePresenter.cs" />

@@ -59,6 +59,7 @@ public sealed class MediaCompanionRegistryTests : IDisposable
     private static SafetensorsHeader SdxlLayout() => Layout(
         ("model.diffusion_model.input_blocks.0.0.weight", new long[] { 4, 4 }),
         ("conditioner.embedders.0.transformer.text_model.embeddings.weight", new long[] { 4, 4 }),
+        ("conditioner.embedders.1.model.ln_final.weight", new long[] { 4 }),
         ("first_stage_model.encoder.conv_in.weight", new long[] { 4, 4 }));
 
     private static SafetensorsHeader Flux1Layout() => Layout(
@@ -103,22 +104,22 @@ public sealed class MediaCompanionRegistryTests : IDisposable
     // ---------- shipped manifest ----------
 
     [Fact]
-    public void Shipped_registry_declares_exactly_the_four_families_this_repo_can_run()
+    public void Shipped_registry_declares_exactly_the_families_this_repo_can_run()
     {
         string[] supported = MediaCompanionRegistry.Shipped.Families
             .Where(family => family.IsSupported).Select(family => family.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray();
 
-        Assert.Equal(new[] { "flux2-klein", "qwen-image", "wan2.2-ti2v-5b", "z-image" }, supported);
+        Assert.Equal(new[] { "chroma", "flux1-schnell", "flux2-klein", "ltx-video", "qwen-image", "sdxl", "wan2.2-ti2v-5b", "z-image" }, supported);
     }
 
     [Fact]
     public void Each_media_type_maps_to_its_supported_families()
     {
-        Assert.Equal(new[] { "qwen-image", "z-image" },
+        Assert.Equal(new[] { "chroma", "flux1-schnell", "qwen-image", "sdxl", "z-image" },
             MediaCompanionRegistry.Shipped.SupportedFor("image").Select(family => family.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray());
         Assert.Equal(new[] { "flux2-klein", "qwen-image" },
             MediaCompanionRegistry.Shipped.SupportedFor("edit").Select(family => family.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray());
-        Assert.Equal("wan2.2-ti2v-5b", Assert.Single(MediaCompanionRegistry.Shipped.SupportedFor("video")).Id);
+        Assert.Equal(new[] { "ltx-video", "wan2.2-ti2v-5b" }, MediaCompanionRegistry.Shipped.SupportedFor("video").Select(family => family.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray());
         Assert.Empty(MediaCompanionRegistry.Shipped.SupportedFor("upscale"));
     }
 
@@ -350,12 +351,12 @@ public sealed class MediaCompanionRegistryTests : IDisposable
     }
 
     [Fact]
-    public void Sdxl_checkpoint_reports_its_embedded_text_encoder_and_is_unsupported()
+    public void Sdxl_checkpoint_reports_its_embedded_text_encoder_and_is_supported_for_images()
     {
         MediaFamilyDetection detection = MediaFamilyDetector.Detect(SdxlLayout(), MediaCompanionRegistry.Shipped);
 
         Assert.Equal("sdxl", detection.FamilyId);
-        Assert.Equal("unsupported", detection.Support);
+        Assert.Equal("supported", detection.Support);
         Assert.True(detection.EmbedsTextEncoder);
         Assert.True(detection.EmbedsVae);
     }
