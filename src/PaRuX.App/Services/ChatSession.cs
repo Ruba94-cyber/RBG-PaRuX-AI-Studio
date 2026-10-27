@@ -970,6 +970,24 @@ namespace PaRuX.Services
                         reply.Content = "I need an attached image to edit - attach one and describe the change.";
                         reply.IsError = true;
                     }
+                    else if (CutoutPhrasing.IsBackgroundRemoval(request.Content))
+                    {
+                        // "Remove the background" / "rimuovi lo sfondo" is a cutout (transparent PNG), not a diffusion edit.
+                        Status = "Removing the background locally…";
+                        RaiseState();
+                        PaRuX.Contracts.MediaAsset cutout = await CutoutClient.Current.RemoveAsync(sourceAttachment.LocalPath, cts.Token).ConfigureAwait(false);
+                        AppSettings cutoutSettings = SettingsStore.Current.Data;
+                        string cutoutPath = await CutoutClient.SaveAsync(cutout,
+                            string.IsNullOrWhiteSpace(cutoutSettings.GeneratedImagesFolder) ? null : cutoutSettings.GeneratedImagesFolder,
+                            cts.Token).ConfigureAwait(false);
+                        ChatMediaJobReconciler.ApplyCompleted(reply, new ChatAttachment
+                        {
+                            FileName = cutout.FileName, LocalPath = cutoutPath,
+                            MediaType = cutout.MediaType, SizeBytes = new FileInfo(cutoutPath).Length
+                        }, reply.MediaJobId ?? Guid.NewGuid().ToString("N"),
+                        "Background removed locally · BiRefNet-lite · " + cutout.Width + "×" + cutout.Height + " · transparent PNG");
+                        Persist();
+                    }
                     else
                     {
                         Status = "Editing your image locally…";

@@ -362,6 +362,8 @@ namespace PaRuX.Views
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_editRunButton, "Create_Edit_Run_Button");
             _editRunButton.Click += async (_, _) => await GenerateMediaAsync(SelectedEditType());
             panel.Children.Add(_editRunButton);
+            panel.Children.Add(new TextBlock { Text = "Or cut the subject out and keep a transparent background:", Opacity = 0.7, TextWrapping = TextWrapping.Wrap });
+            panel.Children.Add(BuildCutoutControls());
             UpdateEditModeDescription();
             return panel;
         }

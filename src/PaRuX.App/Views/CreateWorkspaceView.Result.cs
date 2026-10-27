@@ -59,6 +59,11 @@ namespace PaRuX.Views
                 _editSourceLabel.Text = _resultPath;
                 _status.Text = "Result set as the source image in IMAGE EDIT below.";
             }));
+            _imageOnlyResultButtons.Add(ResultButton("Remove background", "Create_Result_RemoveBackground_Button", async (_, _) =>
+            {
+                if (_resultPath == null || !IsImageFile(_resultPath)) return;
+                await RemoveBackgroundAsync(_resultPath);
+            }));
             _imageOnlyResultButtons.Add(ResultButton("Animate this image", "Create_Result_Animate_Button", (_, _) =>
             {
                 if (_resultPath == null || !IsImageFile(_resultPath)) return;

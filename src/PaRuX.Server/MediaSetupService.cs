@@ -14,6 +14,8 @@ public sealed class MediaSetupService
     private readonly ModelDownloadService _downloads;
     private readonly SpeechService? _speech;
     private readonly ThreedService? _threed;
+    private readonly CutoutService? _cutout;
+    private (DateTime AtUtc, bool Runtime, bool Model)? _cutoutStatus;
     private (DateTime AtUtc, SpeechEngineStatus Status)? _speechStatus;
     private (DateTime AtUtc, bool Installed)? _threedStatus;
     private readonly object _gate = new();
@@ -23,8 +25,9 @@ public sealed class MediaSetupService
     private string _lastType = "image";
 
     public MediaSetupService(RuntimeInstallService runtime, ModelDownloadService downloads, SpeechService? speech = null,
-        ThreedService? threed = null)
+        ThreedService? threed = null, CutoutService? cutout = null)
     {
+        _cutout = cutout;
         _runtime = runtime;
         _downloads = downloads;
         _speech = speech;
@@ -43,6 +46,18 @@ public sealed class MediaSetupService
         return installed;
     }
 
+    private (bool Runtime, bool Model) ReadCutoutFacts(bool fresh = false)
+    {
+        if (_cutout is null) return (false, false);
+        lock (_gate)
+        {
+            if (!fresh && _cutoutStatus is { } cached && DateTime.UtcNow - cached.AtUtc < TimeSpan.FromSeconds(20)) return (cached.Runtime, cached.Model);
+        }
+        CutoutEngineStatus status = _cutout.GetStatusAsync(CancellationToken.None).GetAwaiter().GetResult();
+        lock (_gate) _cutoutStatus = (DateTime.UtcNow, status.RuntimeInstalled, status.ModelInstalled);
+        return (status.RuntimeInstalled, status.ModelInstalled);
+    }
+
     /// <summary>The Python probe costs about a second, so polling reads a short-lived cache.</summary>
     private SpeechEngineStatus ReadSpeechStatus(bool fresh = false)
     {
@@ -59,6 +74,11 @@ public sealed class MediaSetupService
     private MediaSetupPlan PlanFor(string type, bool freshSpeech = false)
     {
         if (type == "3d") return MediaSetupPlanner.PlanThreed(ReadThreedInstalled(freshSpeech));
+        if (type == "cutout")
+        {
+            (bool runtime, bool model) = ReadCutoutFacts(freshSpeech);
+            return MediaSetupPlanner.PlanCutout(runtime, model);
+        }
         if (type == "music")
             return MediaSetupPlanner.PlanMusic(
                 File.Exists(LocalAiPaths.ComfyMain) && File.Exists(LocalAiPaths.ComfyPython),
@@ -89,7 +109,7 @@ public sealed class MediaSetupService
             MediaCatalogueLive.SpeedLookup(MediaSetupPlanner.CapabilityFor(type), digest), type);
     }
 
-    internal static string NormalizeType(string? type) => type is "video" or "edit" or "speech" or "3d" or "music" ? type : "image";
+    internal static string NormalizeType(string? type) => type is "video" or "edit" or "speech" or "3d" or "music" or "cutout" ? type : "image";
 
     public MediaSetupStatus GetStatus(string? type = null)
     {
@@ -125,6 +145,7 @@ public sealed class MediaSetupService
         "speech" => "Speech",
         "3d" => "Image to 3D",
         "music" => "Music",
+        "cutout" => "Background removal",
         _ => "Image generation"
     };
 
@@ -175,7 +196,9 @@ public sealed class MediaSetupService
                 Update(step.Id, "Setting up: " + step.Title, 0, step.SizeBytes);
                 try
                 {
-                    if (step.Id == MediaSetupPlanner.MusicStepId) await InstallMusicModelAsync(step, stepTimeout.Token);
+                    if (step.Id == MediaSetupPlanner.CutoutRuntimeStepId) await InstallCutoutRuntimeAsync(step, stepTimeout.Token);
+                    else if (step.Id == MediaSetupPlanner.CutoutModelStepId) await InstallCutoutModelAsync(step, stepTimeout.Token);
+                    else if (step.Id == MediaSetupPlanner.MusicStepId) await InstallMusicModelAsync(step, stepTimeout.Token);
                     else if (step.Id == MediaSetupPlanner.ThreedStepId) await InstallThreedAsync(step, stepTimeout.Token);
                     else if (step.Id == MediaSetupPlanner.SpeechStepId) await InstallSpeechAsync(step, stepTimeout.Token);
                     else if (step.Id == MediaSetupPlanner.ComfyStepId) await InstallComfyAsync(step, stepTimeout.Token);
@@ -228,6 +251,29 @@ public sealed class MediaSetupService
         }
         try { MediaCheckpointPlacement.MoveIntoPlace(source, destination, MusicWorkflow.CheckpointBytes); }
         catch (IOException ex) { throw new MediaSetupException(step.Id, step.Title + " could not be installed: " + ex.Message); }
+    }
+
+    private async Task InstallCutoutRuntimeAsync(MediaSetupStep step, CancellationToken ct)
+    {
+        if (_cutout is null) throw new MediaSetupException(step.Id, "Background removal is not available in this build.");
+        Update(step.Id, "Installing the background removal engine (onnxruntime, Pillow, NumPy); this takes a few minutes.", 0, 0);
+        try { await _cutout.InstallRuntimeAsync(ct); }
+        catch (InvalidOperationException ex) { throw new MediaSetupException(step.Id, "The background removal engine could not be installed: " + ex.Message); }
+        catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception or TimeoutException)
+        {
+            throw new MediaSetupException(step.Id, "The background removal engine could not be installed: " + ex.Message);
+        }
+    }
+
+    private async Task InstallCutoutModelAsync(MediaSetupStep step, CancellationToken ct)
+    {
+        if (_cutout is null) throw new MediaSetupException(step.Id, "Background removal is not available in this build.");
+        var progress = new Progress<(long Done, long Total)>(p => Update(step.Id, "Downloading " + step.Title + ".", p.Done, p.Total));
+        try { await _cutout.DownloadModelAsync(progress, ct); }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or HttpRequestException or TimeoutException)
+        {
+            throw new MediaSetupException(step.Id, step.Title + " could not be downloaded: " + ex.Message);
+        }
     }
 
     private async Task InstallThreedAsync(MediaSetupStep step, CancellationToken ct)
