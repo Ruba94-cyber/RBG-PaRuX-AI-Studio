@@ -22,6 +22,25 @@ public sealed class ModelTuningProposalDto
     public long SizeBytes { get; set; }
 }
 
+/// <summary>
+/// A concrete, honest next step when tuning found nothing faster on the current settings. Never executed silently.
+/// <see cref="ActionKind"/> is "download_file" (a file in <see cref="RepoId"/>, started from Model Hub with the usual license
+/// consent), "open_runtime_manager", or "info" (nothing to click; the text says what to do).
+/// </summary>
+public sealed class ModelTuningSuggestionDto
+{
+    /// <summary>smaller_quant | draft_model | lower_context | switch_backend | media_variant | media_precision | media_preset | info.</summary>
+    public string Kind { get; set; } = "info";
+    public string Title { get; set; } = string.Empty;
+    public string Detail { get; set; } = string.Empty;
+    /// <summary>Expected benefit in plain words, marked as an estimate unless it was measured on this PC.</summary>
+    public string ExpectedGain { get; set; } = string.Empty;
+    public string ActionKind { get; set; } = "info";
+    public string? RepoId { get; set; }
+    public string? FileName { get; set; }
+    public long SizeBytes { get; set; }
+}
+
 public sealed class ModelTuningItemDto
 {
     public string Id { get; set; } = string.Empty;
@@ -36,6 +55,8 @@ public sealed class ModelTuningItemDto
     /// <summary>Why it waits, was skipped or failed, or what was applied (plain language).</summary>
     public string? Reason { get; set; }
     public ModelTuningProposalDto? Proposal { get; set; }
+    /// <summary>Concrete next steps shown when the current settings are already the best measured on this PC.</summary>
+    public List<ModelTuningSuggestionDto> Suggestions { get; set; } = new();
     public DateTime UpdatedUtc { get; set; }
 }
 

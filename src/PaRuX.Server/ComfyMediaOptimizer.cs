@@ -183,7 +183,7 @@ internal sealed class ComfyMediaOptimizer
     internal const double StructuralSsim = 0.999;
     /// <summary>Lower-precision kernels change rounding; the image must still be the same picture.</summary>
     internal const double NumericSsim = 0.985;
-    internal const int MaximumCandidates = 7;
+    internal const int MaximumCandidates = 9;
     internal static readonly TimeSpan FailureBackoff = TimeSpan.FromHours(24);
 
     private readonly IComfyCalibrationHarness _harness;
@@ -194,6 +194,8 @@ internal sealed class ComfyMediaOptimizer
     private readonly object _statusGate = new();
     private ComfyOptimizationStatus _status = new("idle", null, 0, 0, null);
     private DateTime _lastFailureUtc = DateTime.MinValue;
+    /// <summary>Facts of the latest inspection/run, kept in memory only to word the "nothing faster" suggestions.</summary>
+    private MediaTuningFacts? _lastFacts;
 
     private readonly Func<Task>? _onFinished;
 
@@ -252,11 +254,11 @@ internal sealed class ComfyMediaOptimizer
 
     private List<(string Path, string Label, DateTime QueuedUtc)> SnapshotPending() { lock (_pendingGate) return _pending.ToList(); }
 
-    private void ResolvePending(Action<ModelTuningTracker, string> apply)
+    private void ResolvePending(Action<ModelTuningTracker, string, string> apply)
     {
         List<(string Path, string Label, DateTime QueuedUtc)> items;
         lock (_pendingGate) { items = _pending.ToList(); _pending.Clear(); }
-        if (Tuning is { } t) foreach (var i in items) apply(t, ModelTuningTracker.KeyOf("media", i.Path, WorkloadId));
+        if (Tuning is { } t) foreach (var i in items) apply(t, ModelTuningTracker.KeyOf("media", i.Path, WorkloadId), i.Label);
     }
 
     internal ComfyOptimizationStatus Status { get { lock (_statusGate) return _status; } }
@@ -304,6 +306,23 @@ internal sealed class ComfyMediaOptimizer
             var args = safe.Arguments.Where(a => a != "--use-pytorch-cross-attention").Append("--use-sage-attention").ToList();
             Add("planned-sage", "Planned + SageAttention", new ComfyLaunchPlan(ComfyPlanTier.Aggressive, args,
                 safe.Decisions.Append(sage).ToList(), safe.TextEncoderDevice, safe.TiledVaeDecode));
+        }
+        // Low-VRAM dimension: when the diffusion weights take most of the GPU, measure the precision / attention choices that
+        // lower memory pressure. Both are capability-checked, and the fp8 one must still reproduce the same picture (SSIM gate).
+        if (s.Footprint.DiffusionBytes > 0 && s.Gpu.TotalVramBytes > 0 && s.Footprint.DiffusionBytes > (long)(s.Gpu.TotalVramBytes * 0.55))
+        {
+            if (s.Caps.Supports("--fp8_e4m3fn-unet"))
+                Add("planned-fp8-unet", "Planned + fp8 diffusion weights (low VRAM)", new ComfyLaunchPlan(ComfyPlanTier.Aggressive,
+                    safe.Arguments.Append("--fp8_e4m3fn-unet").ToList(),
+                    safe.Decisions.Append(new ComfyPlanDecision("--fp8_e4m3fn-unet", null, "halves the diffusion weights when they take most of the VRAM; verified for equivalence", true)).ToList(),
+                    safe.TextEncoderDevice, safe.TiledVaeDecode));
+            if (s.Caps.Supports("--use-quad-cross-attention"))
+            {
+                var quad = safe.Arguments.Where(a => a != "--use-pytorch-cross-attention" && a != "--use-sage-attention").Append("--use-quad-cross-attention").ToList();
+                Add("planned-quad-attn", "Planned + memory-efficient attention (low VRAM)", new ComfyLaunchPlan(ComfyPlanTier.Safe, quad,
+                    safe.Decisions.Append(new ComfyPlanDecision("--use-quad-cross-attention", null, "sub-quadratic attention lowers peak memory when VRAM is tight", false)).ToList(),
+                    safe.TextEncoderDevice, safe.TiledVaeDecode));
+            }
         }
         return list;
     }
@@ -354,7 +373,7 @@ internal sealed class ComfyMediaOptimizer
             var pending = SnapshotPending();
             if (!autoEnabled)
             {
-                ResolvePending((t, id) => t.Skipped(id, "Automatic media tuning is off in Settings > Automatic checks"));
+                ResolvePending((t, id, _) => t.Skipped(id, "Automatic media tuning is off in Settings > Automatic checks"));
                 return null;
             }
             if (_harness.IsGamingActive()) { Tuning?.Waiting("Paused: Gaming Mode is on"); return null; }
@@ -366,14 +385,16 @@ internal sealed class ComfyMediaOptimizer
             ComfyEngineSnapshot snap = await _harness.InspectAsync(ct).ConfigureAwait(false);
             if (!snap.Env.TorchHasCuda || !snap.Gpu.IsNvidia)
             {
-                ResolvePending((t, id) => t.Skipped(id, !snap.Env.TorchHasCuda
+                _lastFacts = FactsOf(snap);
+                ResolvePending((t, id, label) => t.Optimal(id, !snap.Env.TorchHasCuda
                     ? "This media engine's PyTorch has no CUDA support; repair it first"
-                    : "Media tuning applies to NVIDIA GPUs only"));
+                    : "Media tuning applies to NVIDIA GPUs only; this PC keeps the engine defaults",
+                    MediaSuggestions(label)));
                 return null;
             }
             if (_store.Find(snap.Fingerprint) is { } existing && existing.Outcome != "failed")
             {
-                ResolvePending((t, id) => t.Skipped(id, "Already tuned for this PC and media engine"));
+                ResolvePending((t, id, _) => t.Skipped(id, "Already tuned for this PC and media engine"));
                 return null;
             }
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -446,19 +467,38 @@ internal sealed class ComfyMediaOptimizer
                     t.Applied(id, SpeedGainPercent(record), $"Applied: +{SpeedGainPercent(record):0}% faster image generation ({record.ChosenId})");
                     break;
                 case "no_improvement":
-                    t.Skipped(id, "No faster profile found");
+                    t.Optimal(id, TuningSuggestions.MediaOptimalText(record.Candidates.FirstOrDefault(c => c.Status == "baseline")?.WarmSeconds),
+                        MediaSuggestions(t.Get(id)?.ModelLabel));
                     break;
                 case "deferred":
                     t.Requeue(id, record.Summary);
                     break;
                 case "not_applicable":
-                    t.Skipped(id, record.Summary);
+                    t.Optimal(id, record.Summary, MediaSuggestions(t.Get(id)?.ModelLabel));
                     break;
                 default:
                     t.Failed(id, record.Summary);
                     break;
             }
         }
+    }
+
+    private static MediaTuningFacts FactsOf(ComfyEngineSnapshot snap) => new(
+        snap.ModelLabel, snap.Gpu.Name, snap.Gpu.IsNvidia, snap.Env.TorchHasCuda, snap.Gpu.TotalVramBytes, snap.Footprint.DiffusionBytes,
+        null, null, snap.Footprint.OutputWidth, snap.Footprint.OutputHeight);
+
+    private const string SyntheticLabel = "Media engine (ComfyUI)";
+
+    /// <summary>Concrete next steps for a checkpoint whose launch flags cannot be made faster; never empty, never throws.</summary>
+    private IReadOnlyList<PaRuX.Contracts.ModelTuningSuggestionDto> MediaSuggestions(string? label)
+    {
+        try
+        {
+            MediaTuningFacts facts = _lastFacts ?? new MediaTuningFacts(label ?? string.Empty, string.Empty, true, true, 0, 0, null, null, 0, 0);
+            if (!string.IsNullOrWhiteSpace(label) && label != SyntheticLabel) facts = facts with { ModelLabel = label };
+            return TuningSuggestions.ForMedia(facts);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { return Array.Empty<PaRuX.Contracts.ModelTuningSuggestionDto>(); }
     }
 
     /// <summary>Warm-run speed-up of the adopted flag set over the default flags, in percent of images per second.</summary>
@@ -482,6 +522,7 @@ internal sealed class ComfyMediaOptimizer
                 return Finish(new ComfyOptimizationRecord { Outcome = "deferred", Summary = "Gaming Mode is on: media optimisation waits." }, persist: false);
 
             ComfyEngineSnapshot snap = await _harness.InspectAsync(ct).ConfigureAwait(false);
+            _lastFacts = FactsOf(snap);
             var record = new ComfyOptimizationRecord
             {
                 Fingerprint = snap.Fingerprint, StackKey = snap.StackKey, GpuName = snap.Gpu.Name, ComfyVersion = snap.ComfyVersion,
@@ -575,6 +616,7 @@ internal sealed class ComfyMediaOptimizer
             }
 
             ComfyCandidateResult baseline = results[0];
+            if (_lastFacts is not null) _lastFacts = _lastFacts with { PeakVramBytes = baseline.PeakVramBytes, BaselineWarmSeconds = baseline.WarmSeconds };
             ComfyCandidateResult? best = null;
             foreach (ComfyCandidateResult c in results.Skip(1).Where(c => c.Status == "ok"))
             {

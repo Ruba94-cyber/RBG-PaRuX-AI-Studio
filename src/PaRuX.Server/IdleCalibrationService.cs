@@ -24,6 +24,13 @@ internal sealed class IdleCalibrationDependencies
     public Func<string, bool>? IsFreshModel { get; init; }
     /// <summary>A fresh model needs no calibration (already tuned, or not measurable): drop it from the fresh queue.</summary>
     public Action<string> FreshModelHandled { get; init; } = _ => { };
+    /// <summary>
+    /// Local facts for the "nothing faster found" suggestions: (model path, runtime backend, winning profile, measured tok/s).
+    /// Null keeps the outcome text but publishes no suggestions beyond the generic one.
+    /// </summary>
+    public Func<string, string, LlamaPerformanceProfileDto?, double?, TextTuningFacts?>? TextFacts { get; init; }
+    /// <summary>Read-only repository listing for a downloaded file: its Hugging Face repo id and GGUF files. Never downloads.</summary>
+    public Func<string, CancellationToken, Task<(string? RepoId, IReadOnlyList<(string FileName, long SizeBytes)> Files)>>? RepoListing { get; init; }
     /// <summary>Visible "tuning for your PC" state; null keeps the service silent (older tests).</summary>
     public ModelTuningTracker? Tuning { get; init; }
     public required Func<CancellationToken, Task<CalibrationEnvironment?>> Environment { get; init; }
@@ -283,7 +290,7 @@ internal sealed class IdleCalibrationService
         else if (_registry.Find(key)?.State != "calibrated")
             _registry.MarkCalibrated(key, label, workload, "idle", now);
         if (run is { Status: "completed" } && tuningId != null && _deps.Tuning is { } done && done.Get(tuningId)?.State == ModelTuningStates.Running)
-            done.Skipped(tuningId, "No faster profile found");
+            PublishOptimal(done, tuningId, run.ModelPath, string.Empty, run);
         lock (_gate) { _runId = null; _runKey = null; _cancelReason = null; _runPath = null; _runTuningId = null; }
         return true;
     }
@@ -307,10 +314,55 @@ internal sealed class IdleCalibrationService
             string id = tuning.Queued("text", completion.ModelPath, label, completion.Workload);
             double gain = ModelTuningGain.Compute(run) ?? 0;
             if (gain >= ModelTuningGain.MinimumReportedPercent) tuning.Applied(id, gain);
-            else tuning.Skipped(id, "No faster profile found");
+            else PublishOptimal(tuning, id, completion.ModelPath, completion.Backend, run);
         }
         _deps.FreshModelHandled(completion.ModelPath);
     }
+
+    /// <summary>Decode speed of the winning profile in this run, as measured; null when none was measured.</summary>
+    internal static double? MeasuredTokensPerSecond(RuntimeOptimizationRun run)
+    {
+        if (run.Winner is null) return null;
+        return run.ServerCandidates.FirstOrDefault(c => c.Status == "completed" && c.Profile.Id == run.Winner.Id)?.DecodeTokensPerSecond;
+    }
+
+    /// <summary>
+    /// Terminal state when nothing beat the current settings: says what was measured and attaches concrete next steps. The
+    /// offline suggestions are published at once; repository-backed ones (smaller quantization, draft head) follow if the
+    /// read-only listing answers within the timeout. Never downloads anything and never throws.
+    /// </summary>
+    private void PublishOptimal(ModelTuningTracker tracker, string tuningId, string modelPath, string backend, RuntimeOptimizationRun run)
+    {
+        double? tps = MeasuredTokensPerSecond(run);
+        TextTuningFacts? facts = null;
+        try { facts = _deps.TextFacts?.Invoke(modelPath, backend, run.Winner, tps); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { Trace.TraceWarning("Tuning facts unavailable: " + ex.Message); }
+        bool listing = facts is not null && _deps.RepoListing is not null;
+        IReadOnlyList<ModelTuningSuggestionDto> offline = facts is null
+            ? TuningSuggestions.ForText(GenericFacts(modelPath, tps), null, null, final: true)
+            : TuningSuggestions.ForText(facts, null, null, final: !listing);
+        tracker.Optimal(tuningId, TuningSuggestions.OptimalText(tps), offline);
+        if (!listing) return;
+        Func<string, CancellationToken, Task<(string? RepoId, IReadOnlyList<(string FileName, long SizeBytes)> Files)>> list = _deps.RepoListing!;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                (string? repo, IReadOnlyList<(string FileName, long SizeBytes)> files) = await list(modelPath, timeout.Token).ConfigureAwait(false);
+                tracker.SetSuggestions(tuningId, TuningSuggestions.ForText(facts!, files, repo, final: true));
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // Offline or unknown repository: finish with what is known locally so the card is never left half-written.
+                Trace.TraceInformation("Tuning repository suggestions unavailable: " + ex.Message);
+                tracker.SetSuggestions(tuningId, TuningSuggestions.ForText(facts!, null, null, final: true));
+            }
+        });
+    }
+
+    private static TextTuningFacts GenericFacts(string modelPath, double? tps) =>
+        new(Path.GetFileName(modelPath), 0, string.Empty, false, 0, 0, tps, 0, null, false, "chat");
 }
 
 internal sealed class IdleCalibrationStatus

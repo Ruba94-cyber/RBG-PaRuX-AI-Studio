@@ -96,6 +96,49 @@ public sealed class ModelTuningPresenterTests
     }
 
     [Fact]
+    public void An_already_optimal_result_shows_what_was_measured_and_the_concrete_next_steps_in_the_infobar_text()
+    {
+        ModelTuningItemDto item = Item("skipped", reason: "Already optimal for this PC (measured 51.2 tok/s)");
+        item.Suggestions = new List<ModelTuningSuggestionDto>
+        {
+            new() { Kind = "smaller_quant", Title = "Try the Q4_K_M version of this model", ExpectedGain = "about +60% tokens/s from the smaller file (estimate)",
+                ActionKind = "download_file", FileName = "Qwen3-8B-Q4_K_M.gguf", SizeBytes = 5L << 30 },
+            new() { Kind = "switch_backend", Title = "Use the CUDA runtime build", ExpectedGain = "often faster (estimate)", ActionKind = "open_runtime_manager" },
+            new() { Kind = "lower_context", Title = "Lower the context window to 16,384 tokens", ExpectedGain = "frees 1.0 GiB (estimate)", ActionKind = "info" },
+            new() { Kind = "info", Title = "A fourth suggestion is not spelled out in the InfoBar", ActionKind = "info" }
+        };
+
+        ModelTuningViewModel vm = ModelTuningPresenter.Present(Status(item), Now);
+
+        Assert.Equal("Already optimal for this PC (measured 51.2 tok/s)", vm.Detail);
+        Assert.StartsWith("Next steps: 1. Try the Q4_K_M version of this model - about +60% tokens/s from the smaller file (estimate)", vm.ProposalText);
+        Assert.Contains("[Qwen3-8B-Q4_K_M.gguf, 5120 MB; choose it in Model Hub]", vm.ProposalText);
+        Assert.Contains("2. Use the CUDA runtime build - often faster (estimate) [Runtime Manager]", vm.ProposalText);
+        Assert.Contains("3. Lower the context window", vm.ProposalText);
+        Assert.DoesNotContain("fourth", vm.ProposalText);
+        Assert.EndsWith("Nothing is downloaded unless you choose it.", vm.ProposalText);
+    }
+
+    [Fact]
+    public void Suggestions_survive_the_server_json_and_the_draft_head_hint_is_not_repeated_when_a_draft_suggestion_exists()
+    {
+        ModelTuningStatusDto parsed = ModelTuningPresenter.Parse(
+            "{\"items\":[{\"id\":\"a\",\"kind\":\"text\",\"modelLabel\":\"m\",\"state\":\"skipped\",\"reason\":\"Already optimal for this PC (measured 40.0 tok/s)\","
+            + "\"proposal\":{\"kind\":\"draft_head\",\"repoId\":\"o/r\",\"fileName\":\"d.gguf\",\"sizeBytes\":314572800},"
+            + "\"suggestions\":[{\"kind\":\"draft_model\",\"title\":\"Add a speculative-decoding draft head\",\"expectedGain\":\"typically 1.3x to 2x (estimate)\","
+            + "\"actionKind\":\"download_file\",\"repoId\":\"o/r\",\"fileName\":\"d.gguf\",\"sizeBytes\":314572800}],\"updatedUtc\":\"2026-10-27T12:00:00Z\"}],\"active\":false}");
+        ModelTuningViewModel vm = ModelTuningPresenter.Present(parsed, Now);
+        Assert.Contains("d.gguf, 300 MB", vm.ProposalText);
+        Assert.DoesNotContain("A draft head would speed this model up", vm.ProposalText);
+    }
+
+    [Fact]
+    public void A_result_without_suggestions_or_proposal_has_no_extra_text()
+    {
+        Assert.Null(ModelTuningPresenter.Present(Status(Item("skipped", reason: "Cancelled by you")), Now).ProposalText);
+    }
+
+    [Fact]
     public void The_server_json_parses_and_the_settings_explanation_names_the_safety_gates()
     {
         ModelTuningStatusDto parsed = ModelTuningPresenter.Parse(
