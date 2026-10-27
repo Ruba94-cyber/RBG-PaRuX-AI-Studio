@@ -1,0 +1,410 @@
+{
+ "_comment": "Tensor names and shapes copied from the safetensors header of the real file at https://huggingface.co/Lightricks/LTX-Video/resolve/8984fa25007f376c1a299016d0957a37a2f797bb/ltx-video-2b-v0.9.5.safetensors (944 tensors in the full header; only a representative subset is kept). Read with an HTTP range request; no weights were downloaded.",
+ "source": "https://huggingface.co/Lightricks/LTX-Video/resolve/8984fa25007f376c1a299016d0957a37a2f797bb/ltx-video-2b-v0.9.5.safetensors",
+ "fullTensorCount": 944,
+ "tensors": [
+  {
+   "name": "model.diffusion_model.adaln_single.emb.timestep_embedder.linear_1.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.adaln_single.emb.timestep_embedder.linear_1.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    256
+   ]
+  },
+  {
+   "name": "model.diffusion_model.adaln_single.emb.timestep_embedder.linear_2.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.adaln_single.emb.timestep_embedder.linear_2.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.adaln_single.linear.bias",
+   "dtype": "BF16",
+   "shape": [
+    12288
+   ]
+  },
+  {
+   "name": "model.diffusion_model.adaln_single.linear.weight",
+   "dtype": "BF16",
+   "shape": [
+    12288,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.caption_projection.linear_1.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.caption_projection.linear_1.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    4096
+   ]
+  },
+  {
+   "name": "model.diffusion_model.caption_projection.linear_2.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.caption_projection.linear_2.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.patchify_proj.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.patchify_proj.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    128
+   ]
+  },
+  {
+   "name": "model.diffusion_model.proj_out.bias",
+   "dtype": "BF16",
+   "shape": [
+    128
+   ]
+  },
+  {
+   "name": "model.diffusion_model.proj_out.weight",
+   "dtype": "BF16",
+   "shape": [
+    128,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.scale_shift_table",
+   "dtype": "BF16",
+   "shape": [
+    2,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn1.k_norm.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn1.q_norm.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn1.to_k.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn1.to_k.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn1.to_out.0.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn1.to_out.0.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn1.to_q.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn1.to_q.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn1.to_v.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn1.to_v.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn2.k_norm.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn2.q_norm.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn2.to_k.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn2.to_k.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn2.to_out.0.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn2.to_out.0.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn2.to_q.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn2.to_q.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn2.to_v.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.attn2.to_v.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.ff.net.0.proj.bias",
+   "dtype": "BF16",
+   "shape": [
+    8192
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.ff.net.0.proj.weight",
+   "dtype": "BF16",
+   "shape": [
+    8192,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.ff.net.2.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.ff.net.2.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    8192
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.0.scale_shift_table",
+   "dtype": "BF16",
+   "shape": [
+    6,
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.27.attn1.to_q.bias",
+   "dtype": "BF16",
+   "shape": [
+    2048
+   ]
+  },
+  {
+   "name": "model.diffusion_model.transformer_blocks.27.attn1.to_q.weight",
+   "dtype": "BF16",
+   "shape": [
+    2048,
+    2048
+   ]
+  },
+  {
+   "name": "vae.decoder.conv_in.conv.bias",
+   "dtype": "BF16",
+   "shape": [
+    1024
+   ]
+  },
+  {
+   "name": "vae.decoder.conv_in.conv.weight",
+   "dtype": "BF16",
+   "shape": [
+    1024,
+    128,
+    3,
+    3,
+    3
+   ]
+  },
+  {
+   "name": "vae.decoder.conv_out.conv.bias",
+   "dtype": "BF16",
+   "shape": [
+    48
+   ]
+  },
+  {
+   "name": "vae.decoder.conv_out.conv.weight",
+   "dtype": "BF16",
+   "shape": [
+    48,
+    128,
+    3,
+    3,
+    3
+   ]
+  },
+  {
+   "name": "vae.encoder.conv_in.conv.bias",
+   "dtype": "BF16",
+   "shape": [
+    128
+   ]
+  },
+  {
+   "name": "vae.encoder.conv_in.conv.weight",
+   "dtype": "BF16",
+   "shape": [
+    128,
+    48,
+    3,
+    3,
+    3
+   ]
+  },
+  {
+   "name": "vae.per_channel_statistics.channel",
+   "dtype": "BF16",
+   "shape": [
+    128
+   ]
+  },
+  {
+   "name": "vae.per_channel_statistics.mean-of-means",
+   "dtype": "BF16",
+   "shape": [
+    128
+   ]
+  },
+  {
+   "name": "vae.per_channel_statistics.mean-of-stds",
+   "dtype": "BF16",
+   "shape": [
+    128
+   ]
+  },
+  {
+   "name": "vae.per_channel_statistics.mean-of-stds_over_std-of-means",
+   "dtype": "BF16",
+   "shape": [
+    128
+   ]
+  },
+  {
+   "name": "vae.per_channel_statistics.std-of-means",
+   "dtype": "BF16",
+   "shape": [
+    128
+   ]
+  }
+ ]
+}

@@ -49,7 +49,8 @@ internal sealed record RegistryFamily(
     RegistrySignature Signature,
     IReadOnlyList<RegistryCompanion> Companions,
     string? MinComfyUiVersion = null,
-    IReadOnlyDictionary<string, string>? PipelineTemplates = null)
+    IReadOnlyDictionary<string, string>? PipelineTemplates = null,
+    string? StartImageTemplate = null)
 {
     public bool IsSupported => Support == "supported";
 
@@ -62,9 +63,11 @@ internal sealed record RegistryFamily(
         return PipelineTemplates is not null && PipelineTemplates.TryGetValue(pipeline, out string? own) ? own : TemplateFile;
     }
 
-    /// <summary>Every template file this family can submit.</summary>
+    /// <summary>Every template file this family can submit, including the video start-image template when it has one.</summary>
     public IEnumerable<string> AllTemplateFiles =>
-        Pipelines.Select(TemplateFor).Where(file => file != null).Select(file => file!).Distinct(StringComparer.Ordinal);
+        Pipelines.Select(TemplateFor).Where(file => file != null).Select(file => file!)
+            .Concat(StartImageTemplate is null ? Array.Empty<string>() : new[] { StartImageTemplate })
+            .Distinct(StringComparer.Ordinal);
 }
 
 internal sealed record RegistryEmbeddedStems(IReadOnlyList<string> TextEncoder, IReadOnlyList<string> Vae);
@@ -207,7 +210,7 @@ internal sealed class MediaCompanionRegistry
     private static RegistryFamily ParseFamily(JsonObject family)
     {
         AllowOnly(family, "family", "id", "displayName", "support", "reason", "pipelines", "templateFile",
-            "mainLoader", "requiredNodes", "signature", "companions", "minComfyUiVersion", "pipelineTemplates");
+            "mainLoader", "requiredNodes", "signature", "companions", "minComfyUiVersion", "pipelineTemplates", "startImageTemplate");
 
         string id = Str(family, "family", "id", 40);
         if (!FamilyIdPattern.IsMatch(id)) throw Invalid("family id \"" + id + "\" is not a lowercase slug.");
@@ -267,6 +270,16 @@ internal sealed class MediaCompanionRegistry
             }
         }
 
+        string? startImageTemplate = OptStr(family, where, "startImageTemplate", 120);
+        if (startImageTemplate != null)
+        {
+            if (support != "supported" || !pipelines.Contains("video", StringComparer.Ordinal))
+                throw Invalid(where + ": only a supported video family may name a start-image template.");
+            if (!startImageTemplate.EndsWith(".json", StringComparison.Ordinal) || startImageTemplate.Contains('/')
+                || startImageTemplate.Contains('\\') || startImageTemplate.Contains(".."))
+                throw Invalid(where + ": start-image template \"" + startImageTemplate + "\" must be a plain .json file name.");
+        }
+
         List<string> requiredNodes = StringArray(family, where, "requiredNodes", required: false, maxItems: 64).ToList();
         if (support == "supported" && requiredNodes.Count == 0) throw Invalid(where + ": a supported family must list the ComfyUI nodes it needs.");
 
@@ -305,7 +318,7 @@ internal sealed class MediaCompanionRegistry
         }
 
         return new RegistryFamily(id, displayName, support, reason, pipelines, templateFile, mainLoader,
-            requiredNodes, new RegistrySignature(required, forbidden, shapeChecks), companions, minComfyUi, pipelineTemplates);
+            requiredNodes, new RegistrySignature(required, forbidden, shapeChecks), companions, minComfyUi, pipelineTemplates, startImageTemplate);
     }
 
     private static RegistryCompanion ParseCompanion(JsonObject companion, string where, string support)

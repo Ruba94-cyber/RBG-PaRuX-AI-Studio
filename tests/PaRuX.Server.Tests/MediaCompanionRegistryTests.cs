@@ -109,7 +109,7 @@ public sealed class MediaCompanionRegistryTests : IDisposable
         string[] supported = MediaCompanionRegistry.Shipped.Families
             .Where(family => family.IsSupported).Select(family => family.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray();
 
-        Assert.Equal(new[] { "chroma", "flux1-schnell", "flux2-klein", "qwen-image", "sdxl", "wan2.2-ti2v-5b", "z-image" }, supported);
+        Assert.Equal(new[] { "chroma", "flux1-schnell", "flux2-klein", "ltx-video", "qwen-image", "sdxl", "wan2.2-ti2v-5b", "z-image" }, supported);
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public sealed class MediaCompanionRegistryTests : IDisposable
             MediaCompanionRegistry.Shipped.SupportedFor("image").Select(family => family.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray());
         Assert.Equal(new[] { "flux2-klein", "qwen-image" },
             MediaCompanionRegistry.Shipped.SupportedFor("edit").Select(family => family.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray());
-        Assert.Equal("wan2.2-ti2v-5b", Assert.Single(MediaCompanionRegistry.Shipped.SupportedFor("video")).Id);
+        Assert.Equal(new[] { "ltx-video", "wan2.2-ti2v-5b" }, MediaCompanionRegistry.Shipped.SupportedFor("video").Select(family => family.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray());
         Assert.Empty(MediaCompanionRegistry.Shipped.SupportedFor("upscale"));
     }
 

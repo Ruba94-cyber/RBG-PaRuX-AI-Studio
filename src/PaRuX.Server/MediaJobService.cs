@@ -428,6 +428,7 @@ public sealed class MediaJobService
                 VideoClipSeeds = new List<long>(intent.VideoClipSeeds),
                 ClientIds = new List<string>(intent.ClientIds),
                 PromptIds = new List<string>(intent.PromptIds),
+                VideoFamilyId = intent.VideoFamilyId,
                 VideoRunId = intent.VideoRunId,
                 VideoPrompt = intent.VideoPrompt,
                 VideoRequestedFrames = intent.VideoRequestedFrames,
@@ -471,6 +472,7 @@ public sealed class MediaJobService
             VideoClipSeeds = record.VideoClipSeeds == null ? new List<long>() : new List<long>(record.VideoClipSeeds),
             ClientIds = new List<string>(record.ClientIds),
             PromptIds = new List<string>(record.PromptIds),
+            VideoFamilyId = record.VideoFamilyId,
             VideoRunId = record.VideoRunId,
             VideoPrompt = record.VideoPrompt,
             VideoRequestedFrames = record.VideoRequestedFrames,
@@ -586,6 +588,7 @@ public sealed class MediaJobService
         ComfyWorkflowRunner.VideoPlanObserver.Value = (prompt, seeds) => RecordVideoPlan(entry, prompt, seeds);
         ComfyWorkflowRunner.VideoClipPlanObserver.Value = (runId, prompt, requestedFrames, frameCounts) =>
             RecordVideoClipPlan(entry, runId, prompt, requestedFrames, frameCounts);
+        ComfyWorkflowRunner.VideoFamilyObserver.Value = familyId => { lock (entry.Gate) entry.Intent.VideoFamilyId = familyId; };
         ComfyWorkflowRunner.VideoClipObserver.Value = (index, clientId, promptId, outputPath) =>
             RecordVideoClip(entry, index, clientId, promptId, outputPath);
         ComfyWorkflowRunner.VideoFinalOutputObserver.Value = path => RecordVideoFinalOutput(entry, path);
@@ -596,6 +599,7 @@ public sealed class MediaJobService
         ComfyWorkflowRunner.SubmissionObserver.Value = null;
         ComfyWorkflowRunner.VideoPlanObserver.Value = null;
         ComfyWorkflowRunner.VideoClipPlanObserver.Value = null;
+        ComfyWorkflowRunner.VideoFamilyObserver.Value = null;
         ComfyWorkflowRunner.VideoClipObserver.Value = null;
         ComfyWorkflowRunner.VideoFinalOutputObserver.Value = null;
     }

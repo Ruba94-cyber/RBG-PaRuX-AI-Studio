@@ -23,7 +23,10 @@ public sealed class MediaFamilyTemplateStructureTests
     /// <summary>(family id, pipeline, template file) for every pipeline of every supported family.</summary>
     public static IEnumerable<object[]> Templates() =>
         MediaCompanionRegistry.Shipped.Families.Where(family => family.IsSupported)
-            .SelectMany(family => family.Pipelines.Select(pipeline => new object[] { family.Id, pipeline, family.TemplateFor(pipeline)! }));
+            .SelectMany(family => family.Pipelines.Select(pipeline => new object[] { family.Id, pipeline, family.TemplateFor(pipeline)! })
+                // A video family's start-image template is a second graph the runner submits; it gets the same structural proof.
+                .Concat(family.StartImageTemplate is null ? Array.Empty<object[]>()
+                    : new[] { new object[] { family.Id, "video-start-image", family.StartImageTemplate } }));
 
     private static JsonObject LoadPrompt(string templateFile)
     {
