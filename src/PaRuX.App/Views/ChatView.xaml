@@ -579,6 +579,7 @@
                 VerticalScrollBarVisibility="Disabled"
                 VerticalScrollMode="Disabled">
                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}" Margin="12,0,0,0">
+                <StackPanel x:Name="TuningStatusHost" Orientation="Horizontal" VerticalAlignment="Center" />
                 <StackPanel Orientation="Horizontal" Spacing="2">
                     <Button
                         x:Name="CodeFolderButton"

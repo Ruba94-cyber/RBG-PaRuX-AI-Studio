@@ -700,6 +700,23 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
         return new ModelRepoDetails { RepoId = details.RepoId, License = details.License, Revision = details.Revision };
     }
 
+    /// <summary>The Hugging Face repository a managed file was downloaded from, or null when unknown (imported / user-placed files).</summary>
+    internal static string? RepoIdFor(string fileName) =>
+        LoadRepoIds().TryGetValue(Path.GetFileName(fileName), out string? repo) && !string.IsNullOrWhiteSpace(repo) ? repo : null;
+
+    /// <summary>Read-only listing of the GGUF files of one repository (name, size). Nothing is downloaded.</summary>
+    internal async Task<IReadOnlyList<(string FileName, long SizeBytes)>> ListRepoGgufFilesAsync(string repoId, CancellationToken ct)
+    {
+        string[] repoParts = (repoId ?? string.Empty).Trim().Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (repoParts.Length != 2 || repoParts.Any(part => !IsSafeRepoPart(part)))
+            return Array.Empty<(string, long)>();
+        HfModelDetail? detail = await FetchHfModelDetailAsync(repoParts[0] + "/" + repoParts[1], ct).ConfigureAwait(false);
+        return (detail?.Siblings ?? new List<HfSibling>())
+            .Where(s => s.RFilename.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase))
+            .Select(s => (s.RFilename.Replace('\\', '/'), s.Size ?? s.Lfs?.Size ?? 0L))
+            .ToList();
+    }
+
     private async Task<HfModelDetail?> FetchHfModelDetailAsync(string repoId, CancellationToken ct)
     {
         string url = "https://huggingface.co/api/models/" + repoId + "?blobs=true";
@@ -2536,6 +2553,13 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
             _completionHandler?.OnGgufDownloaded(finalPath, Path.GetFileNameWithoutExtension(finalPath));
         else if (entry.SplitSet is { } completedSet && completedSet.TryMarkLanded(entry.Status.FileName))
             _completionHandler?.OnGgufDownloaded(completedSet.FirstPartPath, completedSet.Label);
+
+        if (!string.IsNullOrWhiteSpace(request.MediaCheckpointType))
+        {
+            // Media checkpoints join the automatic "tuning for your PC" queue; a failing observer never fails the download.
+            try { _completionHandler?.OnMediaCheckpointDownloaded(finalPath, Path.GetFileNameWithoutExtension(finalPath)); }
+            catch (Exception ex) when (ex is not OutOfMemoryException) { System.Diagnostics.Trace.TraceWarning("Media tuning hand-off failed: " + ex.Message); }
+        }
 
         ModelDownloadLicenseEvidence capturedLicense = request.LicenseEvidence ?? new ModelDownloadLicenseEvidence();
         var sourceIdentity = ModelDownloadProvenanceManifestStore.SourceIdentityFromValidatedUrl(

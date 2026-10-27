@@ -113,6 +113,7 @@ namespace PaRuX.Views
             statusBlock.Children.Add(top);
             statusBlock.Children.Add(_progress);
             statusBlock.Children.Add(_status);
+            statusBlock.Children.Add(new ModelTuningStatusControl(ModelTuningStatusControl.Mode.Line, "media"));
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_status, "Create_Operation_Status_Text");
             statusBlock.Children.Add(_lastOutput);
             statusBlock.Children.Add(BuildResultStrip());

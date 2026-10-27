@@ -560,9 +560,15 @@ public static class LocalAiPaths
         if (normalized == "standard" && IsFallbackOnlyModel(modelPath))
             throw new InvalidDataException("Qwen3.5-4B is a fallback-only model and cannot replace the Qwen3.8-27B Standard profile.");
 
-        using ManualSelectionGate.WriteLease writeLease = ManualSelectionGate.AcquireWrite();
-        SetRoleOverrideUnderLease(normalized, modelPath, origin);
+        using (ManualSelectionGate.WriteLease writeLease = ManualSelectionGate.AcquireWrite())
+            SetRoleOverrideUnderLease(normalized, modelPath, origin);
+        // Observers (automatic tuning) run after the lease is released; a failing observer never fails the assignment.
+        try { RoleModelAssigned?.Invoke(normalized, modelPath); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { System.Diagnostics.Trace.TraceWarning("Role assignment observer failed: " + ex.Message); }
     }
+
+    /// <summary>Raised after a role is pointed at a real GGUF file (role, path). Used to queue the automatic per-PC tuning.</summary>
+    internal static event Action<string, string>? RoleModelAssigned;
 
     private static void SetRoleOverrideUnderLease(string normalized, string modelPath, string origin)
     {

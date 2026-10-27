@@ -114,6 +114,7 @@ builder.Services.AddSingleton<IContinuousSpeechStatusProvider>(services => servi
 builder.Services.AddSingleton<IContinuousSpeechStreamWorker>(services =>
     ContinuousTtsWorker.For(services.GetRequiredService<LocalRuntimeService>()));
 builder.Services.AddSingleton<ModelBenchmarkStore>();
+builder.Services.AddSingleton(_ => new ModelTuningTracker());
 builder.Services.AddSingleton<IModelBenchmarkRunner, LlamaBenchRunner>();
 builder.Services.AddSingleton<ModelBenchmarkService>();
 builder.Services.AddModelArenaServices();
@@ -121,7 +122,12 @@ builder.Services.AddSingleton<IModelDestinationSpaceProvider, ModelDestinationSp
 builder.Services.AddSingleton<PaRuX.Server.Orchestration.Gaming.IGamingResumable>(services => services.GetRequiredService<ModelDownloadService>());
 builder.Services.AddSingleton<ModelDownloadService>(services => new ModelDownloadService(
     completionHandler: new PostDownloadOptimizationHandler(
-        services.GetRequiredService<ModelBenchmarkService>(), new PostDownloadOptimizationQueue()),
+        services.GetRequiredService<ModelBenchmarkService>(), new PostDownloadOptimizationQueue(),
+        services.GetRequiredService<ModelTuningTracker>(),
+        // Resolved lazily: the maintenance service (and so the media optimiser) is built after the download service.
+        queueMedia: (path, label) => services.GetService<AutoMaintenanceService>()?.MediaOptimizer?.QueueCheckpoint(path, label),
+        repoIdFor: path => ModelDownloadService.RepoIdFor(path),
+        listRepoFiles: (repo, ct) => services.GetRequiredService<ModelDownloadService>().ListRepoGgufFilesAsync(repo, ct)),
     destinationSpaceProvider: services.GetRequiredService<IModelDestinationSpaceProvider>(),
     stateDirectory: ServerState.StateDirectory,
     scanOrphanPartials: true));
