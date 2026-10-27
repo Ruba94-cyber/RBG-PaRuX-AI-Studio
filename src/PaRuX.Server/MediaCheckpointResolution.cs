@@ -62,21 +62,22 @@ internal static class MediaCheckpointResolution
     private static MediaCheckpointEffective WithFamilyTemplate(MediaCheckpointEffective effective)
     {
         if (!effective.IsOverridden || string.IsNullOrWhiteSpace(effective.File)) return effective;
-        string? template = FamilyTemplateFile(effective.Type, effective.File);
-        if (template is null || string.Equals(template, effective.TemplateFile, StringComparison.Ordinal)) return effective;
+        (string Template, RegistryMainLoader? Loader)? own = FamilyTemplate(effective.Type, effective.File);
+        if (own is null || string.Equals(own.Value.Template, effective.TemplateFile, StringComparison.Ordinal)) return effective;
+        string loader = own.Value.Loader is { } main ? main.ClassType + "." + main.Input : "UNETLoader.unet_name";
         return effective with
         {
-            TemplateFile = template,
-            ReplacesInputs = new[] { "UNETLoader.unet_name (node " + UnetNode + " of " + template + ")" }
+            TemplateFile = own.Value.Template,
+            ReplacesInputs = new[] { loader + " (node " + UnetNode + " of " + own.Value.Template + ")" }
         };
     }
 
-    private static string? FamilyTemplateFile(string type, string file)
+    private static (string Template, RegistryMainLoader? Loader)? FamilyTemplate(string type, string file)
     {
         MediaFamilyDetection? detection = DetectInstalledFamily(Path.Combine(LocalAiPaths.DiffusionModelsPath, file));
         if (detection?.FamilyId is null) return null;
         RegistryFamily? family = MediaCompanionRegistry.Shipped.FindFamily(detection.FamilyId);
-        return family is { IsSupported: true } ? family.TemplateFor(type) : null;
+        return family is { IsSupported: true } && family.TemplateFor(type) is { } template ? (template, family.MainLoader) : null;
     }
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, MediaFamilyDetection> DetectionCache =

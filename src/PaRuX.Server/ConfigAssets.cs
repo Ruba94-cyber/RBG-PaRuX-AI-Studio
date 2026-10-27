@@ -40,6 +40,8 @@ internal static class ConfigAssets
         "z-image-img2img-api.json",
         "flux2-klein-edit-api.json",
         "wan-video-smoke-api.json",
+        "ltxv-t2v-api.json",
+        "ltxv-i2v-api.json",
         "upscale-api.json"
     };
 

@@ -40,6 +40,13 @@
       "optional": [],
       "outputs": 1
     },
+    "CheckpointLoaderSimple": {
+      "required": [
+        "ckpt_name"
+      ],
+      "optional": [],
+      "outputs": 3
+    },
     "ConditioningZeroOut": {
       "required": [
         "conditioning"
@@ -64,6 +71,16 @@
       "required": [
         "batch_size",
         "height",
+        "width"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "EmptyLTXVLatentVideo": {
+      "required": [
+        "batch_size",
+        "height",
+        "length",
         "width"
       ],
       "optional": [],
@@ -135,6 +152,43 @@
       "optional": [],
       "outputs": 1
     },
+    "LTXVConditioning": {
+      "required": [
+        "frame_rate",
+        "negative",
+        "positive"
+      ],
+      "optional": [],
+      "outputs": 2
+    },
+    "LTXVImgToVideo": {
+      "required": [
+        "batch_size",
+        "height",
+        "image",
+        "length",
+        "negative",
+        "positive",
+        "strength",
+        "vae",
+        "width"
+      ],
+      "optional": [],
+      "outputs": 3
+    },
+    "LTXVScheduler": {
+      "required": [
+        "base_shift",
+        "max_shift",
+        "steps",
+        "stretch",
+        "terminal"
+      ],
+      "optional": [
+        "latent"
+      ],
+      "outputs": 1
+    },
     "LoadImage": {
       "required": [
         "image"
@@ -175,6 +229,21 @@
         "latent"
       ],
       "outputs": 1
+    },
+    "SamplerCustom": {
+      "required": [
+        "add_noise",
+        "cfg",
+        "latent_image",
+        "model",
+        "negative",
+        "noise_seed",
+        "positive",
+        "sampler",
+        "sigmas"
+      ],
+      "optional": [],
+      "outputs": 2
     },
     "SamplerCustomAdvanced": {
       "required": [

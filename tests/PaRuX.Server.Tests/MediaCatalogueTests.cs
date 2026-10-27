@@ -73,9 +73,9 @@ public sealed class MediaCatalogueTests : IDisposable
     public void Shipped_catalogue_loads_and_marks_only_validated_families_supported()
     {
         MediaCatalogue c = MediaCatalogue.Shipped;
-        Assert.Equal(new[] { "flux2-klein", "qwen-image", "qwen-image-edit", "wan2.2-ti2v-5b", "z-image" },
+        Assert.Equal(new[] { "flux2-klein", "ltx-video", "qwen-image", "qwen-image-edit", "wan2.2-ti2v-5b", "z-image" },
             c.Families.Where(f => f.IsSupported).Select(f => f.Id).OrderBy(x => x, StringComparer.Ordinal).ToArray());
-        foreach (string id in new[] { "qwen-image-gguf", "wan2.2-14b", "ltx-video", "ace-step" })
+        foreach (string id in new[] { "qwen-image-gguf", "wan2.2-14b", "ace-step" })
         {
             MediaCatalogueFamily f = c.Families.Single(x => x.Id == id);
             Assert.Equal("resolver_only", f.Support);

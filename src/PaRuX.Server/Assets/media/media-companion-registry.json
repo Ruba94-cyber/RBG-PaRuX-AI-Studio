@@ -232,6 +232,75 @@
       ]
     },
     {
+      "id": "ltx-video",
+      "displayName": "LTX-Video 2B",
+      "support": "supported",
+      "pipelines": [
+        "video"
+      ],
+      "templateFile": "ltxv-t2v-api.json",
+      "startImageTemplate": "ltxv-i2v-api.json",
+      "mainLoader": {
+        "node": "1",
+        "classType": "CheckpointLoaderSimple",
+        "input": "ckpt_name",
+        "folder": "diffusion_models"
+      },
+      "requiredNodes": [
+        "CheckpointLoaderSimple",
+        "CLIPLoader",
+        "CLIPTextEncode",
+        "EmptyLTXVLatentVideo",
+        "LTXVImgToVideo",
+        "LTXVConditioning",
+        "LTXVScheduler",
+        "KSamplerSelect",
+        "SamplerCustom",
+        "VAEDecode",
+        "LoadImage",
+        "CreateVideo",
+        "SaveVideo"
+      ],
+      "signature": {
+        "requiredStems": [
+          "model.diffusion_model.transformer_blocks.",
+          "model.diffusion_model.patchify_proj.",
+          "model.diffusion_model.caption_projection.",
+          "vae.decoder."
+        ],
+        "forbiddenStems": [],
+        "shapeChecks": [
+          {
+            "tensor": "model.diffusion_model.patchify_proj.weight",
+            "dim": 0,
+            "equals": 2048
+          },
+          {
+            "tensor": "model.diffusion_model.patchify_proj.weight",
+            "dim": 1,
+            "equals": 128
+          }
+        ]
+      },
+      "companions": [
+        {
+          "role": "text_encoder",
+          "folder": "text_encoders",
+          "fileName": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+          "clipType": "ltxv",
+          "sharedWith": [],
+          "source": {
+            "repository": "comfyanonymous/flux_text_encoders",
+            "path": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+            "revision": "6af2a98e3f615bdfa612fbd85da93d1ed5f69ef5",
+            "sizeBytes": 5157348688,
+            "sha256": "a498f0485dc9536735258018417c3fd7758dc3bccc0a645feaa472b34955557a"
+          },
+          "license": "apache-2.0"
+        }
+      ]
+    },
+    {
       "id": "flux1",
       "displayName": "FLUX.1 (schnell, dev)",
       "support": "resolver_only",

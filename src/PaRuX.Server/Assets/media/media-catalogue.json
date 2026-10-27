@@ -115,15 +115,14 @@
       ]
     },
     {
-      "id": "ltx-video", "displayName": "LTX-Video 2B", "capability": "video.generate", "support": "resolver_only",
-      "reason": "PaRuX does not run LTX-Video yet. Its checkpoint embeds its own VAE and ComfyUI loads it as a full checkpoint, while PaRuX's video workflow takes a diffusion model plus a separate VAE file and drives the Wan graph's latent, sampler and start-image nodes. An LTX graph needs its own video runner contract (including image-to-video continuation) before it can be offered.",
-      "registryFamily": null, "parametersBillion": 2.0, "textEncoderGb": 4.9, "vaeGb": 0.0,
+      "id": "ltx-video", "displayName": "LTX-Video 2B", "capability": "video.generate", "support": "supported",
+      "registryFamily": "ltx-video", "parametersBillion": 2.0, "textEncoderGb": 5.2, "vaeGb": 0.0,
       "strengths": ["fast", "cinematic"],
       "variants": [
         { "id": "ltx-video-2b-v095", "title": "LTX-Video 2B v0.9.5", "lane": "standard", "precision": "bf16",
           "repository": "Lightricks/LTX-Video", "path": "ltx-video-2b-v0.9.5.safetensors", "revision": "8984fa25007f376c1a299016d0957a37a2f797bb", "fileName": "ltx-video-2b-v0.9.5.safetensors",
-          "sha256": "720d15c9f19f7d0f6b2a92bbbc34410e2cfb2f6856a100b38f734fbf973d4adf", "sizeBytes": 6340729500, "sizeBasis": "exact_listing", "license": "LTX-Video Open Weights License (Hugging Face license: other; read the repository's license file before use)", "tier": 3, "listingVerified": true,
-          "baseCompat": "Single-file checkpoint with its own VAE; needs a T5-XXL text encoder. Size, commit and digest were read from the repository listing; listed only, PaRuX cannot run it yet." }
+          "sha256": "720d15c9f19f7d0f6b2a92bbbc34410e2cfb2f6856a100b38f734fbf973d4adf", "sizeBytes": 6340729500, "sizeBasis": "exact_listing", "license": "OpenRAIL-M (LTX Video 2B 0.9.5 licence file in the repository: commercial use allowed, use-based restrictions apply)", "tier": 3, "listingVerified": true,
+          "baseCompat": "Single-file checkpoint (model and VAE in one file) with the t5xxl_fp8_e4m3fn_scaled text encoder. Runs text-to-video and, for a start image or a continued clip, image-to-video. Clips are 9 to 97 frames (8n+1) at sizes that are multiples of 32; 768x512 is the native size. About 6.3 GB of weights, which fit a 16 GB card; not yet timed on this PC. Size, commit and digest were read from the repository listing." }
       ]
     },
     {
