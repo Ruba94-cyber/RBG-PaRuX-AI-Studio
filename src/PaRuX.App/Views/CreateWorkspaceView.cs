@@ -31,6 +31,7 @@ namespace PaRuX.Views
         // One job at a time: starting a second is refused, and the run buttons stay disabled while a job runs.
         private readonly CreateOperationGate _operations = new();
         private readonly List<Button> _runButtons = new();
+        private readonly List<MediaSetupCard> _setupCards = new();
 
         private readonly TextBox _imagePrompt = new TextBox { PlaceholderText = "Describe the image to create", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 72 };
         private readonly NumberBox _imageWidth = DimensionBox(1024);
@@ -72,13 +73,15 @@ namespace PaRuX.Views
             _dispatcher = DispatcherQueue.GetForCurrentThread();
             Content = BuildUi();
             _runButtons.Add(_editRunButton);
-            Unloaded += (_, _) => _operations.CancelActive();
+            Unloaded += (_, _) => { _operations.CancelActive(); foreach (MediaSetupCard card in _setupCards) card.StopPolling(); };
         }
 
         public void OnShown()
         {
-            _status.Text = "Create is ready. Every generation runs locally through PaRuX Core.";
+            _status.Text = CreateSetupStatusLine.Checking;
             SetProvenance(null);
+            foreach (MediaModelRow row in new[] { _imageModelRow, _videoModelRow, _editModelRow }) _ = row.RefreshAsync();
+            foreach (MediaSetupCard card in _setupCards) card.StartPolling();
         }
 
         private UIElement BuildUi()
@@ -101,16 +104,19 @@ namespace PaRuX.Views
                 Opacity = 0.78
             });
 
+            var statusBlock = new StackPanel { Spacing = 8 };
             var top = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             var cancel = new Button { Content = "Cancel active job" };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(cancel, "Create_Cancel_Active_Job_Button");
             cancel.Click += (_, _) => CancelActive();
             top.Children.Add(cancel);
-            body.Children.Add(top);
-            body.Children.Add(_progress);
-            body.Children.Add(_status);
+            statusBlock.Children.Add(top);
+            statusBlock.Children.Add(_progress);
+            statusBlock.Children.Add(_status);
+            statusBlock.Children.Add(new ModelTuningStatusControl(ModelTuningStatusControl.Mode.Line, "media"));
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_status, "Create_Operation_Status_Text");
-            body.Children.Add(_lastOutput);
+            statusBlock.Children.Add(_lastOutput);
+            statusBlock.Children.Add(BuildResultStrip());
 
             var provenanceRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_provenanceText, MediaProvenanceFormatter.ProvenanceTextAutomationId);
@@ -122,31 +128,110 @@ namespace PaRuX.Views
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_provenanceDetailsButton, "Details");
             _provenanceDetailsButton.Click += (_, _) => ToggleProvenanceDetails();
             provenanceRow.Children.Add(_provenanceDetailsButton);
-            body.Children.Add(provenanceRow);
+            statusBlock.Children.Add(provenanceRow);
 
             _provenanceDetailsPanel.Children.Add(_provenanceDetailsContent);
-            body.Children.Add(_provenanceDetailsPanel);
+            statusBlock.Children.Add(_provenanceDetailsPanel);
 
-            body.Children.Add(Section("IMAGE", BuildImagePanel()));
-            body.Children.Add(Section("VIDEO", BuildVideoPanel()));
-            body.Children.Add(Section("IMAGE EDIT", BuildEditPanel()));
-            body.Children.Add(Section("IMAGE → 3D", BuildThreedPanel()));
-            body.Children.Add(Section("TEXT TO SPEECH", BuildTtsPanel()));
-            body.Children.Add(Section("SPEECH TO TEXT", BuildSttPanel()));
-            body.Children.Add(Section("COMFYUI WORKFLOWS AND LORAS", BuildWorkflowLoraPanel()));
+            // One mode at a time: the long single page made every mode compete for attention. Results, status and setup stay above.
+            var speech = new StackPanel { Spacing = 14 };
+            speech.Children.Add(NewSetupCard("speech", "speech"));
+            speech.Children.Add(Section("TEXT TO SPEECH", BuildTtsPanel()));
+            speech.Children.Add(Section("SPEECH TO TEXT", BuildSttPanel()));
+            var gallery = new MediaGalleryView();
+            gallery.ItemReusedAsEditSource += (_, item) =>
+            {
+                if (item.FilePath is not { Length: > 0 } filePath) return;
+                _editSourcePath = filePath;
+                _editSourceLabel.Text = filePath;
+                SelectMode("Edit");
+            };
+            body.Children.Add(BuildModeTabs(new (string, UIElement)[]
+            {
+                ("Image", Section("IMAGE", BuildImagePanel())),
+                ("Video", Section("VIDEO", BuildVideoPanel())),
+                ("Music", Section("MUSIC", BuildMusicPanel())),
+                ("Edit", Section("IMAGE EDIT", BuildEditPanel())),
+                ("3D", Section("IMAGE → 3D", ThreedWithSetup())),
+                ("Speech", speech),
+                ("Workflows", Section("COMFYUI WORKFLOWS AND LORAS", BuildWorkflowLoraPanel())),
+                ("Gallery", gallery)
+            }));
+            body.Children.Add(statusBlock);
             return scroll;
+        }
+
+        /// <summary>One-click example prompts, so a first-time user sees what to type. Clicking only fills the box.</summary>
+        private static UIElement ExampleChips(TextBox target, string idPrefix, params string[] examples)
+        {
+            var row = new StackPanel { Spacing = 6 };
+            row.Children.Add(new TextBlock { Text = "Try an example, or just ask in Chat (\"create an image of…\", \"crea un'immagine di…\")", FontSize = 12, Opacity = 0.7, TextWrapping = TextWrapping.Wrap });
+            var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            int i = 0;
+            foreach (string example in examples)
+            {
+                var chip = new Button { Content = example.Length > 44 ? example.Substring(0, 41) + "…" : example, Padding = new Thickness(10, 4, 10, 4), FontSize = 12 };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(chip, idPrefix + "_" + (++i));
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(chip, example);
+                string text = example;
+                chip.Click += (_, _) => { target.Text = text; target.Focus(FocusState.Programmatic); };
+                chips.Children.Add(chip);
+            }
+            row.Children.Add(new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalScrollMode = ScrollMode.Auto, Content = chips });
+            return row;
+        }
+
+        /// <summary>One-click aspect-ratio presets that fill the width and height boxes.</summary>
+        private static UIElement SizePresets(string idPrefix, NumberBox width, NumberBox height, params (string Label, int W, int H)[] presets)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            row.Children.Add(new TextBlock { Text = "Size", FontSize = 12, Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center });
+            foreach ((string label, int w, int h) in presets)
+            {
+                var button = new Button { Content = label + " " + w + "×" + h, Padding = new Thickness(10, 3, 10, 3), FontSize = 12 };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(button, idPrefix + "_" + label);
+                int pw = w, ph = h;
+                button.Click += (_, _) => { width.Value = pw; height.Value = ph; };
+                row.Children.Add(button);
+            }
+            return row;
+        }
+
+        private MediaSetupCard NewSetupCard(string type, string label)
+        {
+            var card = new MediaSetupCard(type, label, _dispatcher);
+            if (type == "image")
+                card.StatusChanged += status =>
+                {
+                    if (_operations.IsBusy || _operationMessageSticky || !CreateSetupStatusLine.MayReplace(_status.Text)) return;
+                    _status.Text = CreateSetupStatusLine.For(status.Ready);
+                };
+            _setupCards.Add(card);
+            return card;
         }
 
         private UIElement BuildImagePanel()
         {
             var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(NewSetupCard("image", "image generation"));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_imagePrompt, "Create_Image_Prompt_Box");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_imageWidth, "Create_Image_Width_Box");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_imageHeight, "Create_Image_Height_Box");
             panel.Children.Add(_imagePrompt);
+            panel.Children.Add(ExampleChips(_imagePrompt, "Create_Image_Example",
+                "A cozy cabin in a snowy forest at dusk, warm light in the windows",
+                "Macro photo of a dew-covered spider web at sunrise",
+                "Watercolor portrait of an old sailor with a pipe",
+                "Isometric pixel-art city at night, neon signs"));
             panel.Children.Add(_enhanceImage);
+            panel.Children.Add(_imageModelRow);
             var dimensions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             dimensions.Children.Add(Labeled("Width", _imageWidth));
             dimensions.Children.Add(Labeled("Height", _imageHeight));
             panel.Children.Add(dimensions);
             panel.Children.Add(BuildLoraStackPanel());
+            panel.Children.Add(SizePresets("Create_Image_Size", _imageWidth, _imageHeight,
+                ("Square", 1024, 1024), ("Portrait", 896, 1152), ("Landscape", 1344, 768), ("Phone", 768, 1344)));
             var run = new Button { Content = "Generate image" };
             run.Click += async (_, _) => await GenerateMediaAsync("image");
             _runButtons.Add(run);
@@ -154,6 +239,10 @@ namespace PaRuX.Views
             return panel;
         }
 
+        // Model + content lane per generating tab. Edit follows its mode: instruction edits use the edit checkpoint, variations the image one.
+        private readonly MediaModelRow _imageModelRow = new MediaModelRow("image", "Create_Image");
+        private readonly MediaModelRow _videoModelRow = new MediaModelRow("video", "Create_Video");
+        private readonly MediaModelRow _editModelRow = new MediaModelRow("edit", "Create_Edit");
         private readonly CheckBox _enhanceImage = MediaPromptEnhancerUi.CreateToggle();
         private readonly CheckBox _enhanceVideo = MediaPromptEnhancerUi.CreateToggle("_Video");
         private IReadOnlyDictionary<string, string>? _pendingEnhancementDetails;
@@ -175,11 +264,22 @@ namespace PaRuX.Views
         private UIElement BuildVideoPanel()
         {
             var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(NewSetupCard("video", "video generation"));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_videoPrompt, "Create_Video_Prompt_Box");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_videoWidth, "Create_Video_Width_Box");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_videoHeight, "Create_Video_Height_Box");
             panel.Children.Add(_videoPrompt);
+            panel.Children.Add(ExampleChips(_videoPrompt, "Create_Video_Example",
+                "Waves rolling onto a beach at sunset, cinematic, slow motion",
+                "A paper boat drifting down a rain-soaked street",
+                "Clouds racing over a mountain ridge, time-lapse"));
             panel.Children.Add(_enhanceVideo);
+            panel.Children.Add(_videoModelRow);
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             row.Children.Add(Labeled("Width", _videoWidth));
             row.Children.Add(Labeled("Height", _videoHeight));
+            panel.Children.Add(SizePresets("Create_Video_Size", _videoWidth, _videoHeight,
+                ("Fast 480p", 832, 480), ("HD 720p", 1280, 720), ("Vertical", 480, 832)));
             row.Children.Add(Labeled("Seconds", _videoDuration));
             row.Children.Add(Labeled("FPS", _videoFps));
             row.Children.Add(Labeled("Steps", _videoSteps));
@@ -243,6 +343,7 @@ namespace PaRuX.Views
         private UIElement BuildEditPanel()
         {
             var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(NewSetupCard("edit", "image editing"));
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_editMode, "Create_EditMode_ComboBox");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_editMode, "Edit mode");
             var instructionEdit = new ComboBoxItem { Content = "Instruction edit", Tag = "edit" };
@@ -270,6 +371,7 @@ namespace PaRuX.Views
             panel.Children.Add(_editSourceLabel);
             BuildInpaintControls(panel);
             panel.Children.Add(_editPrompt);
+            panel.Children.Add(_editModelRow);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_variationStrengthPanel, "Create_EditVariationStrength_Panel");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_editStrength, "Create_EditVariationStrength_NumberBox");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_editStrength, "Variation strength");
@@ -279,6 +381,8 @@ namespace PaRuX.Views
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_editRunButton, "Create_Edit_Run_Button");
             _editRunButton.Click += async (_, _) => await GenerateMediaAsync(SelectedEditType());
             panel.Children.Add(_editRunButton);
+            panel.Children.Add(new TextBlock { Text = "Or cut the subject out and keep a transparent background:", Opacity = 0.7, TextWrapping = TextWrapping.Wrap });
+            panel.Children.Add(BuildCutoutControls());
             UpdateEditModeDescription();
             return panel;
         }
@@ -294,6 +398,7 @@ namespace PaRuX.Views
         {
             bool variation = SelectedEditType() == "img2img";
             bool inpaint = SelectedEditType() == CreateInpaintPresenter.ModeTag;
+            _ = _editModelRow.SetTypeAsync(variation ? "image" : "edit");
             _variationStrengthPanel.Visibility = variation ? Visibility.Visible : Visibility.Collapsed;
             _editRunButton.Content = variation ? "Create variation" : inpaint ? "Repaint masked area" : "Edit image";
             _editModeDescription.Text = variation
@@ -406,8 +511,10 @@ namespace PaRuX.Views
 
                 ticket = BeginOperation(type == "video" ? "Generating video…" : type == "image" ? "Generating image…" : type == "inpaint" ? "Repainting masked area…" : "Editing image…");
                 if (ticket == null) return;
+                MediaJobProvenance? jobProvenance = null;
                 var progress = new Progress<MediaJobStatus>(job =>
                 {
+                    if (job.Provenance != null) jobProvenance = job.Provenance;
                     _progress.Value = Math.Clamp(job.ProgressPercent, 0, 100);
                     string eta = job.EtaSeconds.HasValue ? " · ETA ~" + job.EtaSeconds.Value + "s" : string.Empty;
                     _status.Text = job.Stage + " · " + job.ProgressPercent + "%" + eta;
@@ -415,14 +522,18 @@ namespace PaRuX.Views
                 MediaAsset asset = await RunWithCompanionConsentAsync(request, type, progress, ticket.Token);
                 string path = await SaveMediaAssetAsync(asset, type, ticket.Token);
                 _lastOutput.Text = "Output: " + path;
+                ShowResult(path);
                 _status.Text = "Generation completed locally and registered in Artifact Workspace.";
                 if (type == "inpaint") await ShowInpaintResultAsync(path);
-                string modelName = !string.IsNullOrWhiteSpace(asset.FileName) ? asset.FileName : Path.GetFileName(path);
+                // The model the router/override actually chose comes from the server's job provenance; the output file name is only a fallback.
+                string modelName = !string.IsNullOrWhiteSpace(jobProvenance?.ModelFileName) ? jobProvenance!.ModelFileName!
+                    : !string.IsNullOrWhiteSpace(asset.FileName) ? asset.FileName : Path.GetFileName(path);
                 SetProvenance(new MediaProvenanceRecord
                 {
                     EngineFamily = "Local Media Engine",
                     Model = modelName,
                     IsLocal = true,
+                    SelectionReason = jobProvenance?.ModelSelectionReason,
                     AdditionalDetails = _pendingEnhancementDetails
                 });
                 _pendingEnhancementDetails = null;
@@ -654,6 +765,7 @@ namespace PaRuX.Views
                 _status.Text = "A Create job is still running. Cancel it first, or wait for it to finish.";
                 return null;
             }
+            _operationMessageSticky = false;
             _progress.Value = 0;
             _progress.Visibility = Visibility.Visible;
             SetRunButtonsEnabled(false);
@@ -673,8 +785,15 @@ namespace PaRuX.Views
                 _progress.Visibility = Visibility.Collapsed;
                 SetRunButtonsEnabled(true);
             }
-            if (!string.IsNullOrWhiteSpace(message)) _status.Text = message;
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                _status.Text = message;
+                // The result of the last job stays on screen: the setup card's periodic refresh must not replace it with "Create is ready".
+                _operationMessageSticky = true;
+            }
         }
+
+        private bool _operationMessageSticky;
 
         private void SetRunButtonsEnabled(bool enabled)
         {

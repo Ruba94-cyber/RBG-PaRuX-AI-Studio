@@ -89,54 +89,84 @@ function Get-VerifiedArchive($Artifact) {
     return $archive
 }
 
-function Stage-ZipArtifact($Artifact) {
-    $archive = Get-VerifiedArchive $Artifact
-    $destination = [System.IO.Path]::GetFullPath(
-        (Join-Path $PublishDir (([string]$Artifact.destination).Replace('/', '\'))))
+function Stage-ZipArtifactGroup([object[]]$Artifacts) {
+    if ($Artifacts.Count -lt 1) { throw "A baseline runtime staging group must contain at least one artifact." }
+    $destinationRelative = ([string]$Artifacts[0].destination).Replace('/', '\')
+    foreach ($artifact in $Artifacts) {
+        if (([string]$artifact.destination).Replace('/', '\') -ine $destinationRelative) {
+            throw "Artifacts in one staging group must share the same destination."
+        }
+        if (-not ([string]$artifact.archiveName).EndsWith(".zip", [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Only ZIP baseline artifacts are supported by this staging script: $($artifact.archiveName)"
+        }
+    }
+
+    $destination = [System.IO.Path]::GetFullPath((Join-Path $PublishDir $destinationRelative))
     $publishPrefix = $PublishDir.TrimEnd([System.IO.Path]::DirectorySeparatorChar) +
         [System.IO.Path]::DirectorySeparatorChar
     if (-not $destination.StartsWith($publishPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "The locked runtime destination escaped the MSI publish directory: $($Artifact.id)"
+        throw "The locked runtime destination escaped the MSI publish directory: $destinationRelative"
     }
 
     $suffix = [Guid]::NewGuid().ToString('N')
-    # Prepare next to the target: directory rename is atomic on the same filesystem.
     $staged = "$destination.parux-staging-$suffix"
     $backup = "$destination.parux-backup-$suffix"
-    $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("parux-stage-" + $suffix)
+    $tempRoots = New-Object 'System.Collections.Generic.List[string]'
     $oldMoved = $false
-    New-Item -ItemType Directory -Force -Path $temp | Out-Null
+    New-Item -ItemType Directory -Force -Path $staged | Out-Null
     try {
-        Expand-Archive -LiteralPath $archive -DestinationPath $temp -Force
+        foreach ($artifact in $Artifacts) {
+            Write-Host "Staging locked runtime artifact $($artifact.id) $($artifact.version)..."
+            $archive = Get-VerifiedArchive $artifact
+            $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("parux-stage-" + [Guid]::NewGuid().ToString('N'))
+            $tempRoots.Add($temp)
+            New-Item -ItemType Directory -Force -Path $temp | Out-Null
+            Expand-Archive -LiteralPath $archive -DestinationPath $temp -Force
 
-        $required = @($Artifact.requiredFiles)
-        if ($required.Count -lt 1) { throw "Artifact $($Artifact.id) has no requiredFiles gate." }
+            $required = @($artifact.requiredFiles)
+            if ($required.Count -lt 1) { throw "Artifact $($artifact.id) has no requiredFiles gate." }
 
-        $anchor = $null
-        foreach ($requiredFile in $required) {
-            $matches = @(Get-ChildItem -LiteralPath $temp -Recurse -File | Where-Object { $_.Name -ieq [string]$requiredFile })
-            if ($matches.Count -ne 1) {
-                throw "Verified archive $($Artifact.id) must contain exactly one $requiredFile; found $($matches.Count)."
+            $anchor = $null
+            foreach ($requiredFile in $required) {
+                $matches = @(Get-ChildItem -LiteralPath $temp -Recurse -File | Where-Object { $_.Name -ieq [string]$requiredFile })
+                if ($matches.Count -ne 1) {
+                    throw "Verified archive $($artifact.id) must contain exactly one $requiredFile; found $($matches.Count)."
+                }
+                if ($null -eq $anchor) { $anchor = $matches[0].Directory.FullName }
+                elseif ($anchor -ne $matches[0].Directory.FullName) {
+                    throw "Required files for $($artifact.id) do not share one payload root."
+                }
             }
-            if ($null -eq $anchor) { $anchor = $matches[0].Directory.FullName }
-            elseif ($anchor -ne $matches[0].Directory.FullName) {
-                throw "Required files for $($Artifact.id) do not share one payload root."
+
+            $anchorRoot = [System.IO.Path]::GetFullPath($anchor).TrimEnd([System.IO.Path]::DirectorySeparatorChar) +
+                [System.IO.Path]::DirectorySeparatorChar
+            foreach ($file in Get-ChildItem -LiteralPath $anchor -Recurse -File) {
+                $full = [System.IO.Path]::GetFullPath($file.FullName)
+                if (-not $full.StartsWith($anchorRoot, [StringComparison]::OrdinalIgnoreCase)) {
+                    throw "Extracted runtime file escaped its archive payload root: $($artifact.id)"
+                }
+                $relative = $full.Substring($anchorRoot.Length)
+                $destinationFile = [System.IO.Path]::GetFullPath((Join-Path $staged $relative))
+                $stagedPrefix = $staged.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+                if (-not $destinationFile.StartsWith($stagedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+                    throw "Runtime file escaped the staging directory: $($artifact.id)"
+                }
+                if (Test-Path -LiteralPath $destinationFile) {
+                    throw "Runtime archives contain a duplicate staged path: $relative"
+                }
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destinationFile) | Out-Null
+                Copy-Item -LiteralPath $full -Destination $destinationFile -Force
+            }
+
+            foreach ($requiredFile in $required) {
+                $candidate = Join-Path $staged ([string]$requiredFile)
+                if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+                    throw "Staging failed for $($artifact.id): required payload file missing at $candidate"
+                }
             }
         }
 
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
-        New-Item -ItemType Directory -Force -Path $staged | Out-Null
-        Get-ChildItem -LiteralPath $anchor -Force | ForEach-Object {
-            Copy-Item -LiteralPath $_.FullName -Destination $staged -Recurse -Force
-        }
-
-        foreach ($requiredFile in $required) {
-            $candidate = Join-Path $staged ([string]$requiredFile)
-            if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-                throw "Staging failed for $($Artifact.id): required payload file missing at $candidate"
-            }
-        }
-
         if (Test-Path -LiteralPath $destination) {
             if (-not (Test-Path -LiteralPath $destination -PathType Container)) {
                 throw "Runtime staging destination is not a directory: $destination"
@@ -145,7 +175,6 @@ function Stage-ZipArtifact($Artifact) {
             $oldMoved = $true
         }
 
-        # The verified payload is fully prepared before the active publish tree changes.
         [System.IO.Directory]::Move($staged, $destination)
         if ($oldMoved) {
             Remove-Item -LiteralPath $backup -Recurse -Force -ErrorAction Stop
@@ -160,7 +189,7 @@ function Stage-ZipArtifact($Artifact) {
                 $oldMoved = $false
             }
             catch {
-                throw "Runtime staging failed for $($Artifact.id) and rollback failed. Previous payload is retained at $backup. Original failure: $($failure.Exception.Message). Rollback: $($_.Exception.Message)"
+                throw "Runtime staging failed for $destinationRelative and rollback failed. Previous payload is retained at $backup. Original failure: $($failure.Exception.Message). Rollback: $($_.Exception.Message)"
             }
         }
         throw $failure
@@ -169,18 +198,27 @@ function Stage-ZipArtifact($Artifact) {
         if (Test-Path -LiteralPath $staged) {
             Remove-Item -LiteralPath $staged -Recurse -Force -ErrorAction SilentlyContinue
         }
-        if (Test-Path -LiteralPath $temp) {
-            Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+        foreach ($temp in $tempRoots) {
+            if (Test-Path -LiteralPath $temp) {
+                Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+            }
         }
-        # Never erase a backup retained because rollback failed.
     }
 }
 
-foreach ($artifact in $lock.artifacts) {
-    if (-not ([string]$artifact.archiveName).EndsWith(".zip", [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Only ZIP baseline artifacts are supported by this staging script: $($artifact.archiveName)"
+ # Artifacts with the same destination are co-staged into one immutable runtime folder. CUDA's
+ # llama-server build and NVIDIA's separate cudart/cuBLAS redistributable archive are one payload.
+$destinationGroups = [ordered]@{}
+foreach ($artifact in @($lock.artifacts)) {
+    $key = ([string]$artifact.destination).Replace('/', '\').ToLowerInvariant()
+    if ([string]::IsNullOrWhiteSpace($key)) { throw "Baseline artifact $($artifact.id) has no destination." }
+    if (-not $destinationGroups.Contains($key)) {
+        $destinationGroups[$key] = New-Object 'System.Collections.Generic.List[object]'
     }
-    Stage-ZipArtifact $artifact
+    $destinationGroups[$key].Add($artifact)
+}
+foreach ($key in $destinationGroups.Keys) {
+    Stage-ZipArtifactGroup -Artifacts $destinationGroups[$key].ToArray()
 }
 
 $serverDir = Join-Path $PublishDir "PaRuX.Server"

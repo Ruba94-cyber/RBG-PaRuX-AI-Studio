@@ -42,6 +42,15 @@ namespace PaRuX.Services
                 metadataState, publisherLicense, observedUtc);
         }
 
+        /// <summary>
+        /// Decision for a curated catalogue entry that already pins repository, revision and SHA-256. The
+        /// catalogue's licence is the declared review text for that pinned revision, so no second live
+        /// lookup is needed (and a failing one must not block the download). Without a catalogue licence the
+        /// terms still need review. The pin itself is validated by the caller.
+        /// </summary>
+        public static Decision EvaluateCatalogue(string? catalogueLicense, DateTime? observedUtc = null) =>
+            Evaluate(catalogueLicense, metadataRetrieved: !string.IsNullOrWhiteSpace(catalogueLicense), observedUtc);
+
         public static Uri? GetModelCardUri(string? repoId)
         {
             if (string.IsNullOrWhiteSpace(repoId)) return null;

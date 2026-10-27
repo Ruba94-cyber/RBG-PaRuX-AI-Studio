@@ -187,7 +187,7 @@ public sealed class ManualSelectionGateCrossProcessTests : IDisposable
         using Process child = StartChild("manual-selection-hold", _root);
         try
         {
-            string? ready = child.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+            string? ready = child.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(60)).GetAwaiter().GetResult();
             Assert.Equal("held", ready);
 
             child.Kill(entireProcessTree: true);

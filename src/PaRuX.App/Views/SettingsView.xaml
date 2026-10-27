@@ -140,6 +140,25 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Send voice messages automatically" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
+                                <TextBlock Text="Off by default. When on, the Chat microphone sends the transcribed text right away instead of placing it in the prompt box for you to review." Style="{StaticResource PaRuXCaptionTextStyle}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="VoiceAutoSendSwitch"
+                                          AutomationProperties.AutomationId="Settings_VoiceAutoSend_Toggle"
+                                          AutomationProperties.Name="Send voice messages automatically"
+                                          AutomationProperties.AccessibilityView="Control"
+                                          Grid.Column="1" VerticalAlignment="Center" MinWidth="0" OnContent="" OffContent=""
+                                          Toggled="VoiceAutoSendSwitch_Toggled" />
+                        </Grid>
+
+                        <Border Style="{StaticResource PaRuXDividerStyle}" Margin="0,12,0,12" />
+
+                        <Grid Style="{StaticResource PaRuXSettingsRowStyle}" ColumnSpacing="{StaticResource PaRuXSpaceL}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
                                 <TextBlock Text="Runtime installs" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
                                 <TextBlock Text="Notify when a runtime engine install completes or fails." Style="{StaticResource PaRuXCaptionTextStyle}" />
                             </StackPanel>
@@ -430,6 +449,12 @@
                             Text="Which real checkpoint file image/video/edit generation actually uses. Everything found in ComfyUI's diffusion_models folder shows up here - download an alternative into that folder and it becomes pickable, per generation type, without touching a workflow file by hand."
                             TextWrapping="Wrap"
                             Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <TextBlock
+                            Text="Content lane for image, video and edit generation. Automatic mode picks the model per prompt inside this lane; a model you pin in Create always wins."
+                            TextWrapping="Wrap"
+                            Margin="0,10,0,0"
+                            Style="{StaticResource PaRuXCaptionTextStyle}" />
+                        <StackPanel x:Name="MediaLaneHost" Margin="0,6,0,0" />
                         <StackPanel x:Name="MediaCheckpointsList" Spacing="10" Margin="0,10,0,0" />
                         <TextBlock
                             Text="Recommended alternatives to download"
@@ -1363,7 +1388,10 @@
                         <TextBox x:Name="NewPersonaNameBox" PlaceholderText="Name, e.g. Sarcastic Reviewer" />
                         <TextBox x:Name="NewPersonaPromptBox" PlaceholderText="System-prompt instruction, e.g. Respond with dry, sarcastic wit while still being accurate."
                             TextWrapping="Wrap" AcceptsReturn="True" Height="72" />
-                        <Button Content="Create persona" HorizontalAlignment="Left" Click="CreatePersona_Click" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Create persona" HorizontalAlignment="Left" Click="CreatePersona_Click" />
+                            <Button x:Name="ImportPersonaCardButton" Content="Import character card…" AutomationProperties.AutomationId="Settings_Persona_ImportCard_Button" Click="ImportPersonaCard_Click" />
+                        </StackPanel>
                         <TextBlock x:Name="PersonaStatus" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
                     </StackPanel>
                 </Border>
@@ -1832,11 +1860,16 @@
                                        Text="Optimize the media engine for this PC automatically when idle"
                                        Style="{StaticResource PaRuXBodyStrongTextStyle}" />
                             <ToggleSwitch x:Name="Settings_AutoCheck_MediaOptimize_Toggle"
-                                          Grid.Column="1" IsOn="False"
+                                          Grid.Column="1" IsOn="True"
                                           AutomationProperties.AutomationId="Settings_AutoCheck_MediaOptimize_Toggle"
                                           AutomationProperties.Name="Optimize the media engine for this PC automatically when idle"
                                           Toggled="AutoCheckMediaOptimizeToggle_Toggled" />
                         </Grid>
+                        <TextBlock x:Name="Settings_AutoCheck_Tuning_Explanation_Text"
+                                   AutomationProperties.AutomationId="Settings_AutoCheck_Tuning_Explanation_Text"
+                                   AutomationProperties.Name="What automatic tuning does"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource PaRuXCaptionTextStyle}" />
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}">
                             <Button x:Name="Settings_AutoCheck_MediaOptimize_Button" Content="Optimize media engine for this PC"
                                     AutomationProperties.AutomationId="Settings_AutoCheck_MediaOptimize_Button"

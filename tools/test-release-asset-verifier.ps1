@@ -62,6 +62,34 @@ function New-PayloadTree([string]$Directory, [string]$ExePath) {
     New-Item -ItemType Directory -Path (Join-Path $Directory 'Assets') -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $Directory 'Assets\parux.ico'), 'synthetic icon', [Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllText((Join-Path $Directory 'LICENSE.txt'), 'synthetic license', [Text.UTF8Encoding]::new($false))
+
+    # The release verifier requires the bundled CUDA 13.4 baseline: its lock, staging manifest, files and NVIDIA notice.
+    $cudaRelative = 'runtime-baseline/llama.cpp-b11871-cuda13.4'
+    $cudaDir = Join-Path $Directory ('PaRuX.Server\' + $cudaRelative.Replace('/', '\'))
+    New-Item -ItemType Directory -Path $cudaDir -Force | Out-Null
+    $manifestFiles = @()
+    foreach ($name in @('llama-server.exe', 'cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll')) {
+        $file = Join-Path $cudaDir $name
+        [IO.File]::WriteAllText($file, ('synthetic ' + $name), [Text.UTF8Encoding]::new($false))
+        $manifestFiles += [ordered]@{ path = ($cudaRelative + '/' + $name); sizeBytes = (Get-Item -LiteralPath $file).Length; sha256 = (Get-Hash $file) }
+    }
+    $dlls = @('cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll')
+    $destination = 'PaRuX.Server/' + $cudaRelative
+    $lock = [ordered]@{
+        schemaVersion = 1; platform = 'win-x64'
+        artifacts = @(
+            [ordered]@{ id = 'llama.cpp-cuda13'; version = 'b11871'; license = 'MIT'; sizeBytes = 160060670
+                sha256 = ('a' * 64); destination = $destination; requiredFiles = @('llama-server.exe') },
+            [ordered]@{ id = 'cuda-runtime-13.4'; version = '13.4'; license = 'NVIDIA CUDA Toolkit EULA'
+                licenseUrl = 'https://docs.nvidia.com/cuda/eula/index.html'; sizeBytes = 423535356; sha256 = ('b' * 64)
+                destination = $destination; requiredFiles = $dlls; redistributableFiles = $dlls }
+        )
+    }
+    $baselineDir = Join-Path $Directory 'PaRuX.Server\runtime-baseline'
+    Write-Json (Join-Path $baselineDir 'baseline-lock.json') $lock
+    Write-Json (Join-Path $baselineDir 'staging-manifest.json') ([ordered]@{ schemaVersion = 1; platform = 'win-x64'; files = $manifestFiles })
+    [IO.File]::WriteAllText((Join-Path $Directory 'NVIDIA_CUDA_NOTICE.txt'),
+        ('Attachment A https://docs.nvidia.com/cuda/eula/index.html ' + ($dlls -join ' ')), [Text.UTF8Encoding]::new($false))
 }
 
 function Get-PayloadEntries([string]$Directory) {

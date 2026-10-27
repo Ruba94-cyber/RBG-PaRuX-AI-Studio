@@ -179,6 +179,16 @@ namespace PaRuX
         }
 
         /// <summary>
+        /// Renders generated Markdown (headings, tables, bold) instead of showing its raw markup in a dialog.
+        /// </summary>
+        private static StackPanel RenderMarkdownPanel(string markdown)
+        {
+            var panel = new StackPanel();
+            PaRuX.Services.MarkdownRenderer.Render(markdown, panel);
+            return panel;
+        }
+
+        /// <summary>
         /// Displays the in-app help and documentation dialog with topics from InAppHelpCatalog.
         /// Offers immediate replay of the guided tour and keyboard shortcuts sheet.
         /// </summary>
@@ -202,12 +212,7 @@ namespace PaRuX
                     Content = new ScrollViewer
                     {
                         MaxHeight = 480,
-                        Content = new TextBlock
-                        {
-                            Text = markdown,
-                            TextWrapping = TextWrapping.Wrap,
-                            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe UI Variable, Segoe UI")
-                        }
+                        Content = RenderMarkdownPanel(markdown)
                     },
                     PrimaryButtonText = "Replay Guided Tour",
                     SecondaryButtonText = "Keyboard Shortcuts",

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text.RegularExpressions;
 using PaRuX.Models;
 
@@ -86,6 +87,41 @@ namespace PaRuX.Services
         /// <summary>True when the text points back at an already existing image ("animate this image").</summary>
         public static bool ReferencesExistingImage(string input) =>
             !string.IsNullOrWhiteSpace(input) && ExistingImageRefRx.IsMatch(input);
+
+        private static readonly Regex AskAboutImageRx = new Regex(
+            @"\b(?:describe|what(?:'s|\s+is|\s+are)?\s+(?:in|on)|look\s+at|analy[sz]e|caption|"
+          + @"descrivi|cosa\s+c['’]?è|che\s+cosa\s+c['’]?è|guarda|analizza|com['’]?è)\b", Opts);
+
+        /// <summary>
+        /// Whether the latest generated image of the conversation should ride along with this message. An ordinary text message that
+        /// merely follows a generated image must stay a text turn: attaching the image sent it down the Vision route and failed with
+        /// "No managed local vision helper is active" when asked for plain text.
+        /// </summary>
+        public static bool ShouldAttachPriorGeneratedImage(RouteKind route, string text)
+        {
+            if (route == RouteKind.ImageEdit) return true;
+            if (route == RouteKind.Video) return ReferencesExistingImage(text);
+            if (!IsChatRoute(route)) return false;
+            return ReferencesExistingImage(text) && AskAboutImageRx.IsMatch(text ?? string.Empty);
+        }
+
+        /// <summary>
+        /// The most recent image PaRuX generated in this conversation, searching back past error messages and text-only answers; null when
+        /// there is none or its file is gone. (An unrelated failed text turn between two generations used to hide both images.)
+        /// </summary>
+        public static ChatAttachment? FindLastGeneratedImage(System.Collections.Generic.IReadOnlyList<ChatMessage> messages)
+        {
+            for (int i = messages.Count - 1; i >= 0; i--)
+            {
+                ChatMessage message = messages[i];
+                if (message.Role != "assistant" || message.IsError || message.Attachments == null) continue;
+                ChatAttachment? image = message.Attachments.FirstOrDefault(a => a.MediaType != null
+                    && a.MediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(a.LocalPath) && System.IO.File.Exists(a.LocalPath));
+                if (image != null) return image;
+            }
+            return null;
+        }
 
         /// <summary>Routes that consume the most recent generated image of the conversation as their source.</summary>
         public static bool UsesPriorGeneratedImage(RouteKind route) =>
@@ -185,7 +221,7 @@ namespace PaRuX.Services
             {
                 string text = input.Trim();
                 if (IsNativeCodeCommand(text)) return RouteKind.CodeHandoff;
-                if (ImageEditRx.IsMatch(text) || RegionEditRx.IsMatch(text)) return RouteKind.ImageEdit;
+                if (ImageEditRx.IsMatch(text) || CutoutPhrasing.IsBackgroundRemoval(text) || RegionEditRx.IsMatch(text)) return RouteKind.ImageEdit;
                 if (VideoRx.IsMatch(text)) return RouteKind.Video;
                 if (BinaryAnalysisRx.IsMatch(text)) return RouteKind.BinaryAnalysis;
             }
@@ -205,9 +241,13 @@ namespace PaRuX.Services
             // /code is an execution command, not a prompt-shaping Skill. Keep it ahead of every
             // content heuristic so the text after the command cannot accidentally route elsewhere.
             if (IsNativeCodeCommand(text)) return RouteKind.CodeHandoff;
-            if (ImageRx.IsMatch(text)) return RouteKind.Image;
-            if (ImageEditRx.IsMatch(text) || IsRegionEditWithoutAttachment(text)) return RouteKind.ImageEdit;
-            if (VideoRx.IsMatch(text)) return RouteKind.Video;
+            MediaPhrasing.Kind phrased = MediaPhrasing.Detect(text);
+            bool howTo = MediaPhrasing.IsNotARequest(text);
+            if (phrased == MediaPhrasing.Kind.Music) return RouteKind.Music;
+            if (phrased == MediaPhrasing.Kind.Video && !ImageEditRx.IsMatch(text) && !CutoutPhrasing.IsBackgroundRemoval(text)) return RouteKind.Video;
+            if (!howTo && ImageRx.IsMatch(text) || phrased == MediaPhrasing.Kind.Image) return RouteKind.Image;
+            if (ImageEditRx.IsMatch(text) || CutoutPhrasing.IsBackgroundRemoval(text) || IsRegionEditWithoutAttachment(text)) return RouteKind.ImageEdit;
+            if (!howTo && VideoRx.IsMatch(text)) return RouteKind.Video;
             if (BinaryAnalysisRx.IsMatch(text)) return RouteKind.BinaryAnalysis;
             if (CodeDiscussionRx.IsMatch(text)) return RouteKind.ChatNormal;
             if (IsRepositoryChangeRequest(text)) return RouteKind.CodeHandoff;
@@ -276,6 +316,7 @@ namespace PaRuX.Services
                 case RouteKind.Image: return "Image";
                 case RouteKind.ImageEdit: return "Image edit";
                 case RouteKind.Video: return "Video";
+                case RouteKind.Music: return "Music";
                 case RouteKind.CodeHandoff: return "Code";
                 default: return "Normal";
             }

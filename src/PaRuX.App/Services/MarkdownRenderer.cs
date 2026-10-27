@@ -63,6 +63,16 @@ namespace PaRuX.Services
                     continue;
                 }
 
+                // ---- table (header row + separator row; otherwise the pipes stay plain text) ----
+                MarkdownTableParser.Table? table = MarkdownTableParser.TryParse(lines, i);
+                if (table != null)
+                {
+                    FlushParagraph(paragraph, target);
+                    target.Children.Add(BuildTable(table));
+                    i += table.LinesConsumed;
+                    continue;
+                }
+
                 // ---- heading ----
                 Match h = HeadingRx.Match(line);
                 if (h.Success)
@@ -132,6 +142,55 @@ namespace PaRuX.Services
             AddInlines(p.Inlines, text);
             rtb.Blocks.Add(p);
             target.Children.Add(rtb);
+        }
+
+        private static UIElement BuildTable(MarkdownTableParser.Table table)
+        {
+            var grid = new Grid
+            {
+                Margin = new Thickness(0, 4, 0, 10),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(70, 160, 160, 170))
+            };
+            int columns = table.Header.Count;
+            for (int c = 0; c < columns; c++)
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (int r = 0; r <= table.Rows.Count; r++)
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            void AddCell(string text, int row, int column, bool header)
+            {
+                var cell = new Border
+                {
+                    BorderThickness = new Thickness(0, 0, column < columns - 1 ? 1 : 0, row < table.Rows.Count ? 1 : 0),
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(50, 160, 160, 170)),
+                    Padding = new Thickness(10, 6, 10, 6),
+                    Background = header ? new SolidColorBrush(Color.FromArgb(28, 160, 160, 190)) : null
+                };
+                var rtb = new RichTextBlock { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
+                var p = new Paragraph
+                {
+                    FontWeight = header ? FontWeights.SemiBold : FontWeights.Normal,
+                    TextAlignment = table.Alignments[column] switch
+                    {
+                        'r' => TextAlignment.Right,
+                        'c' => TextAlignment.Center,
+                        _ => TextAlignment.Left
+                    }
+                };
+                AddInlines(p.Inlines, text);
+                rtb.Blocks.Add(p);
+                cell.Child = rtb;
+                Grid.SetRow(cell, row);
+                Grid.SetColumn(cell, column);
+                grid.Children.Add(cell);
+            }
+
+            for (int c = 0; c < columns; c++) AddCell(table.Header[c], 0, c, header: true);
+            for (int r = 0; r < table.Rows.Count; r++)
+                for (int c = 0; c < columns; c++)
+                    AddCell(table.Rows[r][c], r + 1, c, header: false);
+            return grid;
         }
 
         private static UIElement BuildHeading(string text, int level)

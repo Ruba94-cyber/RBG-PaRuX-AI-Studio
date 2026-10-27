@@ -159,6 +159,7 @@ namespace PaRuX.Views
             _ = RefreshCloudFallbackAsync();
             _ = RefreshDesktopIntegrationsAsync();
             _ = RefreshDocumentOutputAsync();
+            _ = RefreshMediaLaneAsync();
             _ = RefreshMediaCheckpointsAsync();
             _ = RefreshRecommendedCheckpointsAsync();
             _ = RefreshCustomWorkflowsAsync();
@@ -261,6 +262,29 @@ namespace PaRuX.Views
             try { await PersonaClient.Current.DeleteAsync(id, CancellationToken.None); }
             catch (Exception ex) { Log.Write("DeletePersonaAsync failed: " + ex.Message); }
             await RefreshPersonasAsync();
+        }
+
+        /// <summary>Imports a SillyTavern/Chub character card (.json or .png with an embedded card) as a persona.</summary>
+        private async void ImportPersonaCard_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var picker = new Windows.Storage.Pickers.FileOpenPicker { SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary };
+                picker.FileTypeFilter.Add(".json");
+                picker.FileTypeFilter.Add(".png");
+                WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWin));
+                Windows.Storage.StorageFile? file = await picker.PickSingleFileAsync();
+                if (file == null) return;
+                byte[] data = await System.IO.File.ReadAllBytesAsync(file.Path);
+                Persona imported = await PersonaClient.Current.ImportCardAsync(file.Name, data, CancellationToken.None);
+                if (PersonaStatus != null) PersonaStatus.Text = "Imported \"" + imported.Name + "\" from " + file.Name + ". Set it active to use it in Chat.";
+                await RefreshPersonasAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Write("ImportPersonaCard failed: " + ex.Message);
+                if (PersonaStatus != null) PersonaStatus.Text = "Couldn't import the card: " + ex.Message;
+            }
         }
 
         private async void CreatePersona_Click(object sender, RoutedEventArgs e)
@@ -1202,7 +1226,11 @@ namespace PaRuX.Views
             }
 #endif
 
-            List<GgufModelInfo> models = await Task.Run(ModelManagerService.ListInstalledModels);
+            // Same source as the Model Hub: the managed library served by PaRuX Core, plus the external Local AI folder.
+            List<ManagedModelInfo> managedModels;
+            try { managedModels = await ModelDownloadClient.Current.ListManagedModelsAsync(CancellationToken.None); }
+            catch (Exception ex) { Log.Write("Managed library unavailable for the Settings model list: " + ex.Message); managedModels = new List<ManagedModelInfo>(); }
+            List<GgufModelInfo> models = await Task.Run(() => ModelManagerService.ListInstalledModels(managedModels));
             ResourceSnapshot resources = await ResourceMonitorService.GetSnapshotAsync(CancellationToken.None);
 
             List<ModelRoleStatus> roles;
@@ -1218,7 +1246,7 @@ namespace PaRuX.Views
             DetectedModelsList.Children.Clear();
             if (models.Count == 0)
             {
-                var empty = new TextBlock { Text = "No .gguf models found (or the LocalAI model folder could not be located)." };
+                var empty = new TextBlock { Text = "No .gguf models found in the PaRuX model library or the Local AI model folder." };
                 ApplyCaptionStyle(empty);
                 DetectedModelsList.Children.Add(empty);
                 return;
@@ -1373,9 +1401,9 @@ namespace PaRuX.Views
                 var title = new TextBlock { Text = typeLabel, Style = (Style)Application.Current.Resources["PaRuXBodyStrongTextStyle"] };
                 Grid.SetColumn(title, 0);
                 titleRow.Children.Add(title);
-                if (status.IsOverridden)
+                if (status.IsCheckpointPinned || status.RoutingMode is "Force" or "Prefer")
                 {
-                    var badge = new TextBlock { Text = "Custom" };
+                    var badge = new TextBlock { Text = MediaSelectionPresenter.SettingsBadge(status) };
                     ApplyCaptionStyle(badge);
                     if (Application.Current.Resources.TryGetValue("PaRuXSuccessColor", out object okColor) && okColor is Windows.UI.Color okC)
                         badge.Foreground = new SolidColorBrush(okC);
@@ -1392,9 +1420,16 @@ namespace PaRuX.Views
                 ApplyCaptionStyle(currentHint);
                 card.Children.Add(currentHint);
 
+                if (MediaSelectionPresenter.SettingsRoutingHint(status) is { } routingHint)
+                {
+                    var route = new TextBlock { Text = routingHint, TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
+                    ApplyCaptionStyle(route);
+                    card.Children.Add(route);
+                }
+
                 List<string> alternatives = status.AvailableFiles
                     .Where(f => !string.Equals(f, status.CurrentFile, StringComparison.OrdinalIgnoreCase)).ToList();
-                if (alternatives.Count > 0)
+                if (alternatives.Count > 0 || status.IsCheckpointPinned)
                 {
                     var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
                     foreach (string file in alternatives)
@@ -1404,23 +1439,26 @@ namespace PaRuX.Views
                         button.Click += async (s, e2) => await SetMediaCheckpointAsync(capturedType, capturedFile);
                         row.Children.Add(button);
                     }
-                    if (status.IsOverridden)
+                    if (status.IsCheckpointPinned)
                     {
                         string capturedType = status.Type;
-                        var resetButton = new Button { Content = "Reset to default", FontSize = 12, Padding = new Thickness(8, 2, 8, 2) };
+                        var resetButton = new Button { Content = "Clear pinned model", FontSize = 12, Padding = new Thickness(8, 2, 8, 2) };
                         resetButton.Click += async (s, e2) => await ResetMediaCheckpointAsync(capturedType);
                         row.Children.Add(resetButton);
                     }
                     card.Children.Add(row);
 
-                    var altHintsPanel = new StackPanel { Spacing = 1, Margin = new Thickness(0, 2, 0, 0) };
-                    foreach (string file in alternatives)
+                    if (alternatives.Count > 0)
                     {
-                        var altHint = new TextBlock { Text = file + " - " + DescribeCheckpointFile(file), TextWrapping = TextWrapping.Wrap, Opacity = 0.6 };
-                        ApplyCaptionStyle(altHint);
-                        altHintsPanel.Children.Add(altHint);
+                        var altHintsPanel = new StackPanel { Spacing = 1, Margin = new Thickness(0, 2, 0, 0) };
+                        foreach (string file in alternatives)
+                        {
+                            var altHint = new TextBlock { Text = file + " - " + DescribeCheckpointFile(file), TextWrapping = TextWrapping.Wrap, Opacity = 0.6 };
+                            ApplyCaptionStyle(altHint);
+                            altHintsPanel.Children.Add(altHint);
+                        }
+                        card.Children.Add(altHintsPanel);
                     }
-                    card.Children.Add(altHintsPanel);
                 }
                 else if (status.AvailableFiles.Count <= 1)
                 {
@@ -1934,6 +1972,7 @@ namespace PaRuX.Views
                 if (AgentWorkspaceRootBox != null) AgentWorkspaceRootBox.Text = s.AgentCodingWorkspaceRoot;
                 StorageQuotaBox.Value = Math.Clamp(s.StorageQuotaGigabytes, 10, StorageQuotaService.MaximumQuotaGigabytes);
                 ComputerUseAutomationSwitch.IsOn = s.ComputerUseFullAutomationEnabled;
+                VoiceAutoSendSwitch.IsOn = s.SendVoiceMessagesAutomatically;
                 RefreshComputerApps();
                 RefreshGamingStatus();
                 PopulateLanAddresses();
@@ -1987,6 +2026,13 @@ namespace PaRuX.Views
             SettingsStore.Current.Data.Theme = tag;
             SettingsStore.Current.Save();
             App.ApplyTheme();
+        }
+
+        private void VoiceAutoSendSwitch_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_loading) return;
+            SettingsStore.Current.Data.SendVoiceMessagesAutomatically = VoiceAutoSendSwitch.IsOn;
+            SettingsStore.Current.Save();
         }
 
         private void ComputerUseAutomationSwitch_Toggled(object sender, RoutedEventArgs e)
@@ -3444,17 +3490,23 @@ namespace PaRuX.Views
                     ApplyCaptionStyle(label);
                     row.Children.Add(label);
                     string capturedName = model.FileName;
-                    var delete = new Button { Content = "Delete", FontSize = 12, Padding = new Thickness(8, 2, 8, 2) };
+                    long capturedSize = model.SizeBytes;
+                    var delete =new Button { Content = "Delete", FontSize = 12, Padding = new Thickness(8, 2, 8, 2) };
                     delete.Click += async (s, e2) =>
                     {
                         delete.IsEnabled = false;
-                        try
+                        (bool deleted, string message) = await ManagedModelDeleteFlow.RunAsync(XamlRoot, capturedName, capturedSize);
+                        if (deleted)
                         {
-                            await ModelDownloadClient.Current.DeleteManagedModelAsync(capturedName, CancellationToken.None);
                             await RefreshManagedModelsAsync();
                             await RefreshModelBudgetAsync();
+                            await RefreshDetectedModelsAsync();
                         }
-                        catch (Exception ex) { Log.Write("Delete managed model failed: " + ex.Message); delete.IsEnabled = true; }
+                        else
+                        {
+                            delete.IsEnabled = true;
+                            Log.Write("Settings delete: " + message);
+                        }
                     };
                     Grid.SetColumn(delete, 1);
                     row.Children.Add(delete);

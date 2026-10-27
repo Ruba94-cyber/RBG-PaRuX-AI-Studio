@@ -13,6 +13,8 @@ namespace PaRuX.Services
         public string? Model { get; init; }
         public bool IsLocal { get; init; } = true;
         public string? FallbackReason { get; init; }
+        /// <summary>Why the router chose this model for this request (server-recorded). Null for results routed before this was recorded.</summary>
+        public string? SelectionReason { get; init; }
         public IReadOnlyDictionary<string, string>? AdditionalDetails { get; init; }
 
         public MediaProvenanceRecord() { }
@@ -122,9 +124,11 @@ namespace PaRuX.Services
                 ? $"Made locally with {engine} ({model})"
                 : $"Made remotely with {engine} ({model})";
 
-            string line = !string.IsNullOrWhiteSpace(record.FallbackReason)
-                ? $"{baseLine} · Fallback: {record.FallbackReason.Trim()}"
-                : baseLine;
+            string line = baseLine;
+            if (!string.IsNullOrWhiteSpace(record.SelectionReason))
+                line += $" · Why: {record.SelectionReason.Trim()}";
+            if (!string.IsNullOrWhiteSpace(record.FallbackReason))
+                line += $" · Fallback: {record.FallbackReason.Trim()}";
 
             var details = new List<string>
             {
@@ -132,6 +136,11 @@ namespace PaRuX.Services
                 $"Model: {model}",
                 $"Stayed on this machine: {(record.IsLocal ? "Yes" : "No")}"
             };
+
+            if (!string.IsNullOrWhiteSpace(record.SelectionReason))
+            {
+                details.Add($"Why this model: {record.SelectionReason.Trim()}");
+            }
 
             if (!string.IsNullOrWhiteSpace(record.FallbackReason))
             {

@@ -18,6 +18,26 @@ namespace PaRuX.Services
     /// </summary>
     public static class ModelManagerService
     {
+        /// <summary>The external Local AI models plus the PaRuX-managed library (the Model Hub's source), each once.</summary>
+        public static List<GgufModelInfo> ListInstalledModels(IEnumerable<PaRuX.Contracts.ManagedModelInfo> managed)
+        {
+            var managedInfos = new List<GgufModelInfo>();
+            foreach (PaRuX.Contracts.ManagedModelInfo model in managed)
+            {
+                try
+                {
+                    GgufModelInfo info = File.Exists(model.FilePath) ? GgufMetadataReader.Read(model.FilePath) : new GgufModelInfo();
+                    info.FileName = model.FileName;
+                    info.FilePath = model.FilePath;
+                    info.SizeBytes = model.SizeBytes; // a split set is its whole size
+                    if (string.IsNullOrWhiteSpace(info.Name)) info.Name = string.IsNullOrWhiteSpace(model.Alias) ? model.FileName : model.Alias;
+                    managedInfos.Add(info);
+                }
+                catch (Exception ex) { Log.Write("ModelManagerService: failed to read managed " + model.FileName + ": " + ex.Message); }
+            }
+            return InstalledModelMerge.Merge(managedInfos, ListInstalledModels());
+        }
+
         public static List<GgufModelInfo> ListInstalledModels()
         {
             string? modelsDir = StorageQuotaService.TryLocateExternalModelsDir();

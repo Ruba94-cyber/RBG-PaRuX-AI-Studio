@@ -93,7 +93,9 @@ public sealed class MediaJobService
         {
             if (type is not ("image" or "inpaint"))
                 throw new InvalidDataException("LoRAs can only be used with image and inpaint jobs.");
-            MediaLoraStack.ResolveOrRefuse("image", request.Loras);
+            if (type == "image") MediaLoraStack.ResolveOrRefuse(MediaCheckpointResolution.Resolve("image"), request.Loras);
+            else if (MediaLoraStack.Validate(request.Loras, LoraLibrary.List(), null, null) is { Ok: false } bad)
+                throw new InvalidDataException(bad.Reason); // structure only: the family is checked against the Z-Image model when the job runs
         }
         if (type is "custom" or "imported" && string.IsNullOrWhiteSpace(request.CustomWorkflowId))
             throw new InvalidDataException(type + " requires customWorkflowId.");
@@ -437,6 +439,7 @@ public sealed class MediaJobService
                 VideoClipSeeds = new List<long>(intent.VideoClipSeeds),
                 ClientIds = new List<string>(intent.ClientIds),
                 PromptIds = new List<string>(intent.PromptIds),
+                VideoFamilyId = intent.VideoFamilyId,
                 VideoRunId = intent.VideoRunId,
                 VideoPrompt = intent.VideoPrompt,
                 VideoRequestedFrames = intent.VideoRequestedFrames,
@@ -480,6 +483,7 @@ public sealed class MediaJobService
             VideoClipSeeds = record.VideoClipSeeds == null ? new List<long>() : new List<long>(record.VideoClipSeeds),
             ClientIds = new List<string>(record.ClientIds),
             PromptIds = new List<string>(record.PromptIds),
+            VideoFamilyId = record.VideoFamilyId,
             VideoRunId = record.VideoRunId,
             VideoPrompt = record.VideoPrompt,
             VideoRequestedFrames = record.VideoRequestedFrames,
@@ -595,6 +599,7 @@ public sealed class MediaJobService
         ComfyWorkflowRunner.VideoPlanObserver.Value = (prompt, seeds) => RecordVideoPlan(entry, prompt, seeds);
         ComfyWorkflowRunner.VideoClipPlanObserver.Value = (runId, prompt, requestedFrames, frameCounts) =>
             RecordVideoClipPlan(entry, runId, prompt, requestedFrames, frameCounts);
+        ComfyWorkflowRunner.VideoFamilyObserver.Value = familyId => { lock (entry.Gate) entry.Intent.VideoFamilyId = familyId; };
         ComfyWorkflowRunner.VideoClipObserver.Value = (index, clientId, promptId, outputPath) =>
             RecordVideoClip(entry, index, clientId, promptId, outputPath);
         ComfyWorkflowRunner.VideoFinalOutputObserver.Value = path => RecordVideoFinalOutput(entry, path);
@@ -605,6 +610,7 @@ public sealed class MediaJobService
         ComfyWorkflowRunner.SubmissionObserver.Value = null;
         ComfyWorkflowRunner.VideoPlanObserver.Value = null;
         ComfyWorkflowRunner.VideoClipPlanObserver.Value = null;
+        ComfyWorkflowRunner.VideoFamilyObserver.Value = null;
         ComfyWorkflowRunner.VideoClipObserver.Value = null;
         ComfyWorkflowRunner.VideoFinalOutputObserver.Value = null;
     }

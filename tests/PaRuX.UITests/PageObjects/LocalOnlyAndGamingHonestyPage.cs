@@ -72,6 +72,31 @@ internal sealed class LocalOnlyAndGamingHonestyPage
             && el.Properties.Name.ValueOrDefault.Contains(textSubstring, StringComparison.Ordinal));
     }
 
+    internal void ScrollSettingsContentUntilOnScreen(AutomationElement target, string description)
+    {
+        bool IsOnScreen() => !target.Properties.IsOffscreen.ValueOrDefault;
+        if (IsOnScreen()) return;
+
+        AutomationElement scrollHost = UiWait.ById(_window, "SettingsContentScroll", ControlType.Pane);
+        FlaUI.Core.Patterns.IScrollPattern scroll = scrollHost.Patterns.Scroll.PatternOrDefault
+            ?? throw new InvalidOperationException("SettingsContentScroll does not expose UIA ScrollPattern.");
+        for (int percent = 0; percent <= 100; percent += 5)
+        {
+            scroll.SetScrollPercent(-1, percent);
+            try
+            {
+                UiWait.For(IsOnScreen, description, TimeSpan.FromMilliseconds(400));
+                return;
+            }
+            catch (TimeoutException)
+            {
+                // Search the actual settings content scroll host; child controls can expose unrelated inner scrollers.
+            }
+        }
+
+        UiWait.For(IsOnScreen, description);
+    }
+
     internal AutomationElement? FindControlByName(string name, ControlType controlType)
     {
         var found = _window.FindFirstDescendant(cf =>

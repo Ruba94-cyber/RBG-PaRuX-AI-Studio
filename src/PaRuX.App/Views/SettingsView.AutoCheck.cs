@@ -11,8 +11,24 @@ namespace PaRuX.Views
     /// <summary>"Automatic checks" Settings section, bound to /api/v1/maintenance/settings, /status and /run-now.</summary>
     public sealed partial class SettingsView
     {
-        private bool _autoCheckLoading;
+        // True until the first status read has populated the controls: XAML initialisation raises
+        // Toggled/ValueChanged before every control exists, which used to throw (and would have saved defaults).
+        private bool _autoCheckLoading = true;
         private bool _autoCheckBusy;
+
+        private MediaLaneControl? _mediaLane;
+
+        /// <summary>Content lane (Standard / Uncensored / Automatic) for media generation; the same control and setting as the Create tabs.</summary>
+        private async Task RefreshMediaLaneAsync()
+        {
+            if (MediaLaneHost == null) return;
+            if (_mediaLane == null)
+            {
+                _mediaLane = new MediaLaneControl("Settings_Media");
+                MediaLaneHost.Children.Add(_mediaLane);
+            }
+            await _mediaLane.RefreshAsync();
+        }
 
         public async Task RefreshAutoCheckAsync(CancellationToken ct = default)
         {
@@ -26,6 +42,7 @@ namespace PaRuX.Views
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 Log.Write("RefreshAutoCheckAsync failed: " + ex.Message);
+                _autoCheckLoading = false;
                 if (Settings_AutoCheck_Status_Text != null)
                     Settings_AutoCheck_Status_Text.Text = "Automatic checks could not be read: " + ex.Message;
             }
@@ -43,6 +60,7 @@ namespace PaRuX.Views
                     Settings_AutoCheck_RuntimeUpdate_Toggle.IsOn = status.Settings.KeepRuntimesUpdated;
                 if (Settings_AutoCheck_MediaOptimize_Toggle != null)
                     Settings_AutoCheck_MediaOptimize_Toggle.IsOn = status.Settings.AutoOptimizeMedia;
+                    Settings_AutoCheck_Tuning_Explanation_Text.Text = ModelTuningPresenter.SettingsExplanation;
                 if (Settings_AutoCheck_MediaOptimize_Text != null && !_mediaOptimizeBusy)
                     Settings_AutoCheck_MediaOptimize_Text.Text = MaintenancePresenter.SummarizeMediaOptimization(status.MediaOptimization);
                 if (Settings_AutoCheck_RuntimeUpdate_Text != null)
@@ -145,6 +163,9 @@ namespace PaRuX.Views
 
         private async Task SaveAutoCheckAsync()
         {
+            if (Settings_AutoCheck_Enabled_Toggle == null || Settings_AutoCheck_Interval_Box == null
+                || Settings_AutoCheck_RuntimeUpdate_Toggle == null || Settings_AutoCheck_MediaOptimize_Toggle == null)
+                return;
             bool enabled = Settings_AutoCheck_Enabled_Toggle.IsOn;
             double hours = Settings_AutoCheck_Interval_Box.Value;
             bool keepRuntimes = Settings_AutoCheck_RuntimeUpdate_Toggle.IsOn;

@@ -86,8 +86,9 @@ The script publishes, as one Windows product:
 6. license/notices/provenance files;
 7. Windows-scoped generated CycloneDX SBOM;
 8. verified baseline `llama.cpp b10549` Vulkan payload;
-9. verified PaRuX-owned `uv 0.12.1` payload;
-10. the WiX x64 MSI.
+9. verified baseline `llama.cpp b11871` CUDA 13.4 payload and its NVIDIA CUDA Runtime/cuBLAS DLLs;
+10. verified PaRuX-owned `uv 0.12.1` payload;
+11. the WiX x64 MSI.
 
 The source project and namespace intentionally remain `PaRuX.Server` for compatibility; that internal implementation name is not the installed/public process identity.
 
@@ -96,7 +97,7 @@ The version must be canonical Windows Installer `major.minor.patch` and cannot e
 Expected primary artifact:
 
 ```text
-PaRuX-1.9.6-win-x64.msi
+PaRuX-1.9.7-win-x64.msi
 ```
 
 The WiX package has one stable `UpgradeCode`; every newer version is a Windows Installer **Major Upgrade** and downgrade is blocked.
@@ -111,7 +112,7 @@ First:
 .\scripts\generate-sbom.ps1 `
   -Scope windows `
   -OutputPath .\artifacts\publish\win-x64\PaRuX.Server\SBOM.cyclonedx.json `
-  -ProductVersion 1.9.6
+  -ProductVersion 1.9.7
 ```
 
 The Windows SBOM includes the resolved package graphs of the five projects published into the MSI — Desktop, Server, CLI, Update Helper and Windows ML worker — plus locked runtime/vendored components. `PaRuX.Server.Tests` and Android libraries are deliberately excluded because they are not installed by the Windows MSI.
@@ -129,10 +130,14 @@ Second:
 PaRuX.Server\runtime-baseline\baseline-lock.json
 PaRuX.Server\runtime-baseline\staging-manifest.json
 PaRuX.Server\runtime-baseline\llama.cpp-b10549-vulkan\...
+PaRuX.Server\runtime-baseline\llama.cpp-b11871-cuda13.4\...
 PaRuX.Server\runtime-tools\uv\uv.exe
+NVIDIA_CUDA_NOTICE.txt
 ```
 
-The staging manifest inventories the final extracted payload with file sizes and SHA-256 values. At runtime, bundled llama.cpp and uv are trusted only through that manifest-verification path.
+The CUDA server ZIP and its separate CUDA Runtime/cuBLAS DLL ZIP are hash-locked and co-staged into one folder. The MSI contains `cudart64_13.dll`, `cublas64_13.dll` and `cublasLt64_13.dll`, the Windows CUDA Runtime/cuBLAS redistributables named by Attachment A of [NVIDIA's CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html). `NVIDIA_CUDA_NOTICE.txt` is shipped beside the application. The staging manifest inventories the final extracted payload with file sizes and SHA-256 values. At runtime, bundled llama.cpp and uv are trusted only through that manifest-verification path.
+
+On first Server load, PaRuX selects the bundled CUDA 13.4 runtime only when DXGI identifies an NVIDIA adapter with compute capability 12.0 or newer and the NVIDIA driver is at least 580. Older NVIDIA drivers keep the existing CUDA 12.4 managed-download path; the bootstrap does not route those machines to bundled Vulkan. Non-NVIDIA adapters use the bundled Vulkan baseline. An existing selected or legacy CUDA runtime is preserved.
 
 ## 3. Android and repository-wide SBOMs
 

@@ -48,9 +48,26 @@ internal sealed record RegistryFamily(
     IReadOnlyList<string> RequiredNodes,
     RegistrySignature Signature,
     IReadOnlyList<RegistryCompanion> Companions,
-    string? MinComfyUiVersion = null)
+    string? MinComfyUiVersion = null,
+    IReadOnlyDictionary<string, string>? PipelineTemplates = null,
+    string? StartImageTemplate = null)
 {
     public bool IsSupported => Support == "supported";
+
+    /// <summary>The workflow template this family runs for a pipeline: its own entry in <see cref="PipelineTemplates"/> when the
+    /// family needs a different graph for that pipeline (for example an edit graph beside a text-to-image graph), otherwise
+    /// <see cref="TemplateFile"/>. Null when the family does not run the pipeline.</summary>
+    public string? TemplateFor(string pipeline)
+    {
+        if (!Pipelines.Contains(pipeline, StringComparer.Ordinal)) return null;
+        return PipelineTemplates is not null && PipelineTemplates.TryGetValue(pipeline, out string? own) ? own : TemplateFile;
+    }
+
+    /// <summary>Every template file this family can submit, including the video start-image template when it has one.</summary>
+    public IEnumerable<string> AllTemplateFiles =>
+        Pipelines.Select(TemplateFor).Where(file => file != null).Select(file => file!)
+            .Concat(StartImageTemplate is null ? Array.Empty<string>() : new[] { StartImageTemplate })
+            .Distinct(StringComparer.Ordinal);
 }
 
 internal sealed record RegistryEmbeddedStems(IReadOnlyList<string> TextEncoder, IReadOnlyList<string> Vae);
@@ -63,6 +80,7 @@ internal sealed record RegistryEmbeddedStems(IReadOnlyList<string> TextEncoder, 
 internal sealed class MediaCompanionRegistry
 {
     public const string ResourceName = "PaRuX.Server.Assets.media.media-companion-registry.json";
+    internal const string CheckpointLoaderClass = "CheckpointLoaderSimple";
 
     private static readonly Regex FamilyIdPattern = new(@"^[a-z0-9][a-z0-9.\-]{0,39}$", RegexOptions.CultureInvariant);
     private static readonly Regex RepositoryPattern = new(@"^[A-Za-z0-9][A-Za-z0-9._\-]*/[A-Za-z0-9][A-Za-z0-9._\-]*$", RegexOptions.CultureInvariant);
@@ -110,7 +128,7 @@ internal sealed class MediaCompanionRegistry
     /// <summary>The ComfyUI version a supported family's workflow needs, found by its workflow template file name.
     /// Null when the family declares no minimum; the shipped manifest declares none until a minimum is verified.</summary>
     public string? MinimumComfyUiVersionFor(string templateFile) =>
-        Families.FirstOrDefault(family => family.IsSupported && string.Equals(family.TemplateFile, templateFile, StringComparison.Ordinal))
+        Families.FirstOrDefault(family => family.IsSupported && family.AllTemplateFiles.Contains(templateFile, StringComparer.Ordinal))
             ?.MinComfyUiVersion;
 
     /// <summary>Families a media pipeline can run, such as those that list "image" in their pipelines.</summary>
@@ -192,7 +210,7 @@ internal sealed class MediaCompanionRegistry
     private static RegistryFamily ParseFamily(JsonObject family)
     {
         AllowOnly(family, "family", "id", "displayName", "support", "reason", "pipelines", "templateFile",
-            "mainLoader", "requiredNodes", "signature", "companions", "minComfyUiVersion");
+            "mainLoader", "requiredNodes", "signature", "companions", "minComfyUiVersion", "pipelineTemplates", "startImageTemplate");
 
         string id = Str(family, "family", "id", 40);
         if (!FamilyIdPattern.IsMatch(id)) throw Invalid("family id \"" + id + "\" is not a lowercase slug.");
@@ -225,10 +243,42 @@ internal sealed class MediaCompanionRegistry
                 Str(loader, where + ".mainLoader", "classType", 64),
                 Str(loader, where + ".mainLoader", "input", 64),
                 Str(loader, where + ".mainLoader", "folder", 32));
-            if (mainLoader.Folder != "diffusion_models") throw Invalid(where + ": the main loader must read diffusion_models.");
+            // A single-file checkpoint (CLIP and VAE embedded) is read by CheckpointLoaderSimple from ComfyUI's checkpoints folder;
+            // every other main model is a diffusion model read from diffusion_models.
+            bool checkpointLoader = mainLoader.ClassType == CheckpointLoaderClass;
+            if (checkpointLoader ? mainLoader.Folder != "checkpoints" || mainLoader.Input != "ckpt_name" : mainLoader.Folder != "diffusion_models")
+                throw Invalid(where + ": the main loader must read diffusion_models"
+                    + ", or checkpoints through " + CheckpointLoaderClass + ".ckpt_name.");
         }
         if (support == "supported" && (templateFile == null || !templateFile.EndsWith(".json", StringComparison.Ordinal) || mainLoader == null))
             throw Invalid(where + ": a supported family needs a workflow template and a main loader.");
+
+        Dictionary<string, string>? pipelineTemplates = null;
+        if (family["pipelineTemplates"] != null)
+        {
+            JsonObject own = Obj(family["pipelineTemplates"], where + ".pipelineTemplates");
+            if (support != "supported") throw Invalid(where + ": only a supported family may name pipeline templates.");
+            pipelineTemplates = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, JsonNode?> entry in own)
+            {
+                if (!pipelines.Contains(entry.Key, StringComparer.Ordinal))
+                    throw Invalid(where + ": a template is named for pipeline \"" + entry.Key + "\", which the family does not run.");
+                string file = Str(own, where + ".pipelineTemplates", entry.Key, 120);
+                if (!file.EndsWith(".json", StringComparison.Ordinal) || file.Contains('/') || file.Contains('\\') || file.Contains(".."))
+                    throw Invalid(where + ": pipeline template \"" + file + "\" must be a plain .json file name.");
+                pipelineTemplates[entry.Key] = file;
+            }
+        }
+
+        string? startImageTemplate = OptStr(family, where, "startImageTemplate", 120);
+        if (startImageTemplate != null)
+        {
+            if (support != "supported" || !pipelines.Contains("video", StringComparer.Ordinal))
+                throw Invalid(where + ": only a supported video family may name a start-image template.");
+            if (!startImageTemplate.EndsWith(".json", StringComparison.Ordinal) || startImageTemplate.Contains('/')
+                || startImageTemplate.Contains('\\') || startImageTemplate.Contains(".."))
+                throw Invalid(where + ": start-image template \"" + startImageTemplate + "\" must be a plain .json file name.");
+        }
 
         List<string> requiredNodes = StringArray(family, where, "requiredNodes", required: false, maxItems: 64).ToList();
         if (support == "supported" && requiredNodes.Count == 0) throw Invalid(where + ": a supported family must list the ComfyUI nodes it needs.");
@@ -268,7 +318,7 @@ internal sealed class MediaCompanionRegistry
         }
 
         return new RegistryFamily(id, displayName, support, reason, pipelines, templateFile, mainLoader,
-            requiredNodes, new RegistrySignature(required, forbidden, shapeChecks), companions, minComfyUi);
+            requiredNodes, new RegistrySignature(required, forbidden, shapeChecks), companions, minComfyUi, pipelineTemplates, startImageTemplate);
     }
 
     private static RegistryCompanion ParseCompanion(JsonObject companion, string where, string support)

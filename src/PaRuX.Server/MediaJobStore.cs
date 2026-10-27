@@ -145,6 +145,9 @@ internal sealed class MediaJobRecord
     // ComfyUI's client id is recorded before a submission is posted; the prompt id is recorded once ComfyUI returns it.
     public List<string> ClientIds { get; set; } = new();
     public List<string> PromptIds { get; set; } = new();
+    /// <summary>Registry id of the video family the job runs. Absent on jobs saved before families existed: those were Wan 2.2 5B.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? VideoFamilyId { get; set; }
     public string? VideoRunId { get; set; }
     public string? VideoPrompt { get; set; }
     public int VideoRequestedFrames { get; set; }

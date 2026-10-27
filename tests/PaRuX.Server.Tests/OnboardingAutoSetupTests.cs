@@ -40,8 +40,9 @@ namespace PaRuX.Server.Tests
             { RuntimeConfirmCalls++; return Task.FromResult(ConfirmRuntime); }
             public Task InstallRuntimeAsync(AutoSetupRuntimeOffer offer, IProgress<InstallProgressPresentation> progress, CancellationToken ct)
             { RuntimeInstallCalls++; return Task.CompletedTask; }
+            public Dictionary<string, List<ModelQuantChoice>> ChoicesByRepo = new();
             public Task<IReadOnlyList<ModelQuantChoice>> GetQuantChoicesAsync(string repoId, CancellationToken ct) =>
-                Task.FromResult<IReadOnlyList<ModelQuantChoice>>(Choices);
+                Task.FromResult<IReadOnlyList<ModelQuantChoice>>(ChoicesByRepo.TryGetValue(repoId, out var list) ? list : Choices);
             public Task<AutoSetupFit> EstimateFitAsync(long totalBytes, CancellationToken ct) => Task.FromResult(Fit(totalBytes));
             public Task<ModelDownloadPlan> GetPlanAsync(string repoId, ModelQuantChoice choice, CancellationToken ct)
             {
@@ -67,7 +68,12 @@ namespace PaRuX.Server.Tests
             }
             public Task CancelDownloadsAsync(IReadOnlyList<string> ids) { CancelCalls++; return Task.CompletedTask; }
             public Task<RoleAutoAssignResponse> AutoAssignRolesAsync(CancellationToken ct) { AssignCalls++; return Task.FromResult(Roles); }
-            public Task<string?> VerifyChatAsync(CancellationToken ct) { VerifyCalls++; return Task.FromResult(VerifyFailure); }
+            public Queue<string?> VerifyQueue = new();
+            public Task<string?> VerifyChatAsync(CancellationToken ct)
+            {
+                VerifyCalls++;
+                return Task.FromResult(VerifyQueue.Count > 0 ? VerifyQueue.Dequeue() : VerifyFailure);
+            }
         }
 
         private static ModelQuantChoice Choice(string quant, long size) => new()
@@ -232,6 +238,73 @@ namespace PaRuX.Server.Tests
             AutoSetupViewModel vm = OnboardingAutoSetupPresenter.Present(result);
             Assert.True(vm.ShowSkip);
             Assert.True(vm.PrimaryEnabled);
+        }
+
+        [Fact]
+        public void Ready_state_offers_start_chatting_not_set_up_again()
+        {
+            AutoSetupViewModel vm = OnboardingAutoSetupPresenter.Present(
+                new AutoSetupState { Phase = AutoSetupPhase.Ready, Message = "ok" });
+
+            Assert.Equal("Start chatting", vm.PrimaryLabel);
+            Assert.True(vm.PrimaryEnabled);
+        }
+
+        [Fact]
+        public async Task Verification_is_retried_when_the_runtime_changed_while_it_ran()
+        {
+            // Real first run: the managed runtime updater switched the runtime during the chat check, the check
+            // reported "changed during verification" and the whole setup stopped on a transient condition.
+            var host = new FakeHost();
+            host.Polls.Enqueue(new() { Dl("completed", 4 * Gb, 4 * Gb) });
+            host.VerifyQueue.Enqueue("Your model or runtime changed during verification. Check the current setup and retry.");
+            host.VerifyQueue.Enqueue(null);
+
+            AutoSetupState result = await Make(host).RunAsync(CancellationToken.None);
+
+            Assert.Equal(AutoSetupPhase.Ready, result.Phase);
+            Assert.Equal(2, host.VerifyCalls);
+        }
+
+        [Fact]
+        public async Task A_real_wrong_answer_is_not_retried_automatically()
+        {
+            var host = new FakeHost { VerifyFailure = "The local model did not return the one-time code." };
+            host.Polls.Enqueue(new() { Dl("completed", 4 * Gb, 4 * Gb) });
+
+            AutoSetupState result = await Make(host).RunAsync(CancellationToken.None);
+
+            Assert.Equal(AutoSetupPhase.Failed, result.Phase);
+            Assert.Equal(1, host.VerifyCalls);
+        }
+
+        [Fact]
+        public async Task Falls_back_to_the_next_candidate_when_no_file_of_the_recommended_model_fits()
+        {
+            // Real clean install on a 16 GB GPU: the recommended 27B had no quantisation that fit and the
+            // automatic setup stopped with "No recommended model fits this PC" instead of trying a smaller model.
+            FirstModelAdvice advice = MakeAdvice("FitsOnGpu");
+            advice.Candidates.Add(new FirstModelCandidate
+            {
+                Suitability = "FitsOnGpu", Rank = 2, Reason = "r2",
+                Model = new RecommendedModel
+                {
+                    Id = "m2", Title = "Fixture 8B", HuggingFaceRepoId = "fixture/small", QuantHint = "Q4_K_M",
+                    EstimatedSizeBytes = 2 * Gb, CapabilityIds = new List<string> { ModelCapabilityIds.GeneralChat }
+                }
+            });
+            var host = new FakeHost { Advice = advice };
+            host.Fit = bytes => bytes <= 3 * Gb ? AutoSetupFit.Fits : AutoSetupFit.TooBig;
+            host.ChoicesByRepo["fixture/general"] = new List<ModelQuantChoice> { Choice("Q4_K_M", 9 * Gb), Choice("Q2_K", 5 * Gb) };
+            host.ChoicesByRepo["fixture/small"] = new List<ModelQuantChoice> { Choice("Q4_K_M", 2 * Gb) };
+            host.Polls.Enqueue(new() { Dl("completed", 2 * Gb, 2 * Gb) });
+
+            AutoSetupState result = await Make(host).RunAsync(CancellationToken.None);
+
+            Assert.Equal(AutoSetupPhase.Ready, result.Phase);
+            Assert.Equal("fixture/small", result.RepoId);
+            Assert.Equal("Fixture 8B", result.ModelTitle);
+            Assert.Contains("Fixture 7B", result.ModelNote);
         }
 
         [Fact]
@@ -439,6 +512,63 @@ namespace PaRuX.Server.Tests
                 b => Task.FromResult(b <= 6 * Gb ? AutoSetupFit.Fits : AutoSetupFit.TooBig));
 
             Assert.Equal("Q4_K_S", picked!.Quantization);   // hinted Q4_K_M is incomplete, so next preferred
+        }
+
+        [Theory]
+        [InlineData("IQ1_S")]
+        [InlineData("IQ1_M")]
+        [InlineData("IQ2_XXS")]
+        [InlineData("IQ2_M")]
+        [InlineData("Q2_K")]
+        public async Task Picker_NeverChoosesAQuantisationBelowThreeBits(string lowQuant)
+        {
+            // Real first run: a 27B on a 16 GB card was set up as IQ1_S because it was the only file that "fit".
+            // A 1-2 bit model is not a usable first model; the setup must move to a smaller model instead.
+            var candidate = MakeAdvice("FitsOnGpu").Candidates[0];
+            var choices = new List<ModelQuantChoice> { Choice(lowQuant, 3 * Gb) };
+
+            ModelQuantChoice? picked = await AutoSetupModelPicker.PickQuantAsync(choices, candidate,
+                b => Task.FromResult(AutoSetupFit.Fits));
+
+            Assert.Null(picked);
+        }
+
+        [Fact]
+        public async Task Falls_back_to_a_smaller_model_instead_of_a_one_bit_quantisation_of_the_big_one()
+        {
+            FirstModelAdvice advice = MakeAdvice("FitsOnGpu");
+            advice.Candidates.Add(new FirstModelCandidate
+            {
+                Suitability = "FitsOnGpu", Rank = 2, Reason = "r2",
+                Model = new RecommendedModel
+                {
+                    Id = "m2", Title = "Fixture 8B", HuggingFaceRepoId = "fixture/small", QuantHint = "Q4_K_M",
+                    EstimatedSizeBytes = 2 * Gb, CapabilityIds = new List<string> { ModelCapabilityIds.GeneralChat }
+                }
+            });
+            var host = new FakeHost { Advice = advice };
+            host.Fit = bytes => bytes <= 3 * Gb ? AutoSetupFit.Fits : AutoSetupFit.TooBig;
+            host.ChoicesByRepo["fixture/general"] = new List<ModelQuantChoice> { Choice("IQ1_S", 2 * Gb), Choice("Q4_K_M", 9 * Gb) };
+            host.ChoicesByRepo["fixture/small"] = new List<ModelQuantChoice> { Choice("Q4_K_M", 2 * Gb) };
+            host.Polls.Enqueue(new() { Dl("completed", 2 * Gb, 2 * Gb) });
+
+            AutoSetupState result = await Make(host).RunAsync(CancellationToken.None);
+
+            Assert.Equal("fixture/small", result.RepoId);
+            Assert.Equal("Q4_K_M", result.Quantization);
+        }
+
+        [Fact]
+        public async Task Picker_RejectsAFileFarSmallerThanTheModelItClaimsToQuantise()
+        {
+            // The fixture model is estimated at 4 GB; a 0.5 GB file under its name is not a quantisation of it.
+            var candidate = MakeAdvice("FitsOnGpu").Candidates[0];
+            var choices = new List<ModelQuantChoice> { Choice("Q4_0", Gb / 2), Choice("Q4_K_M", 4 * Gb) };
+
+            ModelQuantChoice? picked = await AutoSetupModelPicker.PickQuantAsync(choices, candidate,
+                b => Task.FromResult(AutoSetupFit.Fits));
+
+            Assert.Equal("Q4_K_M", picked!.Quantization);
         }
 
         [Fact]

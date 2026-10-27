@@ -247,23 +247,29 @@ namespace PaRuX.Views
         {
             var root = new Grid();
             var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-            var body = new StackPanel
+            // The page is three tab panels under one header: Text models (everything that was here before), Media, Downloads.
+            // "body" stays the Text panel so the existing section ordering code keeps working unchanged.
+            var outer = new StackPanel
             {
                 Spacing = 18,
                 Margin = new Thickness(24),
                 MaxWidth = 1180,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
-            scroll.Content = body;
+            var body = new StackPanel { Spacing = 18 };
+            scroll.Content = outer;
             root.Children.Add(scroll);
 
-            body.Children.Add(new TextBlock { Text = "Model Hub", FontSize = 28, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-            body.Children.Add(new TextBlock
+            outer.Children.Add(new TextBlock { Text = "Model Hub", FontSize = 28, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+            outer.Children.Add(new TextBlock
             {
                 Text = "Choose the right local model, not just a file. Compare GGUF quantizations against this PC's real GPU/RAM capacity, manage resumable downloads, inspect installed performance and select compatible Image / Video / Edit checkpoints from one workspace.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.78
             });
+
+            // Non-modal "Tuning for your PC" status: the running job, or the latest result for a few minutes (text and media).
+            outer.Children.Add(new ModelTuningStatusControl(ModelTuningStatusControl.Mode.Hub));
 
             var searchRow = new Grid { ColumnSpacing = 8 };
             searchRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -292,9 +298,7 @@ namespace PaRuX.Views
             AutomationProperties.SetAutomationId(_discoveryRefreshStatus,
                 "ModelHub_DiscoveryRefresh_Status_Text");
             body.Children.Add(_discoveryRefreshStatus);
-            body.Children.Add(_busy);
             AutomationProperties.SetAutomationId(_status, "ModelHub_Status_Text");
-            body.Children.Add(_status);
             body.Children.Add(_hardwareSummary);
 
             _suggestionsSection = Section("SUGGESTED FOR THIS PC · CANDIDATES, NOT VALIDATED", _suggestions);
@@ -688,9 +692,8 @@ namespace PaRuX.Views
             _installedSection = Section("INSTALLED TEXT MODEL LIBRARY", _installed);
             body.Children.Add(_recommendedSection);
             body.Children.Add(_searchSection);
-            body.Children.Add(_mediaSection);
-            body.Children.Add(_downloadsSection);
             body.Children.Add(_installedSection);
+            BuildHubTabs(outer, body);
             return root;
         }
 
@@ -747,8 +750,6 @@ namespace PaRuX.Views
             elementsToMove.AddRange(_debugFixtures);
             elementsToMove.Add(_recommendedSection);
             elementsToMove.Add(_searchSection);
-            elementsToMove.Add(_mediaSection);
-            elementsToMove.Add(_downloadsSection);
             elementsToMove.Add(_installedSection);
 
             foreach (var elem in elementsToMove)
@@ -771,18 +772,14 @@ namespace PaRuX.Views
                     _body.Children.Add(debugFixture);
                 }
                 _body.Children.Add(_recommendedSection);
-                _body.Children.Add(_searchSection);
-                _body.Children.Add(_mediaSection);
-                _body.Children.Add(_downloadsSection);
                 _body.Children.Add(_installedSection);
+                _body.Children.Add(_searchSection);
             }
             else
             {
                 _body.Children.Add(_recommendedSection);
-                _body.Children.Add(_searchSection);
-                _body.Children.Add(_mediaSection);
-                _body.Children.Add(_downloadsSection);
                 _body.Children.Add(_installedSection);
+                _body.Children.Add(_searchSection);
                 if (_cohortFilterRow != null) _body.Children.Add(_cohortFilterRow);
                 _body.Children.Add(_candidateActions);
                 _body.Children.Add(_explicitDiscoveryStatus);
@@ -883,8 +880,9 @@ namespace PaRuX.Views
                 RenderCandidateUtilityPolicyStatus();
                 _mediaCatalogue = mediaCatalogueTask.Result ?? _mediaCatalogue;
                 RenderMedia(mediaTask.Result, mediaRecommendedTask.Result, downloadsTask.Result);
+                RenderHuggingFaceRows(downloadsTask.Result);
                 RenderDiscoveryRefreshStatus();
-                _status.Text = installedTask.Result.Count + " installed GGUF model(s) · "
+                _status.Text = installedTask.Result.Count + " PaRuX-managed GGUF model(s) (models you linked from elsewhere are listed in Settings > Models) · "
                     + mediaTask.Result.Count + " media role(s) · " + downloadsTask.Result.Count + " download job(s) · "
                     + (_discoveryCatalog?.Candidates.Count ?? 0) + " discovered Candidate(s).";
                 if (_catalogStale) _status.Text += " · " + StaleCatalogMessage;
@@ -2846,7 +2844,8 @@ namespace PaRuX.Views
                 if (!reconciled)
                     _candidateDownloadUnknown.Add(selectedCandidate.Key);
                 _status.Text = reconciled
-                    ? "Candidate start response was not confirmed. The Core queue and managed library were refreshed; retry is safe if no matching transfer is active."
+                    ? "Candidate start response was not confirmed (" + LimitDisplay(ex.Message, 180)
+                        + "). The Core queue and managed library were refreshed; retry is safe if no matching transfer is active."
                     : "Candidate start status is unknown because the Core queue could not be refreshed. PaRuX has blocked another start until Model Hub can reconcile it. Details: "
                         + LimitDisplay(ex.Message, 180);
             }
@@ -4191,7 +4190,7 @@ namespace PaRuX.Views
                 _media.Children.Add(new TextBlock
                 {
                     Text = label + " · active: " + (string.IsNullOrWhiteSpace(status.CurrentFile) ? "not configured" : status.CurrentFile)
-                        + (status.IsOverridden ? " · custom selection" : " · workflow default"),
+                        + " · " + MediaSelectionPresenter.SummarySource(status),
                     TextWrapping = TextWrapping.Wrap,
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
                 });
@@ -4246,24 +4245,38 @@ namespace PaRuX.Views
             SetBusy(true, "Checking repository terms for " + checkpoint.FileName + "…");
             try
             {
-                bool queued = await ModelLicenseConsentPrompt.ConfirmAndStartRepositoryDownloadAsync(
-                    XamlRoot,
-                    checkpoint.HuggingFaceRepoId,
-                    checkpoint.FileName,
-                    async (revision, licenseEvidence) =>
+                async Task StartPinnedDownload(string revision, ModelDownloadLicenseEvidence licenseEvidence)
+                {
+                    var download = new ModelDownloadRequest
                     {
-                        var download = new ModelDownloadRequest
-                        {
-                            RepoId = checkpoint.HuggingFaceRepoId,
-                            FileName = checkpoint.FileName,
-                            DownloadUrl = checkpoint.DownloadUrl,
-                            SizeBytes = checkpoint.EstimatedSizeBytes,
-                            MediaCheckpointType = checkpoint.Type,
-                            LicenseEvidence = licenseEvidence
-                        };
-                        ModelDownloadClient.PinRequestToRevision(download, revision);
-                        await ModelDownloadClient.Current.StartDownloadAsync(download, CancellationToken.None);
-                    });
+                        RepoId = checkpoint.HuggingFaceRepoId,
+                        Revision = revision,
+                        FileName = checkpoint.FileName,
+                        DownloadUrl = checkpoint.DownloadUrl,
+                        SizeBytes = checkpoint.EstimatedSizeBytes,
+                        ExpectedSha256 = string.IsNullOrWhiteSpace(checkpoint.Sha256) ? null : checkpoint.Sha256.Trim(),
+                        MediaCheckpointType = checkpoint.Type,
+                        LicenseEvidence = licenseEvidence
+                    };
+                    ModelDownloadClient.PinRequestToRevision(download, revision);
+                    await ModelDownloadClient.Current.StartDownloadAsync(download, CancellationToken.None);
+                }
+
+                bool queued;
+                if (ModelRevisionIdentity.IsValid(checkpoint.Revision))
+                {
+                    // The catalogue pins repository + revision + SHA-256 and carries its declared licence:
+                    // that is the review text. No second live metadata lookup is made or needed.
+                    var decision = ModelLicenseConsentPolicy.EvaluateCatalogue(checkpoint.License);
+                    queued = await ModelLicenseConsentPrompt.ConfirmAndStartAtRevisionAsync(
+                        XamlRoot, checkpoint.HuggingFaceRepoId, checkpoint.FileName,
+                        decision, checkpoint.Revision, StartPinnedDownload);
+                }
+                else
+                {
+                    queued = await ModelLicenseConsentPrompt.ConfirmAndStartRepositoryDownloadAsync(
+                        XamlRoot, checkpoint.HuggingFaceRepoId, checkpoint.FileName, StartPinnedDownload);
+                }
                 if (!queued)
                 {
                     trigger.IsEnabled = true;
@@ -4791,6 +4804,19 @@ namespace PaRuX.Views
                         HorizontalAlignment = HorizontalAlignment.Left
                     });
                 }
+                var deleteButton = new Button { Content = "Delete", HorizontalAlignment = HorizontalAlignment.Left };
+                AutomationProperties.SetName(deleteButton, "Delete model " + model.FileName);
+                string capturedFile = model.FileName;
+                long capturedSize = model.SizeBytes;
+                deleteButton.Click += async (_, _) =>
+                {
+                    deleteButton.IsEnabled = false;
+                    (bool deleted, string message) = await ManagedModelDeleteFlow.RunAsync(XamlRoot, capturedFile, capturedSize);
+                    _status.Text = message;
+                    if (deleted) await RefreshAllAsync();
+                    else deleteButton.IsEnabled = true;
+                };
+                row.Children.Add(deleteButton);
                 _installed.Children.Add(row);
             }
             if (models.Count == 0) _installed.Children.Add(new TextBlock { Text = "No PaRuX-managed GGUF model is installed yet." });

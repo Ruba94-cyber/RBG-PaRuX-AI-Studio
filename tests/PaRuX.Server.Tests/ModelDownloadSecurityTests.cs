@@ -24,6 +24,19 @@ public sealed class ModelDownloadSecurityTests
     }
 
     [Fact]
+    public void Expected_sha256_is_validated_and_normalized()
+    {
+        ModelDownloadRequest request = Valid();
+        request.ExpectedSha256 = new string('A', 64);
+
+        ModelDownloadRequest validated = ModelDownloadService.ValidateDownloadRequest(request);
+
+        Assert.Equal(new string('a', 64), validated.ExpectedSha256);
+        request.ExpectedSha256 = "not-a-digest";
+        Assert.Throws<InvalidDataException>(() => ModelDownloadService.ValidateDownloadRequest(request));
+    }
+
+    [Fact]
     public void Valid_huggingface_safetensors_checkpoint_is_accepted()
     {
         // Safetensors downloads must name their media workflow; this file is a Z-Image checkpoint.

@@ -288,12 +288,7 @@ namespace PaRuX
                     Content = new ScrollViewer
                     {
                         MaxHeight = 450,
-                        Content = new TextBlock
-                        {
-                            Text = markdown,
-                            TextWrapping = TextWrapping.Wrap,
-                            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas, Segoe UI Variable, Segoe UI")
-                        }
+                        Content = RenderMarkdownPanel(markdown)
                     },
                     CloseButtonText = "Close",
                     DefaultButton = ContentDialogButton.Close,

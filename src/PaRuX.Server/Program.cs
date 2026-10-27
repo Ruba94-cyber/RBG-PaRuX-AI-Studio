@@ -20,6 +20,7 @@ using PaRuX.Server.CapabilityProfiler;
 using PaRuX.Intelligence;
 
 StartupTrace.Mark("main-entered");
+PaRuX.Server.BundledBaselineRuntimeBootstrap.Initialize();
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 PaRuX.Server.Gateway.GatewaySettings gatewaySettings = PaRuX.Server.Gateway.GatewaySettings.Load(ServerState.StateDirectory);
 LocalApiServerService.VendorModelDefault = gatewaySettings.VendorModelDefault;
@@ -50,6 +51,7 @@ builder.Services.AddSingleton<RuntimeManagerService>(services => new RuntimeMana
     services.GetRequiredService<ISystemRamSnapshotProvider>(),
     services.GetRequiredService<IGpuPerformanceTelemetrySnapshotProvider>()));
 builder.Services.AddSingleton<RuntimeInstallService>();
+builder.Services.AddSingleton<MediaSetupService>();
 builder.Services.AddSingleton<ComponentInventoryService>();
 builder.Services.AddSingleton<SmartRouterService>(services => new SmartRouterService(
     services.GetRequiredService<RuntimeManagerService>(),
@@ -112,21 +114,39 @@ builder.Services.AddSingleton<IContinuousSpeechStatusProvider>(services => servi
 builder.Services.AddSingleton<IContinuousSpeechStreamWorker>(services =>
     ContinuousTtsWorker.For(services.GetRequiredService<LocalRuntimeService>()));
 builder.Services.AddSingleton<ModelBenchmarkStore>();
+builder.Services.AddSingleton(_ => new ModelTuningTracker());
 builder.Services.AddSingleton<IModelBenchmarkRunner, LlamaBenchRunner>();
 builder.Services.AddSingleton<ModelBenchmarkService>();
 builder.Services.AddModelArenaServices();
 builder.Services.AddSingleton<IModelDestinationSpaceProvider, ModelDestinationSpaceProvider>();
 builder.Services.AddSingleton<PaRuX.Server.Orchestration.Gaming.IGamingResumable>(services => services.GetRequiredService<ModelDownloadService>());
 builder.Services.AddSingleton<ModelDownloadService>(services => new ModelDownloadService(
-    completionHandler: services.GetRequiredService<ModelBenchmarkService>(),
+    completionHandler: new PostDownloadOptimizationHandler(
+        services.GetRequiredService<ModelBenchmarkService>(), new PostDownloadOptimizationQueue(),
+        services.GetRequiredService<ModelTuningTracker>(),
+        // Resolved lazily: the maintenance service (and so the media optimiser) is built after the download service.
+        queueMedia: (path, label) => services.GetService<AutoMaintenanceService>()?.MediaOptimizer?.QueueCheckpoint(path, label),
+        repoIdFor: path => ModelDownloadService.RepoIdFor(path),
+        listRepoFiles: (repo, ct) => services.GetRequiredService<ModelDownloadService>().ListRepoGgufFilesAsync(repo, ct)),
     destinationSpaceProvider: services.GetRequiredService<IModelDestinationSpaceProvider>(),
     stateDirectory: ServerState.StateDirectory,
     scanOrphanPartials: true));
+builder.Services.AddSingleton<ManagedModelDeletionService>(services =>
+{
+    RuntimeManagerService runtime = services.GetRequiredService<RuntimeManagerService>();
+    return new ManagedModelDeletionService(
+        services.GetRequiredService<ModelDownloadService>(),
+        async ct => (await runtime.GetStatusAsync(ct)).ActiveModelPath,
+        log: services.GetRequiredService<ILoggerFactory>().CreateLogger("ManagedModelDeletion"));
+});
 builder.Services.AddSingleton<IModelDiscoveryProvider>(_ => ModelDiscoveryProviderSelector.Create(
     Environment.GetEnvironmentVariable(ModelDiscoveryProviderSelector.EndpointVariable),
     () => new HuggingFaceModelDiscoveryProvider()));
 builder.Services.AddSingleton<LoraInstallJobs>(services => new LoraInstallJobs(services.GetRequiredService<ModelDownloadService>()));
 builder.Services.AddSingleton(_ => new ModelDiscoveryCatalogStore());
+builder.Services.AddSingleton<IMediaDiscoveryProvider>(_ => new HuggingFaceMediaDiscoveryProvider());
+builder.Services.AddSingleton(sp => new MediaDiscoveryService(sp.GetRequiredService<IMediaDiscoveryProvider>(),
+    new MediaDiscoveryStore(), MediaCompanionRegistry.Shipped, isGamingActive: () => sp.GetRequiredService<LocalRuntimeService>().GamingMode));
 builder.Services.AddSingleton(_ => new ModelDiscoveryPolicyStore());
 builder.Services.AddSingleton(services => new ModelDiscoveryService(
     services.GetRequiredService<IModelDiscoveryProvider>(),
@@ -191,6 +211,8 @@ builder.Services.AddHostedService(services => services.GetRequiredService<Candid
 builder.Services.AddSingleton<ModelCompareService>();
 builder.Services.AddSingleton<GroupChatService>();
 builder.Services.AddSingleton<ThreedService>();
+builder.Services.AddSingleton<CutoutService>();
+builder.Services.AddSingleton<MusicService>();
 builder.Services.AddSingleton<TaskStore>();
 builder.Services.AddSingleton<AgentOrchestrator>();
 builder.Services.AddSingleton<ILocalCompletionClient, LlamaServerCompletionClient>();
@@ -1036,6 +1058,19 @@ app.MapPost("/api/v1/personas", (CreatePersonaRequest request, PersonaService pe
     try { return Results.Ok(personas.Create(request.Name, request.SystemPrompt)); }
     catch (InvalidDataException ex) { return Results.BadRequest(new { error = ex.Message }); }
 }).RequireDesktopOwner();
+
+app.MapPost("/api/v1/personas/import-card", (ImportPersonaCardRequest request, PersonaService personas) =>
+{
+    try
+    {
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(request.DataBase64 ?? string.Empty); }
+        catch (FormatException) { return Results.BadRequest(new { error = "The card data is not valid Base64." }); }
+        (string name, string prompt) = CharacterCardImporter.ToPersona(bytes, request.FileName ?? string.Empty);
+        return Results.Ok(personas.Create(name, prompt));
+    }
+    catch (InvalidDataException exception) { return Results.BadRequest(new { error = exception.Message }); }
+});
 
 app.MapDelete("/api/v1/personas/{id}", (string id, PersonaService personas) =>
 {
@@ -2648,6 +2683,8 @@ app.MapPost("/api/v1/models/roles/auto-assign", async (
 
 AutoMaintenanceEndpoints.Map(app);
 MediaCatalogueEndpoints.Map(app);
+MediaDiscoveryEndpoints.Map(app);
+MediaLaneEndpoints.Map(app);
 RuntimeSuggestionEndpoints.Map(app);
 
 app.MapGet("/api/v1/models/budget", async (ModelDownloadService models) => Results.Ok(await models.GetBudgetAsync()));
@@ -2669,10 +2706,16 @@ app.MapGet("/api/v1/models/library", (ModelDownloadService models, ModelBenchmar
     return Results.Ok(library);
 });
 
-app.MapDelete("/api/v1/models/library/{fileName}", (string fileName, ModelDownloadService models) =>
+app.MapDelete("/api/v1/models/library/{fileName}", async (string fileName, ManagedModelDeletionService deletion, CancellationToken ct) =>
 {
-    try { return models.DeleteManagedModel(fileName) ? Results.NoContent() : Results.NotFound(new { error = "Managed model not found" }); }
-    catch (InvalidDataException ex) { return Results.BadRequest(new { error = ex.Message }); }
+    ManagedModelDeleteResult result = await deletion.DeleteAsync(fileName, ct);
+    return result.Status switch
+    {
+        ManagedModelDeleteStatus.Deleted => Results.NoContent(),
+        ManagedModelDeleteStatus.NotFound => Results.NotFound(new { error = result.Message }),
+        ManagedModelDeleteStatus.Refused => Results.Conflict(new { error = result.Message, blockers = result.Blockers }),
+        _ => Results.BadRequest(new { error = result.Message })
+    };
 }).RequireDesktopOwner();
 
 app.MapPost("/api/v1/models/library/import", (ImportManagedModelRequest request, ModelDownloadService models) =>
@@ -3466,32 +3509,22 @@ static MediaCheckpointStatus DescribeCheckpoint(string type)
         Type = type,
         CurrentFile = effective.File,
         IsOverridden = effective.IsOverridden,
+        IsCheckpointPinned = effective.IsCheckpointPinned,
+        PinnedFile = effective.PinnedFile,
+        RoutingMode = effective.Routing?.Mode.ToString() ?? "Automatic",
+        RoutingUsesOverride = effective.Routing?.UsesOverride ?? false,
+        RoutingRefusalCode = effective.Routing?.RefusalCode,
         AvailableFiles = LocalAiPaths.ListDiffusionModelCheckpoints(),
         Template = effective.TemplateFile,
         ReplacesInputs = effective.ReplacesInputs.ToList(),
         Family = effective.IsOverridden ? MediaCheckpointResolution.FamilyOfInstalledFile(effective.File) : null,
-        ClearedOverrideFile = effective.ClearedOverrideFile
+        ClearedOverrideFile = effective.ClearedOverrideFile,
+        CompatibleFiles = MediaCheckpointResolution.CompatibleFiles(type)
     };
 }
 
 // The plan for the checkpoint a type's next job loads. Shared by the read-only endpoint and the fetch.
-static MediaCompanionPlan BuildCompanionPlan(string type)
-{
-    MediaCheckpointEffective effective = MediaCheckpointResolution.Resolve(type);
-    string checkpointPath = Path.Combine(LocalAiPaths.DiffusionModelsPath, effective.File);
-    MediaFamilyDetection detection = File.Exists(checkpointPath)
-        ? MediaFamilyDetector.DetectFile(checkpointPath, MediaCompanionRegistry.Shipped)
-        : new MediaFamilyDetection(null, null, "unidentified",
-            "The checkpoint " + effective.File + " is not installed in ComfyUI's diffusion_models folder.", false, false, 0);
-    string[] folders = MediaCompanionRegistry.Shipped.Families
-        .SelectMany(family => family.Companions)
-        .Select(companion => companion.Folder)
-        .Append("diffusion_models")
-        .Distinct(StringComparer.Ordinal)
-        .ToArray();
-    var installed = MediaCompanionResolver.ScanFolders(Path.Combine(LocalAiPaths.ComfyApp, "models"), folders);
-    return MediaCompanionResolver.BuildPlan(type, effective.File, detection, MediaCompanionRegistry.Shipped, installed);
-}
+static MediaCompanionPlan BuildCompanionPlan(string type) => MediaCompanionPlanReader.Build(type);
 
 app.MapGet("/api/v1/media/checkpoints", () => Results.Ok(new[]
 {
@@ -3520,6 +3553,17 @@ app.MapPost("/api/v1/media/checkpoints/{type}/reset", (string type) =>
 
 app.MapGet("/api/v1/media/checkpoints/recommended", () => Results.Ok(RecommendedCheckpointsService.List));
 
+// Add-your-own checkpoint from Hugging Face: the server reads the repository listing and returns the pinned commit, the
+// real size and the resolve URL it built itself. Read-only; the client then starts the normal consent-gated download.
+var hfCheckpointResolver = new HuggingFaceCheckpointResolver(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+app.MapGet("/api/v1/media/checkpoints/huggingface/resolve", async (string repoId, string filePath, CancellationToken ct) =>
+{
+    try { return Results.Ok(await hfCheckpointResolver.ResolveAsync(repoId, filePath, ct)); }
+    catch (InvalidDataException ex) { return Results.BadRequest(new { error = ex.Message }); }
+    catch (HttpRequestException ex) { return Results.Json(new { error = "Could not reach Hugging Face: " + ex.Message }, statusCode: StatusCodes.Status502BadGateway); }
+    catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return Results.Json(new { error = "Hugging Face did not answer in time." }, statusCode: StatusCodes.Status504GatewayTimeout); }
+});
+
 // Companion plan for the checkpoint the next job of this type will load: what is installed, what is missing,
 // and the plan hash a fetch must present. Read-only; nothing is downloaded here.
 app.MapGet("/api/v1/media/companions", (string type) =>
@@ -3539,6 +3583,11 @@ app.MapPost("/api/v1/media/companions/fetch", async (MediaCompanionFetchRequest 
     return result.Ok ? Results.Ok(result) : Results.Conflict(result);
 }).RequireDesktopOwner();
 
+// Guided first-run media setup: ComfyUI, the prompt-assistant model, a downloadable image checkpoint and its companions.
+app.MapGet("/api/v1/media/setup", (string? type, MediaSetupService setup) => Results.Ok(setup.GetStatus(type)));
+app.MapPost("/api/v1/media/setup/start", (string? type, MediaSetupService setup) => Results.Accepted("/api/v1/media/setup", setup.Start(type))).RequireDesktopOwner();
+app.MapPost("/api/v1/media/setup/cancel", (string? type, MediaSetupService setup) => { setup.Cancel(type); return Results.Ok(setup.GetStatus(type)); }).RequireDesktopOwner();
+
 app.MapPost("/api/v1/media/checkpoints/activate", (ActivateCheckpointRequest request) =>
 {
     if (request.Type != "image" && request.Type != "video" && request.Type != "edit")
@@ -3547,8 +3596,10 @@ app.MapPost("/api/v1/media/checkpoints/activate", (ActivateCheckpointRequest req
         || request.FileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         return Results.BadRequest(new { error = "Invalid file name." });
 
-    string source = Path.Combine(ModelDownloadService.ModelsDirectory, request.FileName);
-    if (!File.Exists(source))
+    // The file is either still in the text-model folder (ComfyUI was missing when it finished) or was already placed in ComfyUI by the
+    // download itself. Both activate; the second case moves nothing.
+    string? source = MediaCheckpointPlacement.FindActivationSource(request.FileName);
+    if (source is null)
         return Results.BadRequest(new { error = "No downloaded file named \"" + request.FileName + "\" was found - download it first." });
 
     MediaDependencyError? familyRefusal = null;
@@ -3556,12 +3607,16 @@ app.MapPost("/api/v1/media/checkpoints/activate", (ActivateCheckpointRequest req
     {
         // Family gate BEFORE the file is moved: a refused file stays where the download put it.
         MediaCheckpointResolution.EnsureFamilyAllowed(request.Type, source, out familyRefusal);
-        Directory.CreateDirectory(LocalAiPaths.DiffusionModelsPath);
-        string destination = Path.Combine(LocalAiPaths.DiffusionModelsPath, request.FileName);
-        if (!File.Exists(destination))
+        if (string.Equals(Path.GetFullPath(Path.GetDirectoryName(source)!), Path.GetFullPath(ModelDownloadService.ModelsDirectory), StringComparison.OrdinalIgnoreCase))
         {
-            try { File.Move(source, destination); }
-            catch (IOException) { File.Copy(source, destination, overwrite: false); File.Delete(source); }
+            string destinationFolder = MediaCheckpointResolution.DestinationFolderFor(source);
+            Directory.CreateDirectory(destinationFolder);
+            string destination = Path.Combine(destinationFolder, request.FileName);
+            if (!File.Exists(destination))
+            {
+                try { File.Move(source, destination); }
+                catch (IOException) { File.Copy(source, destination, overwrite: false); File.Delete(source); }
+            }
         }
         if (request.AssignOverride) LocalAiPaths.SetMediaCheckpointOverride(request.Type, request.FileName);
         return Results.Ok(DescribeCheckpoint(request.Type));
@@ -3577,6 +3632,12 @@ app.MapPost("/api/v1/media/checkpoints/activate", (ActivateCheckpointRequest req
     catch (InvalidDataException ex) { return Results.BadRequest(new { error = ex.Message }); }
     catch (Exception ex) { return Results.Json(new { error = "Couldn't activate: " + ex.Message }, statusCode: StatusCodes.Status500InternalServerError); }
 }).RequireDesktopOwner();
+
+// Media checkpoints an older build left in the text-model folder. GET lists them; POST installs them in ComfyUI. A file PaRuX
+// downloaded is moved; anything else is copied only with includeUserManaged=true and the original always stays. Nothing is deleted.
+app.MapGet("/api/v1/media/checkpoints/misplaced", () => Results.Ok(MediaCheckpointMigration.Find()));
+app.MapPost("/api/v1/media/checkpoints/misplaced/migrate", (MigrateMisplacedCheckpointsRequest? request) =>
+    Results.Ok(MediaCheckpointMigration.Migrate(request?.IncludeUserManaged ?? false))).RequireDesktopOwner();
 
 app.MapGet("/api/v1/media/workflows", ([FromServices] CustomWorkflowService workflows) => Results.Ok(workflows.List()));
 
@@ -3661,6 +3722,60 @@ app.MapPost("/api/v1/threed/generate", async (ThreedGenerateRequest request, Thr
     }
 });
 
+// Local background removal (BiRefNet-lite ONNX in a managed Python runtime): returns a transparent PNG as a MediaAsset.
+app.MapGet("/api/v1/cutout/engine", async (CutoutService cutout, CancellationToken ct) =>
+    Results.Ok(await cutout.GetStatusAsync(ct)));
+
+app.MapPost("/api/v1/cutout/engine/install", async (CutoutService cutout, CancellationToken ct) =>
+{
+    try
+    {
+        string log = await cutout.InstallEngineAsync(ct);
+        return Results.Ok(new { installed = true, log });
+    }
+    catch (Exception exception) when (exception is InvalidOperationException or InvalidDataException or IOException or HttpRequestException)
+    {
+        return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+}).RequireDesktopOwner();
+
+app.MapPost("/api/v1/cutout/remove", async (CutoutRemoveRequest request, CutoutService cutout, LocalRuntimeService runtime, CancellationToken ct) =>
+{
+    try
+    {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, runtime.GamingCancellationToken);
+        return Results.Ok(await cutout.RemoveBackgroundAsync(request, linked.Token));
+    }
+    catch (InvalidDataException exception) { return Results.BadRequest(new { error = exception.Message }); }
+    catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+    {
+        return Results.Conflict(new { error = "Gaming Mode activated; background removal was stopped." });
+    }
+    catch (Exception exception) when (exception is not OperationCanceledException)
+    {
+        return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+}).RequireDesktopOwner();
+
+// Local music (ACE-Step 1.5 through the managed ComfyUI): returns the saved FLAC as a MediaAsset.
+app.MapPost("/api/v1/music/generate", async (MusicGenerateRequest request, MusicService music, LocalRuntimeService runtime, CancellationToken ct) =>
+{
+    try
+    {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, runtime.GamingCancellationToken);
+        return Results.Ok(await music.GenerateAsync(request, linked.Token));
+    }
+    catch (InvalidDataException exception) { return Results.BadRequest(new { error = exception.Message }); }
+    catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+    {
+        return Results.Conflict(new { error = "Gaming Mode activated; music generation was stopped." });
+    }
+    catch (Exception exception) when (exception is not OperationCanceledException)
+    {
+        return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+}).RequireDesktopOwner();
+
 app.MapGamingEndpoints();
 app.MapMcp("/mcp");
 
@@ -3669,6 +3784,15 @@ if (!app.Environment.IsEnvironment("Testing"))
     app.Lifetime.ApplicationStarted.Register(state.Publish);
     app.Lifetime.ApplicationStarted.Register(() => StartupTrace.Mark("application-started"));
     app.Lifetime.ApplicationStopped.Register(state.RemoveIfOwned);
+}
+// PaRuX-downloaded media checkpoints that an older build left in the text-model folder are moved into ComfyUI (user files are only offered).
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    _ = Task.Run(() =>
+    {
+        try { MediaCheckpointMigration.Migrate(includeUserManaged: false); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { System.Diagnostics.Trace.TraceWarning("Media checkpoint migration failed: " + ex.Message); }
+    });
 }
 // Media jobs that were in flight when Core last stopped are decided against ComfyUI in the background.
 _ = Task.Run(async () =>

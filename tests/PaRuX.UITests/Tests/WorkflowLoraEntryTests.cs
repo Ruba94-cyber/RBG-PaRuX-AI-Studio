@@ -18,7 +18,9 @@ public sealed class WorkflowLoraEntryTests
         using var app = new UiTestApplication(nameof(Create_workspace_exposes_workflow_import_and_lora_search));
         try
         {
-            new MainWindowPage(app.MainWindow).Click("Navigation_Create_Item", ControlType.ListItem);
+            var page = new CreateWorkspaceModesPage(app.MainWindow, app);
+            page.OpenCreateWorkspace();
+            page.SelectMode("Workflows");
             AutomationElement import = UiWait.ById(app.MainWindow, "Create_Workflow_Import_Button", ControlType.Button);
             Assert.True(import.Properties.IsEnabled.ValueOrDefault);
             AutomationElement search = UiWait.ById(app.MainWindow, "Create_Lora_Search", ControlType.Edit);

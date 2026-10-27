@@ -58,6 +58,20 @@ public sealed class ModelLicenseConsentPolicyTests
     }
 
     [Fact]
+    public void Catalogue_license_hint_is_not_treated_as_observed_metadata_at_a_pinned_revision()
+    {
+        const string revision = "6fc90a3b1b653e935a0d175e260736de25b84df5";
+        Assert.True(ModelRevisionIdentity.IsValid(revision));
+
+        var decision = ModelLicenseConsentPolicy.Evaluate("Apache-2.0", metadataRetrieved: false);
+
+        Assert.True(decision.RequiresReview);
+        Assert.False(decision.MetadataRetrieved);
+        Assert.Equal(ModelLicenseMetadataStatus.Unavailable, decision.LicenseMetadataStatus);
+        Assert.Null(decision.PublisherDeclaredLicense);
+    }
+
+    [Fact]
     public void Candidate_consent_preserves_the_catalog_metadata_observation_time()
     {
         DateTime observedUtc = new(2026, 9, 24, 12, 30, 0, DateTimeKind.Utc);
@@ -107,5 +121,21 @@ public sealed class ModelLicenseConsentPolicyTests
     public void Invalid_repository_ids_do_not_create_links(string repoId)
     {
         Assert.Null(ModelLicenseConsentPolicy.GetModelCardUri(repoId));
+    }
+
+    [Fact]
+    public void Catalogue_licence_is_the_review_text_without_a_live_lookup()
+    {
+        var apache = ModelLicenseConsentPolicy.EvaluateCatalogue("Apache-2.0");
+        Assert.False(apache.RequiresReview);
+        Assert.True(apache.MetadataRetrieved);
+        Assert.DoesNotContain("unavailable", apache.MetadataStatus, StringComparison.OrdinalIgnoreCase);
+
+        var custom = ModelLicenseConsentPolicy.EvaluateCatalogue("flux-1-dev-non-commercial-license");
+        Assert.True(custom.RequiresReview);
+        Assert.True(custom.MetadataRetrieved);
+        Assert.Contains("flux-1-dev-non-commercial-license", custom.MetadataStatus);
+
+        Assert.True(ModelLicenseConsentPolicy.EvaluateCatalogue(null).RequiresReview);
     }
 }

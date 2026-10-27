@@ -276,11 +276,27 @@ if ($Scope -in @("windows", "all")) {
         # artifacts are pinned by version and hash, so it is also where their terms belong. An
         # entry without a license is emitted without one rather than guessed at.
         $licenseProperty = $artifact.PSObject.Properties["license"]
+        $licenseUrlProperty = $artifact.PSObject.Properties["licenseUrl"]
         if ($null -ne $licenseProperty -and -not [string]::IsNullOrWhiteSpace([string]$licenseProperty.Value)) {
-            $runtimeComponent["licenses"] = @([ordered]@{ expression = [string]$licenseProperty.Value })
+            if ($null -ne $licenseUrlProperty -and -not [string]::IsNullOrWhiteSpace([string]$licenseUrlProperty.Value)) {
+                $runtimeComponent["licenses"] = @([ordered]@{ license = [ordered]@{
+                    name = [string]$licenseProperty.Value
+                    url = [string]$licenseUrlProperty.Value
+                } })
+            } else {
+                $runtimeComponent["licenses"] = @([ordered]@{ expression = [string]$licenseProperty.Value })
+            }
             $script:LicensesResolved++
         } else {
             $script:LicensesUnknown++
+        }
+        $redistributablesProperty = $artifact.PSObject.Properties["redistributableFiles"]
+        if ($null -ne $redistributablesProperty -and $null -ne $redistributablesProperty.Value) {
+            $properties = @($runtimeComponent["properties"])
+            foreach ($file in @($redistributablesProperty.Value)) {
+                $properties += [ordered]@{ name = "parux:redistributableFile"; value = [string]$file }
+            }
+            $runtimeComponent["properties"] = $properties
         }
         Add-Component $key $runtimeComponent
     }

@@ -13,7 +13,7 @@ internal sealed class AutoMaintenanceHostedService : BackgroundService
     private readonly Func<DateTime> _utcNow;
 
     internal AutoMaintenanceHostedService(AutoMaintenanceService service)
-        : this(service, TimeSpan.FromSeconds(45), TimeSpan.FromMinutes(1), () => DateTime.UtcNow) { }
+        : this(service, TimeSpan.FromSeconds(45), TimeSpan.FromSeconds(15), () => DateTime.UtcNow) { }
 
     internal AutoMaintenanceHostedService(AutoMaintenanceService service, TimeSpan startupDelay, TimeSpan tick,
         Func<DateTime> utcNow)
@@ -87,6 +87,13 @@ internal sealed class AutoMaintenanceHostedService : BackgroundService
 
 internal static class AutoMaintenanceComposition
 {
+    /// <summary>Fingerprint token for an installed backend. Non-text backends (e.g. media-comfyui) have no llama build tag,
+    /// so they are recorded as installed instead of failing the whole hardware probe.</summary>
+    internal static string RuntimeFingerprintToken(string backend) =>
+        Array.IndexOf(LocalAiPaths.KnownRuntimeBackends, backend) < 0
+            ? backend + "@installed"
+            : $"{backend}@{LocalAiPaths.GetActiveRuntimeBuildTag(backend) ?? LocalAiPaths.DefaultRuntimeBuildTag(backend)}";
+
     internal static AutoMaintenanceService Create(IServiceProvider sp)
     {
         var gpuInventory = new GpuInventoryService();
@@ -142,6 +149,8 @@ internal static class AutoMaintenanceComposition
             }),
             new ComfyOptimizationStore(), mediaHistory,
             onFinished: async () => { if (!localRuntime.GamingMode) await localRuntime.RestoreDefaultTextExclusivelyAsync(CancellationToken.None).ConfigureAwait(false); });
+        mediaOptimizer.Tuning = sp.GetRequiredService<ModelTuningTracker>();
+        mediaOptimizer.IsOnBattery = SystemPower.IsOnBattery;
         ManagedRuntimeLaunchObserver.Handler = (dir, ok, msg) =>
         {
             runtimeUpdater.ObserveLaunch(dir, ok, msg);
@@ -161,7 +170,7 @@ internal static class AutoMaintenanceComposition
                 var runtimes = new List<string>();
                 if (status is not null)
                     foreach (RuntimeBackendStatus b in status.Backends.Where(b => b.Installed))
-                        runtimes.Add($"{b.Backend}@{LocalAiPaths.GetActiveRuntimeBuildTag(b.Backend) ?? LocalAiPaths.DefaultRuntimeBuildTag(b.Backend)}");
+                        runtimes.Add(RuntimeFingerprintToken(b.Backend));
                 try
                 {
                     resolved = InstalledRuntimeResolver.Resolve(await inventory.DiscoverAsync(ct).ConfigureAwait(false),
@@ -196,6 +205,8 @@ internal static class AutoMaintenanceComposition
                 .ToList(),
             SuggestBackends = ct => sp.GetRequiredService<RuntimeSuggestionService>().ProposalsAsync(ct),
             SuggestMedia = MediaMaintenanceProposals.ProposeLive,
+            RefreshMediaDiscovery = ct => sp.GetRequiredService<MediaDiscoveryService>().RefreshAsync(force: false, ct),
+            IsOnBattery = SystemPower.IsOnBattery,
             IsGamingActive = () => localRuntime.GamingMode
         });
     }
@@ -236,6 +247,21 @@ internal static class AutoMaintenanceEndpoints
 {
     internal sealed record SettingsRequest(bool? Enabled, int? IntervalHours, bool? KeepRuntimesUpdated = null, bool? AutoOptimizeMedia = null, bool? CalibrateWhenIdle = null);
 
+    internal sealed record TuningCancelRequest(string? Id);
+
+    /// <summary>Cancels one tuning job: a running calibration is stopped, a queued one never starts (this session).</summary>
+    internal static bool CancelTuning(ModelTuningItemDto item, ModelTuningTracker tuning, IdleCalibrationService calibration, AutoMaintenanceService maintenance)
+    {
+        if (item.Kind == "media") return maintenance.MediaOptimizer?.CancelCurrent() ?? false;
+        bool running = calibration.CancelByUser(item.ModelPath);
+        if (!running)
+        {
+            tuning.Skipped(item.Id, "Cancelled by you");
+            new PostDownloadOptimizationQueue().MarkDone(item.ModelPath);
+        }
+        return true;
+    }
+
     internal static void Map(WebApplication app)
     {
         app.MapGet("/api/v1/maintenance/status", (AutoMaintenanceService service, ModelDiscoveryService discovery,
@@ -270,7 +296,18 @@ internal static class AutoMaintenanceEndpoints
         app.MapGet("/api/v1/maintenance/calibration", (IdleCalibrationService calibration) =>
             Results.Ok(calibration.GetStatus())).RequireDesktopOwner();
 
-        app.MapGet("/api/v1/maintenance/settings", (AutoMaintenanceService service) =>
+        // "Tuning for your PC": per-model state of the automatic calibration (queued/running/applied/skipped/failed) for text and media.
+        app.MapGet("/api/v1/models/tuning", (ModelTuningTracker tuning) => Results.Ok(tuning.Snapshot())).RequireDesktopOwner();
+
+        app.MapPost("/api/v1/models/tuning/cancel", (TuningCancelRequest request, ModelTuningTracker tuning,
+            IdleCalibrationService calibration, AutoMaintenanceService maintenance) =>
+        {
+            ModelTuningItemDto? item = string.IsNullOrWhiteSpace(request?.Id) ? null : tuning.Get(request!.Id);
+            if (item is null || ModelTuningStates.IsTerminal(item.State)) return Results.NotFound(new { cancelled = false });
+            return Results.Ok(new { cancelled = CancelTuning(item, tuning, calibration, maintenance) });
+        }).RequireDesktopOwner();
+
+        app.MapGet("/api/v1/maintenance/settings",(AutoMaintenanceService service) =>
             Results.Ok(service.GetState().Settings)).RequireDesktopOwner();
 
         app.MapPut("/api/v1/maintenance/settings", (SettingsRequest request, AutoMaintenanceService service) =>

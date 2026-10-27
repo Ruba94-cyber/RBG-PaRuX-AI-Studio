@@ -368,8 +368,19 @@ public static class LocalAiPaths
     public static string? UncensoredVision => GetRoleOverride("uncensored") != null
         ? null : GetBundledVisionProjectorForModel("uncensored", DefaultUncensoredModel);
 
-    public static string SmallModel => Path.Combine(ModelsPath, "Qwen3.5-4B-Q4_K_M.gguf");
-    public static string SmallUncensoredModel => Path.Combine(ModelsPath, "Qwen3.5-4B-Uncensored-Q4_K_M.gguf");
+    public static string SmallModel => ResolveAssistantModel("Qwen3.5-4B-Q4_K_M.gguf");
+    public static string SmallUncensoredModel => ResolveAssistantModel("Qwen3.5-4B-Uncensored-Q4_K_M.gguf");
+
+    /// <summary>The Local AI root's models folder wins; otherwise PaRuX's managed download folder, where the guided media setup
+    /// and the Model Hub put downloaded files on a clean install. Absent in both, the Local AI root path is returned so errors
+    /// name the expected location.</summary>
+    private static string ResolveAssistantModel(string fileName)
+    {
+        string inRoot = Path.Combine(ModelsPath, fileName);
+        if (File.Exists(inRoot)) return inRoot;
+        string managed = Path.Combine(ModelDownloadService.ModelsDirectory, fileName);
+        return File.Exists(managed) ? managed : inRoot;
+    }
 
     /// <summary>The bundled 4B pair exists only for the explicit no-heavy-GPU/media fallback
     /// paths. It must never be persisted as the user's primary Standard role.</summary>
@@ -549,9 +560,15 @@ public static class LocalAiPaths
         if (normalized == "standard" && IsFallbackOnlyModel(modelPath))
             throw new InvalidDataException("Qwen3.5-4B is a fallback-only model and cannot replace the Qwen3.8-27B Standard profile.");
 
-        using ManualSelectionGate.WriteLease writeLease = ManualSelectionGate.AcquireWrite();
-        SetRoleOverrideUnderLease(normalized, modelPath, origin);
+        using (ManualSelectionGate.WriteLease writeLease = ManualSelectionGate.AcquireWrite())
+            SetRoleOverrideUnderLease(normalized, modelPath, origin);
+        // Observers (automatic tuning) run after the lease is released; a failing observer never fails the assignment.
+        try { RoleModelAssigned?.Invoke(normalized, modelPath); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { System.Diagnostics.Trace.TraceWarning("Role assignment observer failed: " + ex.Message); }
     }
+
+    /// <summary>Raised after a role is pointed at a real GGUF file (role, path). Used to queue the automatic per-PC tuning.</summary>
+    internal static event Action<string, string>? RoleModelAssigned;
 
     private static void SetRoleOverrideUnderLease(string normalized, string modelPath, string origin)
     {
@@ -974,18 +991,66 @@ public static class LocalAiPaths
 
     public static string DiffusionModelsPath => Path.Combine(ComfyApp, "models", "diffusion_models");
 
-    public static List<string> ListDiffusionModelCheckpoints()
+    /// <summary>ComfyUI's checkpoints folder: where single-file checkpoints (SDXL, FLUX.1 schnell; text encoders and VAE embedded) live.</summary>
+    public static string CheckpointsPath => Path.Combine(ComfyApp, "models", "checkpoints");
+
+    /// <summary>The ComfyUI models folder that holds a family's main model, by the registry's main-loader folder.</summary>
+    public static string MainModelFolderPath(string comfyFolder) =>
+        string.Equals(comfyFolder, "checkpoints", StringComparison.Ordinal) ? CheckpointsPath : DiffusionModelsPath;
+
+    /// <summary>The full path of an installed main model: diffusion_models first, then a recognised single-file checkpoint in checkpoints.
+    /// When the file is in neither, the diffusion_models path is returned so callers report the usual "not installed" reason.</summary>
+    public static string MainModelPath(string fileName)
     {
-        if (!Directory.Exists(DiffusionModelsPath)) return new List<string>();
+        string diffusion = Path.Combine(DiffusionModelsPath, fileName);
+        if (File.Exists(diffusion)) return diffusion;
+        string checkpoint = Path.Combine(CheckpointsPath, fileName);
+        return File.Exists(checkpoint) && IsRecognisedCheckpointFile(checkpoint) ? checkpoint : diffusion;
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Length, DateTime WrittenUtc, bool Recognised)> CheckpointRecognition =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>True when a file in the checkpoints folder is a single-file checkpoint of a family PaRuX can run. The checkpoints folder
+    /// also holds other things (the music model), which must not be offered as image models. The verdict is cached per size and write time.</summary>
+    private static bool IsRecognisedCheckpointFile(string path)
+    {
         try
         {
-            return Directory.EnumerateFiles(DiffusionModelsPath)
-                .Where(f => new FileInfo(f).Length > 0)
-                .Select(f => Path.GetFileName(f)!)
-                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            var info = new FileInfo(path);
+            if (info.Length <= 0 || !string.Equals(info.Extension, ".safetensors", StringComparison.OrdinalIgnoreCase)) return false;
+            if (CheckpointRecognition.TryGetValue(path, out var cached) && cached.Length == info.Length && cached.WrittenUtc == info.LastWriteTimeUtc)
+                return cached.Recognised;
+            MediaCompanionRegistry registry = MediaCompanionRegistry.Shipped;
+            MediaFamilyDetection detection = MediaFamilyDetector.DetectFile(path, registry);
+            RegistryFamily? family = detection.FamilyId is null ? null : registry.FindFamily(detection.FamilyId);
+            bool recognised = family is { IsSupported: true, MainLoader.Folder: "checkpoints" };
+            CheckpointRecognition[path] = (info.Length, info.LastWriteTimeUtc, recognised);
+            return recognised;
         }
-        catch { return new List<string>(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    public static List<string> ListDiffusionModelCheckpoints()
+    {
+        var names = new List<string>();
+        try
+        {
+            if (Directory.Exists(DiffusionModelsPath))
+                names.AddRange(Directory.EnumerateFiles(DiffusionModelsPath)
+                    .Where(f => new FileInfo(f).Length > 0)
+                    .Select(f => Path.GetFileName(f)!));
+        }
+        catch { names.Clear(); }
+        try
+        {
+            if (Directory.Exists(CheckpointsPath))
+                names.AddRange(Directory.EnumerateFiles(CheckpointsPath, "*.safetensors")
+                    .Where(IsRecognisedCheckpointFile)
+                    .Select(f => Path.GetFileName(f)!));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        return names.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private static string MediaCheckpointOverridesPath => Path.Combine(
@@ -997,10 +1062,10 @@ public static class LocalAiPaths
     public static void SetMediaCheckpointOverride(string type, string fileName)
     {
         if (string.IsNullOrWhiteSpace(fileName) || !ListDiffusionModelCheckpoints().Contains(fileName, StringComparer.OrdinalIgnoreCase))
-            throw new InvalidDataException("That checkpoint file was not found in the diffusion_models folder.");
+            throw new InvalidDataException("That checkpoint file was not found in the diffusion_models or checkpoints folder.");
         // Family gate: an override is saved only if this workflow can run the file's family. A wrong-family
         // file would otherwise fail late, inside ComfyUI.
-        MediaCheckpointResolution.EnsureFamilyAllowed(type, Path.Combine(DiffusionModelsPath, fileName));
+        MediaCheckpointResolution.EnsureFamilyAllowed(type, MainModelPath(fileName));
 
         MutateOverrides(MediaCheckpointOverridesPath, working => { working[type] = fileName; return true; });
     }

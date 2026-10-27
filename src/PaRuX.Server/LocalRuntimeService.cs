@@ -290,16 +290,37 @@ public sealed class LocalRuntimeService
         if (GamingMode) throw new InvalidOperationException("Gaming Mode is active, so media generation is unavailable.");
 
         PaRuX.Contracts.ModelExecutionProfile profile = ExecutionProfileStore.Current.Get().Effective;
-        ExecutionResourceDecision thermalAdmission = await ExecutionResourceGuard.CheckCurrentAsync(
-            profile,
-            enforceCurrentVram: false,
-            cancellationToken,
-            enforceCurrentSystemRam: false).ConfigureAwait(false);
-        if (!thermalAdmission.Allowed) throw new InvalidOperationException(thermalAdmission.Message);
+        await StartMediaRuntimeAfterPreflightAsync(
+            () => ExecutionResourceGuard.CheckCurrentAsync(
+                profile,
+                enforceCurrentVram: false,
+                cancellationToken,
+                enforceCurrentSystemRam: false),
+            // Fast failure: if the machine is over its RAM budget even after PaRuX's own outgoing
+            // text resident exits, loading ComfyUI cannot fit either. Refuse now instead of after
+            // minutes of runtime startup. The outgoing text model is discounted, never counted.
+            () => ExecutionResourceGuard.CheckCurrentAsync(
+                profile,
+                enforceCurrentVram: false,
+                cancellationToken,
+                _process.GetTextWorkingSetBytes()),
+            () => _process.StartMediaAsync(cancellationToken)).ConfigureAwait(false);
+    }
 
-        LocalAiProcessManager.RuntimeResult started = await _process.StartMediaAsync(cancellationToken).ConfigureAwait(false);
+    internal static async Task StartMediaRuntimeAfterPreflightAsync(
+        Func<Task<ExecutionResourceDecision>> thermalCheck,
+        Func<Task<ExecutionResourceDecision>> outgoingTextDiscountedRamCheck,
+        Func<Task<LocalAiProcessManager.RuntimeResult>> startMedia)
+    {
+        ExecutionResourceDecision thermalAdmission = await thermalCheck().ConfigureAwait(false);
+        if (!thermalAdmission.Allowed) throw new InvalidOperationException(thermalAdmission.Message);
+        ExecutionResourceDecision ramPreflight = await outgoingTextDiscountedRamCheck().ConfigureAwait(false);
+        if (!ramPreflight.Allowed) throw new InvalidOperationException(ramPreflight.Message);
+
+        LocalAiProcessManager.RuntimeResult started = await startMedia().ConfigureAwait(false);
         if (!started.Success)
-            throw new InvalidOperationException("Could not start the local media runtime for resource admission: " + started.Message);
+            throw new InvalidOperationException("Generation did not start: the local media-assistant runtime is missing or failed to start ("
+                + started.Message + "). Open Runtime Manager to repair or reinstall it, then try again. No media was generated.");
     }
 
     /// <summary>

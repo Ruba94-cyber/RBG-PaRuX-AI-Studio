@@ -8,19 +8,32 @@ internal sealed record MediaJobShape(double Megapixels, int Frames, double Secon
 
 internal sealed record MediaCatalogueCapability(string Id, string Label, MediaJobShape DefaultJob);
 
+/// <summary>Provenance of a variant that was discovered on Hugging Face instead of curated: popularity and recency drive the
+/// "best proposed" ordering; none of it is quality evidence.</summary>
+internal sealed record MediaDiscoveryMeta(long Downloads, long Likes, DateTime? LastModifiedUtc, string SourceLabel);
+
+/// <summary>Sampler settings a checkpoint's own model card recommends. Each field is optional; an absent one keeps the template value.</summary>
+internal sealed record MediaSamplingHint(int? Steps, double? Cfg, string? Sampler, string? Scheduler);
+
 internal sealed record MediaCatalogueVariant(
     string Id, string Title, string Lane, string? LaneEvidence, string Precision, string? Repository, string? Path,
     string FileName, long? SizeBytes, string SizeBasis, string License, int Tier, bool ListingVerified, bool Bundled,
-    string BaseCompat, IReadOnlyList<string> AdditionalFiles)
+    string BaseCompat, IReadOnlyList<string> AdditionalFiles, string? Revision = null, string? Sha256 = null,
+    MediaSamplingHint? Sampling = null, string? PromptPrefix = null, MediaDiscoveryMeta? Discovery = null)
 {
+    internal bool IsDiscovered => Discovery is not null;
+    /// <summary>Pinned to the listed commit when the catalogue records one, so the bytes cannot change under the recorded size.</summary>
     internal string? DownloadUrl => Repository is not null && Path is not null
-        ? $"https://huggingface.co/{Repository}/resolve/main/{Path}" : null;
+        ? $"https://huggingface.co/{Repository}/resolve/{Revision ?? "main"}/{Path}" : null;
 }
 
 internal sealed record MediaCatalogueFamily(
     string Id, string DisplayName, string Capability, string Support, string? Reason, string? RegistryFamily,
-    double ParametersBillion, double TextEncoderGb, double VaeGb, IReadOnlyList<MediaCatalogueVariant> Variants)
+    double ParametersBillion, double TextEncoderGb, double VaeGb, IReadOnlyList<MediaCatalogueVariant> Variants,
+    IReadOnlyList<string>? DeclaredStrengths = null)
 {
+    /// <summary>What this family is declared to be good at (see <see cref="MediaCatalogue.Strengths"/>); empty when undeclared.</summary>
+    internal IReadOnlyList<string> Strengths => DeclaredStrengths ?? Array.Empty<string>();
     internal bool IsSupported => Support == "supported";
 }
 
@@ -34,8 +47,11 @@ internal sealed class MediaCatalogue
     public const string ResourceName = "PaRuX.Server.Assets.media.media-catalogue.json";
     internal const int SupportedSchemaVersion = 1;
     internal static readonly string[] Lanes = { "standard", "uncensored" };
+    /// <summary>Closed vocabulary for the optional per-family "strengths" array; the prompt hints in MediaPromptStyleHints use the same ids.</summary>
+    internal static readonly string[] Strengths = { "photoreal", "anime", "illustration", "text-rendering", "fast", "editing", "cinematic" };
     internal static readonly string[] CapabilityIds = { "image.generate", "image.edit", "video.generate", "audio.music", "audio.speak" };
     private static readonly Regex IdPattern = new(@"^[a-z0-9][a-z0-9.\-]{0,59}$", RegexOptions.CultureInvariant);
+    private static readonly Regex SamplerNamePattern = new(@"^[a-z0-9_]{1,40}$", RegexOptions.CultureInvariant);
     private static readonly Regex RepoPattern = new(@"^[A-Za-z0-9][A-Za-z0-9._\-]*/[A-Za-z0-9][A-Za-z0-9._\-]*$", RegexOptions.CultureInvariant);
     private static readonly Lazy<MediaCatalogue> ShippedCatalogue = new(LoadShipped);
 
@@ -54,6 +70,44 @@ internal sealed class MediaCatalogue
         if (s is null) throw new InvalidDataException("The embedded media catalogue is missing.");
         using var r = new StreamReader(s);
         return Parse(r.ReadToEnd(), MediaCompanionRegistry.Shipped);
+    }
+
+    /// <summary>The catalogue variant listed under this file name, or null (a file the catalogue does not list).</summary>
+    internal (MediaCatalogueFamily Family, MediaCatalogueVariant Variant)? FindByFileName(string fileName)
+    {
+        foreach (MediaCatalogueFamily family in Families)
+            foreach (MediaCatalogueVariant variant in family.Variants)
+                if (string.Equals(variant.FileName, fileName, StringComparison.OrdinalIgnoreCase)) return (family, variant);
+        return null;
+    }
+    /// <summary>The media job type (companion-registry pipeline) a ComfyUI capability is submitted as. Null for the audio
+    /// capabilities, which PaRuX does not run through the media workflow templates.</summary>
+    internal static string? PipelineOf(string capability) => capability switch
+    {
+        "image.generate" => "image",
+        "image.edit" => "edit",
+        "video.generate" => "video",
+        _ => null
+    };
+
+    /// <summary>This catalogue plus discovered families. Embedded (curated) entries always win: a discovered variant that names the
+    /// same checkpoint file, or the same repository path, as an embedded one is dropped.</summary>
+    internal MediaCatalogue WithDiscovered(IEnumerable<MediaCatalogueFamily> discovered)
+    {
+        var files = new HashSet<string>(Families.SelectMany(f => f.Variants).Select(v => v.FileName), StringComparer.OrdinalIgnoreCase);
+        var paths = new HashSet<string>(Families.SelectMany(f => f.Variants).Where(v => v.Repository != null && v.Path != null)
+            .Select(v => v.Repository + "/" + v.Path), StringComparer.OrdinalIgnoreCase);
+        var ids = new HashSet<string>(Families.SelectMany(f => f.Variants).Select(v => v.Id), StringComparer.Ordinal);
+        var merged = new List<MediaCatalogueFamily>(Families);
+        foreach (MediaCatalogueFamily family in discovered)
+        {
+            if (Capabilities.All(c => c.Id != family.Capability)) continue;
+            var keep = family.Variants.Where(v => !files.Contains(v.FileName)
+                && !(v.Repository != null && v.Path != null && paths.Contains(v.Repository + "/" + v.Path)) && ids.Add(v.Id)).ToList();
+            foreach (MediaCatalogueVariant v in keep) { files.Add(v.FileName); }
+            if (keep.Count > 0) merged.Add(family with { Variants = keep });
+        }
+        return new MediaCatalogue(Version, Capabilities, merged);
     }
 
     internal MediaCatalogueCapability? CapabilityOf(string id) => Capabilities.FirstOrDefault(c => c.Id == id);
@@ -101,6 +155,11 @@ internal sealed class MediaCatalogue
                 RegistryFamily? rf = registry.Families.FirstOrDefault(x => x.Id == regFamily);
                 if (rf is null || !rf.IsSupported || string.IsNullOrEmpty(rf.TemplateFile))
                     throw new InvalidDataException($"{where}: a supported family must map to a supported companion-registry family with a workflow template.");
+                // The registry family must actually run the media type this capability is submitted as, or the Hub would
+                // offer a download whose file the workflow gate then refuses.
+                string? pipeline = PipelineOf(cap);
+                if (pipeline is null || !rf.Pipelines.Contains(pipeline, StringComparer.Ordinal))
+                    throw new InvalidDataException($"{where}: capability \"{cap}\" is not a pipeline the companion-registry family \"{rf.Id}\" runs.");
             }
             else if (string.IsNullOrWhiteSpace(reason))
                 throw new InvalidDataException($"{where}: a resolver_only family must state an honest reason.");
@@ -139,15 +198,52 @@ internal sealed class MediaCatalogue
                 string license = Str(v, "license", vw);
                 int tier = Int(v, "tier", vw);
                 if (tier is < 1 or > 5) throw new InvalidDataException($"{vw}: tier must be 1-5.");
+                string? revision = OptStr(v, "revision");
+                if (revision is not null && !System.Text.RegularExpressions.Regex.IsMatch(revision, "^[0-9a-f]{40}$"))
+                    throw new InvalidDataException($"{vw}: revision must be a 40-character lowercase commit SHA.");
+                string? sha256 = OptStr(v, "sha256");
+                if (sha256 is not null && !System.Text.RegularExpressions.Regex.IsMatch(sha256, "^[0-9a-f]{64}$"))
+                    throw new InvalidDataException($"{vw}: sha256 must be 64 lowercase hex characters.");
+                if (sha256 is not null && revision is null)
+                    throw new InvalidDataException($"{vw}: a pinned sha256 needs the commit revision it belongs to.");
                 var extra = new List<string>();
                 if (v.TryGetProperty("additionalFiles", out JsonElement af))
                     foreach (JsonElement e in af.EnumerateArray()) extra.Add(e.GetString() ?? string.Empty);
+                MediaSamplingHint? sampling = null;
+                if (v.TryGetProperty("sampling", out JsonElement sm))
+                {
+                    if (sm.ValueKind != JsonValueKind.Object) throw new InvalidDataException($"{vw}: sampling must be an object.");
+                    int? steps = sm.TryGetProperty("steps", out JsonElement stepsEl) && stepsEl.ValueKind == JsonValueKind.Number ? stepsEl.GetInt32() : null;
+                    double? cfg = sm.TryGetProperty("cfg", out JsonElement cf) && cf.ValueKind == JsonValueKind.Number ? cf.GetDouble() : null;
+                    string? sampler = OptStr(sm, "sampler");
+                    string? scheduler = OptStr(sm, "scheduler");
+                    if (steps is < 1 or > 200) throw new InvalidDataException($"{vw}: sampling.steps must be 1-200.");
+                    if (cfg is < 0 or > 30) throw new InvalidDataException($"{vw}: sampling.cfg must be 0-30.");
+                    if (sampler is not null && !SamplerNamePattern.IsMatch(sampler)) throw new InvalidDataException($"{vw}: sampling.sampler is not a sampler name.");
+                    if (scheduler is not null && !SamplerNamePattern.IsMatch(scheduler)) throw new InvalidDataException($"{vw}: sampling.scheduler is not a scheduler name.");
+                    sampling = new MediaSamplingHint(steps, cfg, sampler, scheduler);
+                }
+                string? promptPrefix = OptStr(v, "promptPrefix");
+                if (promptPrefix is not null && (promptPrefix.Length > 200 || promptPrefix.Any(char.IsControl)))
+                    throw new InvalidDataException($"{vw}: promptPrefix must be one line of at most 200 characters.");
                 variants.Add(new(vid, Str(v, "title", vw), lane, laneEvidence, precision, repo, path, fileName, size, sizeBasis, license, tier,
-                    verified, bundled, Str(v, "baseCompat", vw), extra));
+                    verified, bundled, Str(v, "baseCompat", vw), extra, revision, sha256, sampling, promptPrefix));
             }
             if (variants.Count == 0) throw new InvalidDataException($"{where}: has no variants.");
+            var strengths = new List<string>();
+            if (f.TryGetProperty("strengths", out JsonElement st))
+            {
+                if (st.ValueKind != JsonValueKind.Array) throw new InvalidDataException($"{where}: strengths must be an array.");
+                foreach (JsonElement e in st.EnumerateArray())
+                {
+                    string? sv = e.ValueKind == JsonValueKind.String ? e.GetString() : null;
+                    if (sv is null || !Strengths.Contains(sv)) throw new InvalidDataException($"{where}: unknown strength \"{sv}\".");
+                    if (strengths.Contains(sv)) throw new InvalidDataException($"{where}: duplicate strength \"{sv}\".");
+                    strengths.Add(sv);
+                }
+            }
             families.Add(new(fid, Str(f, "displayName", where), cap, support, reason, regFamily, paramsB,
-                Dbl(f, "textEncoderGb", where), Dbl(f, "vaeGb", where), variants));
+                Dbl(f, "textEncoderGb", where), Dbl(f, "vaeGb", where), variants, strengths));
         }
         return new MediaCatalogue(version, caps, families);
     }

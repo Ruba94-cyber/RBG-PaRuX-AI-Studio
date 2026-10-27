@@ -23,6 +23,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Fixtures\performance-stream\*.sse" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\comfy-node-specs.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\comfy-combo-options.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\ltx-video-2b-v0.9.5-header.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\PaRuX.Server\PaRuX.Server.csproj" />
@@ -34,6 +37,7 @@
   <ItemGroup>
     <Compile Include="..\..\src\PaRuX.App\Models\RouteKind.cs" Link="Routing\RouteKind.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ModelArenaPresenter.cs" Link="Linked\ModelArenaPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\InstalledModelMerge.cs" Link="Linked\InstalledModelMerge.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CreateWorkflowLoraPresenter.cs" Link="Linked\CreateWorkflowLoraPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\InpaintMaskModel.cs" Link="Linked\InpaintMaskModel.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CreateInpaintPresenter.cs" Link="Linked\CreateInpaintPresenter.cs" />
@@ -47,6 +51,9 @@
     <Compile Include="..\..\src\PaRuX.App\Services\CodingWorkspacePath.cs" Link="CodingAgent\CodingWorkspacePath.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ManagedRuntimeEndpoint.cs" Link="Runtime\ManagedRuntimeEndpoint.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\RouterService.cs" Link="Routing\RouterService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaPhrasing.cs" Link="Routing\MediaPhrasing.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MicrophoneChooser.cs" Link="Voice\MicrophoneChooser.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CutoutPhrasing.cs" Link="Routing\CutoutPhrasing.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatMediaJobReconciler.cs" Link="Chat\ChatMediaJobReconciler.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatRenderWindowPolicy.cs" Link="Chat\ChatRenderWindowPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatModelRouteInfo.cs" Link="Chat\ChatModelRouteInfo.cs" />
@@ -57,6 +64,9 @@
     <Compile Include="..\..\src\PaRuX.App\Services\CandidateEvaluationStatusText.cs" Link="ModelHub\CandidateEvaluationStatusText.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\DiscoveryRefreshStatusPresenter.cs" Link="ModelHub\DiscoveryRefreshStatusPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MaintenancePresenter.cs" Link="Maintenance\MaintenancePresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\WavSilenceDetector.cs" Link="Chat\WavSilenceDetector.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\SpeechTextPreparer.cs" Link="Chat\SpeechTextPreparer.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\VoiceRecordingSession.cs" Link="Chat\VoiceRecordingSession.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ProjectWorkspaceSession.cs" Link="Projects\ProjectWorkspaceSession.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\DocumentTextExtractor.cs" Link="Documents\DocumentTextExtractor.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\AppPaths.cs" Link="CodingAgent\AppPaths.cs" />
@@ -100,6 +110,10 @@
     <Compile Include="..\..\src\PaRuX.App\Services\CodingContextCompiler.cs" Link="CodingAgent\CodingContextCompiler.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CodingContextBudgetPolicy.cs" Link="CodingAgent\CodingContextBudgetPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentPromptBudgetPolicy.cs" Link="CodingAgent\CodingAgentPromptBudgetPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentStopReason.cs" Link="CodingAgent\CodingAgentStopReason.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MarkdownTableParser.cs" Link="CodingAgent\MarkdownTableParser.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelQuantSizeResolver.cs" Link="CodingAgent\ModelQuantSizeResolver.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CodingContextRemedyPolicy.cs" Link="CodingAgent\CodingContextRemedyPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentPromptBuilder.cs" Link="CodingAgent\CodingAgentPromptBuilder.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentMcpToolPolicy.cs" Link="CodingAgent\CodingAgentMcpToolPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CodingAgentActionJsonRepair.cs" Link="CodingAgent\CodingAgentActionJsonRepair.cs" />
@@ -214,6 +228,10 @@
     <Compile Include="..\..\src\PaRuX.App\Services\OnboardingChatVerificationPolicy.cs" Link="Onboarding\OnboardingChatVerificationPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\OnboardingAutoSetup.cs" Link="Onboarding\OnboardingAutoSetup.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\OnboardingAutoSetupPresenter.cs" Link="Onboarding\OnboardingAutoSetupPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaSetupPresenter.cs" Link="Media\MediaSetupPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\DiscoveredListWindow.cs" Link="Media\DiscoveredListWindow.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ModelTuningPresenter.cs" Link="Media\ModelTuningPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaHubSelectionPresenter.cs" Link="ModelHub\MediaHubSelectionPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\BundledRuntimeOverviewPresenter.cs" Link="Onboarding\BundledRuntimeOverviewPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ComponentLifecyclePresenter.cs" Link="Lifecycle\ComponentLifecyclePresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\UserFailureRecoveryMapper.cs" Link="Diagnostics\UserFailureRecoveryMapper.cs" />
@@ -237,6 +255,8 @@
     <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryItem.cs" Link="MediaGallery\MediaGalleryItem.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryItemMapper.cs" Link="MediaGallery\MediaGalleryItemMapper.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaProvenanceFormatter.cs" Link="MediaGallery\MediaProvenanceFormatter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaModelPickerPresenter.cs" Link="MediaGallery\MediaModelPickerPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CloudFallbackMutationQueue.cs" Link="Settings\CloudFallbackMutationQueue.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryBrowser.cs" Link="MediaGallery\MediaGalleryBrowser.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaGalleryDeleteCoordinator.cs" Link="MediaGallery\MediaGalleryDeleteCoordinator.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaEditSourceBridge.cs" Link="MediaGallery\MediaEditSourceBridge.cs" />

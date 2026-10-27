@@ -194,11 +194,7 @@ namespace PaRuX.Services
 
         private ChatAttachment? LastGeneratedImage()
         {
-            ChatMessage? last = Conversation.Messages.LastOrDefault(m => m.Role == "assistant");
-            if (last == null || last.IsError || last.Attachments == null) return null;
-            return last.Attachments.FirstOrDefault(a => a.MediaType != null
-                && a.MediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(a.LocalPath) && File.Exists(a.LocalPath));
+            return RouterService.FindLastGeneratedImage(Conversation.Messages);
         }
 
         private static readonly Regex StrengthRx = new(
@@ -248,7 +244,7 @@ namespace PaRuX.Services
 
             RouteKind route = hasAttachments ? RouterService.ClassifyWithAttachment(text) : RouterService.Classify(text);
             if (RouterService.UsesPriorGeneratedImage(route) && !hasAttachments
-                && (route != RouteKind.Video || RouterService.ReferencesExistingImage(text)))
+                && RouterService.ShouldAttachPriorGeneratedImage(route, text))
             {
                 ChatAttachment? lastImage = LastGeneratedImage();
                 if (lastImage != null)
@@ -813,7 +809,7 @@ namespace PaRuX.Services
                 return;
             }
 
-            if (!RouterService.IsChatRoute(route) && route != RouteKind.Image && route != RouteKind.Video && route != RouteKind.ImageEdit)
+            if (!RouterService.IsChatRoute(route) && route != RouteKind.Image && route != RouteKind.Video && route != RouteKind.ImageEdit && route != RouteKind.Music)
             {
                 var deferred = new ChatMessage
                 {
@@ -974,6 +970,24 @@ namespace PaRuX.Services
                         reply.Content = "I need an attached image to edit - attach one and describe the change.";
                         reply.IsError = true;
                     }
+                    else if (CutoutPhrasing.IsBackgroundRemoval(request.Content))
+                    {
+                        // "Remove the background" / "rimuovi lo sfondo" is a cutout (transparent PNG), not a diffusion edit.
+                        Status = "Removing the background locally…";
+                        RaiseState();
+                        PaRuX.Contracts.MediaAsset cutout = await CutoutClient.Current.RemoveAsync(sourceAttachment.LocalPath, cts.Token).ConfigureAwait(false);
+                        AppSettings cutoutSettings = SettingsStore.Current.Data;
+                        string cutoutPath = await CutoutClient.SaveAsync(cutout,
+                            string.IsNullOrWhiteSpace(cutoutSettings.GeneratedImagesFolder) ? null : cutoutSettings.GeneratedImagesFolder,
+                            cts.Token).ConfigureAwait(false);
+                        ChatMediaJobReconciler.ApplyCompleted(reply, new ChatAttachment
+                        {
+                            FileName = cutout.FileName, LocalPath = cutoutPath,
+                            MediaType = cutout.MediaType, SizeBytes = new FileInfo(cutoutPath).Length
+                        }, reply.MediaJobId ?? Guid.NewGuid().ToString("N"),
+                        "Background removed locally · BiRefNet-lite · " + cutout.Width + "×" + cutout.Height + " · transparent PNG");
+                        Persist();
+                    }
                     else
                     {
                         Status = "Editing your image locally…";
@@ -1017,6 +1031,24 @@ namespace PaRuX.Services
                         "Edited locally · " + edited.Width + "×" + edited.Height + " · seed " + edited.Seed
                         + (RouterService.RegionEditHint(request.Content) is { } regionHint ? "\n\n" + regionHint : string.Empty));
                     }
+                }
+                else if (route == RouteKind.Music)
+                {
+                    ChatMessage request = Conversation.Messages.Last(m => m.Role == "user");
+                    Status = "Composing your music locally…";
+                    RaiseState();
+                    PaRuX.Contracts.MediaAsset song = await MusicClient.Current.GenerateAsync(new PaRuX.Contracts.MusicGenerateRequest
+                    {
+                        Prompt = request.Content, WriteLyrics = true, Language = MediaPhrasing.GuessLanguage(request.Content),
+                        DurationSeconds = 45, Seed = -1
+                    }, cts.Token).ConfigureAwait(false);
+                    string songPath = await MusicClient.SaveAsync(song, cts.Token).ConfigureAwait(false);
+                    ChatMediaJobReconciler.ApplyCompleted(reply, new ChatAttachment
+                    {
+                        FileName = song.FileName, LocalPath = songPath, MediaType = song.MediaType, SizeBytes = new FileInfo(songPath).Length
+                    }, reply.MediaJobId ?? Guid.NewGuid().ToString("N"),
+                    "Composed locally · ACE-Step 1.5 · " + song.DurationSeconds.ToString("0") + "s · seed " + song.Seed);
+                    Persist();
                 }
                 else if (route != RouteKind.Image)
                 {

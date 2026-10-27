@@ -101,20 +101,23 @@ public sealed class ComfyWorkflowRunner
 
     public async Task<MediaResult> RunImageAsync(string prompt, long seed, int width, int height, CancellationToken ct, IProgress<int>? progressPercent = null, bool skipPromptRefinement = false, IReadOnlyList<MediaLoraSelection>? loras = null)
     {
-        // Refused before the runtime starts: a LoRA of the wrong family or a missing file never reaches the GPU queue.
-        MediaLoraStackCheck loraStack = MediaLoraStack.ResolveOrRefuse("image", loras);
         await EnsureMediaReadyAsync(ct);
         try
         {
+            // The active checkpoint decides the template: Z-Image by default, or the SDXL / FLUX.1 schnell / Chroma graph when one of those is active.
+            MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob("image");
+            // Refused before anything is queued: a LoRA of the wrong family or a missing file never reaches the GPU.
+            MediaLoraStackCheck loraStack = MediaLoraStack.ResolveOrRefuse(effective, loras);
             string refinedPrompt = await RefineUnlessReviewedAsync(skipPromptRefinement, prompt, RefinePromptAsync, ct);
-            string path = await SubmitAndWaitAsync(LocalAiPaths.ImageWorkflowTemplate, request =>
+            refinedPrompt = MediaImageGraph.WithPromptPrefix(refinedPrompt, effective);
+            string path = await SubmitAndWaitAsync(MediaCheckpointResolution.TemplatePathFor(effective), request =>
             {
                 SetIn(request, "4", "text", refinedPrompt);
                 SetIn(request, "8", "seed", seed);
                 SetIn(request, "6", "width", width);
                 SetIn(request, "6", "height", height);
                 SetIn(request, "10", "filename_prefix", "LocalAI_images/AI_Studio");
-                ApplyCheckpointOverrideIfSet(request, "image");
+                ApplyResolvedCheckpoint(request, effective);
                 MediaLoraStack.Inject(request, loraStack.Loras);
             }, saveNode: "10", timeout: TimeSpan.FromMinutes(10), ct, progressPercent, mediaType: "image");
             return new MediaResult(path, seed, width, height, 0, 0, 0);
@@ -128,12 +131,15 @@ public sealed class ComfyWorkflowRunner
         try
         {
             string uploadedName = await UploadImageAsync(sourceImage, sourceFileName, ct);
-            string path = await SubmitAndWaitAsync(LocalAiPaths.EditWorkflowTemplate, request =>
+            // One resolution per job picks the checkpoint and the graph of its family. Every edit template shares the node
+            // contract patched below: 4 source image, 7 instruction, 13 the noise/sampler node that holds the seed, 19 save.
+            MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob("edit");
+            string path = await SubmitAndWaitAsync(MediaCheckpointResolution.TemplatePathFor(effective), request =>
             {
                 SetIn(request, "4", "image", uploadedName);
-                SetIn(request, "7", "text", instruction);
-                SetIn(request, "13", "noise_seed", seed);
-                ApplyCheckpointOverrideIfSet(request, "edit");
+                SetEditInstruction(request, instruction);
+                SetEditSeed(request, seed);
+                ApplyResolvedCheckpoint(request, effective);
             }, saveNode: "19", timeout: TimeSpan.FromMinutes(10), ct, mediaType: "edit");
             return new MediaResult(path, seed, 0, 0, 0, 0, 0);
         }
@@ -147,17 +153,20 @@ public sealed class ComfyWorkflowRunner
         string maskBase64, int? growPixels, IReadOnlyList<MediaLoraSelection>? loras, CancellationToken ct, IProgress<int>? progressPercent = null)
     {
         byte[] mask = MediaInpaintMask.Validate(sourceImage, maskBase64);
-        MediaLoraStackCheck loraStack = MediaLoraStack.ResolveOrRefuse("image", loras);
         await EnsureMediaReadyAsync(ct);
         try
         {
+            // Registered as the "inpaint" pipeline of the Z-Image family (pipelineTemplates); like img2img it falls back to the Z-Image default
+            // when another family is active, and is refused by name when that default is not installed.
+            MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForPipeline("inpaint", LocalAiPaths.InpaintWorkflowTemplate);
+            MediaLoraStackCheck loraStack = MediaLoraStack.ResolveOrRefuse(effective, loras);
             string refinedPrompt = await RefinePromptAsync(prompt, ct);
             string uploadedSource = await UploadImageAsync(sourceImage, sourceFileName, ct);
             string uploadedMask = await UploadImageAsync(mask, "inpaint_mask.png", ct);
             string path = await SubmitAndWaitAsync(LocalAiPaths.InpaintWorkflowTemplate, request =>
             {
                 MediaInpaintMask.Patch(request, refinedPrompt, seed, uploadedSource, uploadedMask, MediaInpaintMask.NormalizeGrow(growPixels));
-                ApplyCheckpointOverrideIfSet(request, "image");
+                if (effective.IsOverridden) SetIn(request, MediaCheckpointResolution.UnetNode, "unet_name", effective.File);
                 MediaLoraStack.Inject(request, loraStack.Loras);
             }, saveNode: MediaInpaintMask.SaveNode, timeout: TimeSpan.FromMinutes(10), ct, progressPercent, mediaType: "inpaint");
             return new MediaResult(path, seed, 0, 0, 0, 0, 0);
@@ -175,6 +184,9 @@ public sealed class ComfyWorkflowRunner
         await EnsureMediaReadyAsync(ct);
         try
         {
+            // The img2img graph is Z-Image's. An active SDXL / FLUX.1 / Chroma checkpoint has no img2img graph yet, so this resolves to
+            // the Z-Image default (and refuses by name when it is not installed) instead of pushing a wrong-family file into the graph.
+            MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForImg2Img();
             string refinedPrompt = await RefinePromptAsync(prompt, ct);
             string uploadedName = await UploadImageAsync(sourceImage, sourceFileName, ct);
             string path = await SubmitAndWaitAsync(LocalAiPaths.Img2ImgWorkflowTemplate, request =>
@@ -184,7 +196,7 @@ public sealed class ComfyWorkflowRunner
                 SetIn(request, "9", "seed", seed);
                 SetIn(request, "9", "denoise", Math.Clamp(strength, 0.05, 1.0));
                 SetIn(request, "11", "filename_prefix", "LocalAI_images/AI_Studio_img2img");
-                ApplyCheckpointOverrideIfSet(request, "image");
+                if (effective.IsOverridden) SetIn(request, MediaCheckpointResolution.UnetNode, "unet_name", effective.File);
             }, saveNode: "11", timeout: TimeSpan.FromMinutes(10), ct, mediaType: "img2img");
             return new MediaResult(path, seed, 0, 0, 0, 0, 0);
         }
@@ -293,9 +305,15 @@ public sealed class ComfyWorkflowRunner
         try
         {
             string refinedPrompt = await RefineUnlessReviewedAsync(skipPromptRefinement, prompt, RefinePromptAsync, ct);
+            // One resolution per job picks the checkpoint AND the video family of that checkpoint (its graph and node contract).
+            MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob("video");
+            VideoFamilyContract contract = VideoFamilyContracts.For(effective);
+            RegistryFamily videoFamily = VideoFamilyContracts.RegistryFamilyOf(contract);
+            (width, height) = contract.FitSize(width, height);
             int requestedFrames = Math.Max(1, (int)Math.Ceiling(durationSeconds * fps));
-            int[] clipFrameCounts = PlanWanClipFrameCounts(requestedFrames);
+            int[] clipFrameCounts = contract.PlanClipFrameCounts(requestedFrames);
             (string videoPrompt, long[] clipSeeds) = BuildVideoPlanAndNotifyObserver(refinedPrompt, seed, clipFrameCounts.Length);
+            VideoFamilyObserver.Value?.Invoke(contract.FamilyId);
             VideoClipPlanObserver.Value?.Invoke(jobId, videoPrompt, requestedFrames, clipFrameCounts);
             Directory.CreateDirectory(frameTempDir);
             // Optional user start image: uploaded once, then attached to clip one the same way clip chaining attaches
@@ -308,20 +326,14 @@ public sealed class ComfyWorkflowRunner
                 int clipIndex = i;
                 IProgress<int>? clipProgress = progressPercent == null ? null
                     : new Progress<int>(clipRaw => progressPercent.Report(Math.Min(99, (clipIndex * 100 + clipRaw) / clipFrameCounts.Length)));
-                string clipPath = await SubmitAndWaitAsync(LocalAiPaths.VideoWorkflowTemplate, request =>
+                // Clip one starts from the user's image when one was given. Later clips continue from the previous last frame.
+                string? conditioningImage = i == 0 ? startImageName : previousImageName;
+                var clipSettings = new VideoClipSettings(videoPrompt, clipSeeds[i], width, height, clipFrameCounts[i], steps, fps, jobId, i, conditioningImage);
+                string clipPath = await SubmitAndWaitAsync(VideoTemplatePath(contract, videoFamily, conditioningImage != null), request =>
                 {
-                    SetVideoPromptAndSeed(request, videoPrompt, clipSeeds[i]);
-                    SetIn(request, "6", "width", width);
-                    SetIn(request, "6", "height", height);
-                    SetIn(request, "6", "length", clipFrameCounts[i]);
-                    SetIn(request, "8", "steps", steps);
-                    SetIn(request, "10", "fps", (double)fps);
-                    SetIn(request, "11", "filename_prefix", "LocalAI_videos/PaRuX_" + jobId + "_clip_" + (i + 1));
-                    // Clip one starts from the user's image when one was given. Later clips continue from the previous last frame.
-                    string? conditioningImage = i == 0 ? startImageName : previousImageName;
-                    if (conditioningImage != null) AddWanStartImage(request, conditioningImage);
-                    ApplyCheckpointOverrideIfSet(request, "video");
-                }, saveNode: "11", timeout: TimeSpan.FromMinutes(25), ct, clipProgress,
+                    contract.ApplyClip(request, clipSettings);
+                    contract.ApplyCheckpoint(request, effective);
+                }, saveNode: contract.OutputNode, timeout: TimeSpan.FromMinutes(25), ct, clipProgress,
                     (filename, subfolder) => ValidateOwnedWanClipOutput(filename, subfolder, jobId, i + 1),
                     submittedClientIds: clientIds, mediaType: "video", videoClipIndex: i);
                 paths.Add(clipPath);
@@ -405,6 +417,19 @@ public sealed class ComfyWorkflowRunner
         try
         {
             Directory.CreateDirectory(tempDir);
+            // The family the job started with decides the graph. A job saved before families existed was a Wan job.
+            VideoFamilyContract contract = VideoFamilyContracts.ForFamilyId(intent.VideoFamilyId ?? VideoFamilyContracts.Wan.FamilyId)
+                ?? throw new InvalidDataException("The saved video job names a video family this build does not know.");
+            MediaCheckpointEffective? effective = null;
+            RegistryFamily? videoFamily = null;
+            if (paths.Count < intent.VideoClips.Count)
+            {
+                effective = MediaCheckpointResolution.ResolveForJob("video");
+                if (!string.Equals(VideoFamilyContracts.For(effective).FamilyId, contract.FamilyId, StringComparison.Ordinal))
+                    throw new InvalidOperationException("The active video checkpoint is no longer a " + contract.FamilyId
+                        + " model, so the remaining clips of this job cannot continue from the saved ones.");
+                videoFamily = VideoFamilyContracts.RegistryFamilyOf(contract);
+            }
             for (int i = paths.Count; i < intent.VideoClips.Count; i++)
             {
                 if (i == 0) throw new InvalidDataException("The first saved video clip is missing.");
@@ -415,9 +440,10 @@ public sealed class ComfyWorkflowRunner
                     frameBytes, "parux-continuity-" + Guid.NewGuid().ToString("N") + ".png", ct).ConfigureAwait(false);
                 int clipIndex = i;
                 IProgress<int>? clipProgress = null;
-                string clipPath = await RunVideoClipAsync(
-                    intent.VideoPrompt, ClipSeedFor(intent, i), intent.Width, intent.Height, intent.Fps, intent.Steps,
-                    intent.VideoRunId!, clipIndex, intent.VideoClips[i].FrameCount, conditioningImage,
+                (int clipWidth, int clipHeight) = contract.FitSize(intent.Width, intent.Height);
+                var clipSettings = new VideoClipSettings(intent.VideoPrompt, ClipSeedFor(intent, i), clipWidth, clipHeight,
+                    intent.VideoClips[i].FrameCount, intent.Steps, intent.Fps, intent.VideoRunId!, clipIndex, conditioningImage);
+                string clipPath = await RunVideoClipAsync(contract, videoFamily!, effective!, clipSettings,
                     ct, clipProgress, clientIds).ConfigureAwait(false);
                 intent.VideoClips[i].OutputPath = clipPath;
                 paths.Add(clipPath);
@@ -452,26 +478,21 @@ public sealed class ComfyWorkflowRunner
         return checked(intent.Seed + clipIndex);
     }
 
-    private async Task<string> RunVideoClipAsync(string prompt, long seed, int width, int height, int fps, int steps,
-        string jobId, int clipIndex, int clipFrames, string? conditioningImage, CancellationToken ct,
+    private async Task<string> RunVideoClipAsync(VideoFamilyContract contract, RegistryFamily family,
+        MediaCheckpointEffective effective, VideoClipSettings clip, CancellationToken ct,
         IProgress<int>? progressPercent, List<string>? submittedClientIds)
     {
-        return await SubmitAndWaitAsync(LocalAiPaths.VideoWorkflowTemplate, request =>
+        return await SubmitAndWaitAsync(VideoTemplatePath(contract, family, clip.StartImageName != null), request =>
         {
-            SetIn(request, "4", "text", prompt);
-            SetIn(request, "8", "seed", seed);
-            SetIn(request, "6", "width", width);
-            SetIn(request, "6", "height", height);
-            SetIn(request, "6", "length", clipFrames);
-            SetIn(request, "8", "steps", steps);
-            SetIn(request, "10", "fps", (double)fps);
-            SetIn(request, "11", "filename_prefix", "LocalAI_videos/PaRuX_" + jobId + "_clip_" + (clipIndex + 1));
-            if (conditioningImage != null) AddWanStartImage(request, conditioningImage);
-            ApplyCheckpointOverrideIfSet(request, "video");
-        }, saveNode: "11", timeout: TimeSpan.FromMinutes(25), ct, progressPercent,
-            (filename, subfolder) => ValidateOwnedWanClipOutput(filename, subfolder, jobId, clipIndex + 1, MediaOutputRoot),
-            submittedClientIds: submittedClientIds, mediaType: "video", videoClipIndex: clipIndex).ConfigureAwait(false);
+            contract.ApplyClip(request, clip);
+            contract.ApplyCheckpoint(request, effective);
+        }, saveNode: contract.OutputNode, timeout: TimeSpan.FromMinutes(25), ct, progressPercent,
+            (filename, subfolder) => ValidateOwnedWanClipOutput(filename, subfolder, clip.JobId, clip.ClipIndex + 1, MediaOutputRoot),
+            submittedClientIds: submittedClientIds, mediaType: "video", videoClipIndex: clip.ClipIndex).ConfigureAwait(false);
     }
+
+    private static string VideoTemplatePath(VideoFamilyContract contract, RegistryFamily family, bool hasStartImage) =>
+        Path.Combine(LocalAiPaths.ConfigDir, contract.TemplateFileFor(family, hasStartImage));
 
     private async Task<string> FinalizeVideoAsync(List<string> paths, IReadOnlyList<int> clipFrameCounts,
         int requestedFrames, int fps, CancellationToken ct)
@@ -502,17 +523,46 @@ public sealed class ComfyWorkflowRunner
     private static void ApplyCheckpointOverrideIfSet(JsonObject request, string type)
     {
         // Same resolution the status API reports (MediaCheckpointResolution.Resolve), so the graph and the UI agree.
-        MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob(type);
-        if (effective.IsOverridden) SetIn(request, MediaCheckpointResolution.UnetNode, "unet_name", effective.File);
+        ApplyResolvedCheckpoint(request, MediaCheckpointResolution.ResolveForJob(type));
+    }
+
+    /// <summary>The instruction goes to node 7 under the input that node's class names it: <c>text</c> on FLUX.2's
+    /// CLIPTextEncode, <c>prompt</c> on Qwen-Image-Edit's TextEncodeQwenImageEdit.</summary>
+    internal static void SetEditInstruction(JsonObject request, string instruction) =>
+        SetIn(request, "7", EditInstructionInput(request), instruction);
+
+    internal static string EditInstructionInput(JsonObject request) =>
+        request["prompt"]?["7"]?["inputs"] is JsonObject inputs && inputs.ContainsKey("prompt") ? "prompt" : "text";
+
+    /// <summary>The seed lives in node 13 under the input that node's class names it: <c>noise_seed</c> on FLUX.2's
+    /// RandomNoise, <c>seed</c> on Qwen-Image-Edit's KSampler.</summary>
+    internal static void SetEditSeed(JsonObject request, long seed) =>
+        SetIn(request, "13", EditSeedInput(request), seed);
+
+    internal static string EditSeedInput(JsonObject request) =>
+        request["prompt"]?["13"]?["inputs"] is JsonObject inputs && inputs.ContainsKey("seed") ? "seed" : "noise_seed";
+
+    /// <summary>Same patch as <see cref="ApplyCheckpointOverrideIfSet"/> for a job that already resolved its checkpoint, so
+    /// the template it submitted and the file it loads come from one decision.</summary>
+    private static void ApplyResolvedCheckpoint(JsonObject request, MediaCheckpointEffective effective)
+    {
+        // The family's own loader input (unet_name, or ckpt_name for a single-file checkpoint) plus its catalogue sampler hints.
+        MediaImageGraph.ApplyEffective(request, effective);
+    }
+
+    internal static string? ModelSelectionReasonForProvenance(MediaJobRequest request)
+    {
+        string type = (request.Type ?? string.Empty).Trim().ToLowerInvariant();
+        return MediaCheckpointResolution.SelectionReasonFor(type == "img2img" ? "image" : type);
     }
 
     internal string? ModelFileNameForProvenance(MediaJobRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         string type = (request.Type ?? string.Empty).Trim().ToLowerInvariant();
-        string checkpointType = type is "img2img" or "inpaint" ? "image" : type;
-        if (checkpointType is "image" or "video" or "edit")
-            return MediaCheckpointResolution.FileNameForProvenance(checkpointType);
+        if (type is "img2img" or "inpaint") return MediaCheckpointResolution.FileNameForImg2ImgProvenance();
+        if (type is "image" or "video" or "edit")
+            return MediaCheckpointResolution.FileNameForProvenance(type);
 
         string? templatePath = type switch
         {
@@ -621,25 +671,11 @@ public sealed class ComfyWorkflowRunner
         });
     }
 
-    internal static int NormalizeWanFrameCount(int requested)
-    {
-        int bounded = Math.Clamp(requested, 5, 49);
-        return 1 + (int)(4 * Math.Ceiling((bounded - 1) / 4.0));
-    }
+    // Clip planning is a property of the video family (see VideoFamilyContract); these two are the Wan 2.2 TI2V-5B figures
+    // (4n+1 frames, 5 to 49 per clip) that the first video runner was written around.
+    internal static int NormalizeWanFrameCount(int requested) => VideoFamilyContracts.Wan.NormalizeFrameCount(requested);
 
-    internal static int[] PlanWanClipFrameCounts(int requestedFrames)
-    {
-        int remainingUniqueFrames = Math.Max(1, requestedFrames);
-        var counts = new List<int>();
-        while (remainingUniqueFrames > 0)
-        {
-            int wanted = Math.Min(49, remainingUniqueFrames + (counts.Count == 0 ? 0 : 1));
-            int clipFrames = NormalizeWanFrameCount(wanted);
-            counts.Add(clipFrames);
-            remainingUniqueFrames -= clipFrames - (counts.Count == 1 ? 0 : 1);
-        }
-        return counts.ToArray();
-    }
+    internal static int[] PlanWanClipFrameCounts(int requestedFrames) => VideoFamilyContracts.Wan.PlanClipFrameCounts(requestedFrames);
 
     internal static (string Prompt, long[] ClipSeeds) BuildVideoPlan(string refinedPrompt, long seed, int clipCount)
     {
@@ -907,7 +943,7 @@ public sealed class ComfyWorkflowRunner
     {
         MediaCompanionRegistry registry = MediaCompanionRegistry.Shipped;
         string mainFileName = MediaCompanionGraph.ReadMainFileName(request, type, registry);
-        string checkpointPath = Path.Combine(LocalAiPaths.DiffusionModelsPath, mainFileName);
+        string checkpointPath = LocalAiPaths.MainModelPath(mainFileName);
         // A missing main checkpoint gets the same typed refusal as the live preflight, not a raw family error.
         if (!File.Exists(checkpointPath)) throw new MediaDependencyException(ComfyLivePreflight.MissingFileByName(mainFileName));
         MediaFamilyDetection detection = MediaFamilyDetector.DetectFile(checkpointPath, registry);
@@ -1166,6 +1202,8 @@ public sealed class ComfyWorkflowRunner
     // Persist the exact clip prompt and seeds before the first video clip is submitted.
     internal static readonly AsyncLocal<Action<string, IReadOnlyList<long>>?> VideoPlanObserver = new();
     internal static readonly AsyncLocal<Action<string, string, int, IReadOnlyList<int>>?> VideoClipPlanObserver = new();
+    /// <summary>Told which video family the job runs, before the clip plan is saved, so a restart continues with the same graph.</summary>
+    internal static readonly AsyncLocal<Action<string>?> VideoFamilyObserver = new();
     internal static readonly AsyncLocal<Action<int, string?, string?, string?>?> VideoClipObserver = new();
     internal static readonly AsyncLocal<Action<string>?> VideoFinalOutputObserver = new();
     // What ComfyUI still holds for a job's prompts after a Core restart (ComfyPromptRecovery).

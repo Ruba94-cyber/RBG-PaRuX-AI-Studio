@@ -18,18 +18,27 @@ namespace PaRuX.Views
     public sealed partial class SettingsView
     {
         private bool _cloudFallbackLoading;
+        private bool _cloudFallbackSetupPending;
+        private long _cloudFallbackUserActionVersion;
+        private int _cloudFallbackSaveOperations;
+        private int _cloudFallbackTestOperations;
+        private readonly CloudFallbackMutationQueue _cloudFallbackMutations = new();
 
         private async Task RefreshCloudFallbackAsync()
         {
-            if (CloudFallbackStatusText == null) return;
+            if (CloudFallbackStatusText == null || _cloudFallbackSetupPending) return;
+            long requestVersion = _cloudFallbackUserActionVersion;
             try
             {
                 CloudFallbackStatus status = await CloudFallbackClient.Current.GetStatusAsync(CancellationToken.None);
+                // A status read that began before a user action must not undo the unsaved form or a newer toggle.
+                if (requestVersion != _cloudFallbackUserActionVersion || _cloudFallbackSetupPending) return;
                 ApplyCloudFallbackStatus(status);
             }
             catch (Exception ex)
             {
                 Log.Write("RefreshCloudFallbackAsync failed: " + ex.Message);
+                if (requestVersion != _cloudFallbackUserActionVersion || _cloudFallbackSetupPending) return;
                 CloudFallbackStatusText.Text = "Couldn't load cloud fallback status: " + ex.Message;
             }
         }
@@ -146,6 +155,7 @@ namespace PaRuX.Views
         private async void CloudFallbackToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (_cloudFallbackLoading || CloudFallbackToggle == null) return;
+            long actionVersion = ++_cloudFallbackUserActionVersion;
 
             if (!CloudFallbackToggle.IsOn)
             {
@@ -153,11 +163,15 @@ namespace PaRuX.Views
                 // the key it needs go away together.
                 try
                 {
-                    CloudFallbackStatus status = await CloudFallbackClient.Current.DisableAsync(CancellationToken.None);
+                    CloudFallbackStatus status = await _cloudFallbackMutations.EnqueueAsync(
+                        () => CloudFallbackClient.Current.DisableAsync(CancellationToken.None));
+                    if (actionVersion != _cloudFallbackUserActionVersion) return;
+                    _cloudFallbackSetupPending = false;
                     ApplyCloudFallbackStatus(status);
                 }
                 catch (Exception ex)
                 {
+                    if (actionVersion != _cloudFallbackUserActionVersion) return;
                     Log.Write("CloudFallbackToggle_Toggled (off) failed: " + ex.Message);
                     // The server decides what the switch shows, not the click. If the fallback is still armed the
                     // switch stays On, and the status line says that the state could not be confirmed.
@@ -170,10 +184,12 @@ namespace PaRuX.Views
                             return observed.Enabled;
                         },
                         CancellationToken.None);
+                    if (actionVersion != _cloudFallbackUserActionVersion) return;
                     string failure = "Couldn't turn the fallback off: " + ex.Message;
                     if (observed != null)
                     {
                         // Applies the full status the server just reported (switch, detail panel and state line).
+                        _cloudFallbackSetupPending = false;
                         ApplyCloudFallbackStatus(observed);
                         CloudFallbackStatusText.Text = failure + "\n" + CloudFallbackStatusText.Text;
                     }
@@ -199,6 +215,7 @@ namespace PaRuX.Views
 
             // Turning it on only opens the form. Nothing is armed until Save succeeds with a key and
             // a model, so flipping this switch by itself can never send anything anywhere.
+            _cloudFallbackSetupPending = true;
             if (CloudFallbackDetailPanel != null) CloudFallbackDetailPanel.Visibility = Visibility.Visible;
             CloudFallbackStatusText.Text = "Choose a provider, paste an API key and a model id, then Save.";
         }
@@ -211,6 +228,8 @@ namespace PaRuX.Views
                 CloudFallbackStatusText.Text = "Choose a provider first.";
                 return;
             }
+
+            long actionVersion = ++_cloudFallbackUserActionVersion;
 
             string apiKey = CloudFallbackApiKeyBox?.Password ?? string.Empty;
             var request = new SetCloudFallbackRequest
@@ -225,39 +244,62 @@ namespace PaRuX.Views
 
             try
             {
+                _cloudFallbackSaveOperations++;
                 if (SaveCloudFallbackButton != null) SaveCloudFallbackButton.IsEnabled = false;
-                CloudFallbackStatus status = await CloudFallbackClient.Current.SaveAsync(request, CancellationToken.None);
+                if (TestCloudFallbackButton != null) TestCloudFallbackButton.IsEnabled = false;
+                CloudFallbackStatus status = await _cloudFallbackMutations.EnqueueAsync(
+                    () => CloudFallbackClient.Current.SaveAsync(request, CancellationToken.None));
+                if (actionVersion != _cloudFallbackUserActionVersion) return;
+                _cloudFallbackSetupPending = false;
                 ApplyCloudFallbackStatus(status);
             }
             catch (Exception ex)
             {
+                if (actionVersion != _cloudFallbackUserActionVersion) return;
                 Log.Write("SaveCloudFallback_Click failed: " + ex.Message);
                 CloudFallbackStatusText.Text = "Couldn't save the fallback: " + ex.Message;
             }
             finally
             {
-                if (SaveCloudFallbackButton != null) SaveCloudFallbackButton.IsEnabled = true;
+                if (SaveCloudFallbackButton != null)
+                {
+                    if (_cloudFallbackSaveOperations > 0) _cloudFallbackSaveOperations--;
+                    SaveCloudFallbackButton.IsEnabled = _cloudFallbackSaveOperations == 0 && _cloudFallbackTestOperations == 0;
+                    if (TestCloudFallbackButton != null)
+                        TestCloudFallbackButton.IsEnabled = _cloudFallbackSaveOperations == 0 && _cloudFallbackTestOperations == 0;
+                }
             }
         }
 
         private async void TestCloudFallback_Click(object sender, RoutedEventArgs e)
         {
+            long actionVersion = ++_cloudFallbackUserActionVersion;
             try
             {
+                _cloudFallbackTestOperations++;
                 if (TestCloudFallbackButton != null) TestCloudFallbackButton.IsEnabled = false;
+                if (SaveCloudFallbackButton != null) SaveCloudFallbackButton.IsEnabled = false;
                 CloudFallbackStatusText.Text = "Checking the provider...";
                 CloudFallbackTestResult result = await CloudFallbackClient.Current.TestAsync(CancellationToken.None);
+                if (actionVersion != _cloudFallbackUserActionVersion) return;
                 CloudFallbackStatusText.Text = result.Detail;
                 if (result.Success) await RefreshCloudFallbackAsync();
             }
             catch (Exception ex)
             {
+                if (actionVersion != _cloudFallbackUserActionVersion) return;
                 Log.Write("TestCloudFallback_Click failed: " + ex.Message);
                 CloudFallbackStatusText.Text = "Couldn't reach the provider: " + ex.Message;
             }
             finally
             {
-                if (TestCloudFallbackButton != null) TestCloudFallbackButton.IsEnabled = true;
+                if (TestCloudFallbackButton != null)
+                {
+                    if (_cloudFallbackTestOperations > 0) _cloudFallbackTestOperations--;
+                    TestCloudFallbackButton.IsEnabled = _cloudFallbackTestOperations == 0;
+                    if (SaveCloudFallbackButton != null)
+                        SaveCloudFallbackButton.IsEnabled = _cloudFallbackTestOperations == 0 && _cloudFallbackSaveOperations == 0;
+                }
             }
         }
     }

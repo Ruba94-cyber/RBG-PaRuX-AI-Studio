@@ -2,34 +2,91 @@
   "schemaVersion": 1,
   "_comment": "Per-family companion manifest for PaRuX media pipelines. Every file name below is taken from the workflow templates in ../config or from docs/audits/parts/image-gen.md. A null source.revision, sizeBytes or sha256 means the value is NOT pinned yet: the resolver reports such a component as manual-install only and the fetch path refuses it. Tensor-name signatures are PaRuX's own reading of the public layouts and are checked only with synthetic headers in tests until validated on real weights. Shared files (same folder and file name in more than one family) must declare identical sources. An optional companion license is the publisher's declared licence for that exact file; leave it out until it has been checked.",
   "embeddedStems": {
-    "textEncoder": [ "conditioner.embedders.", "cond_stage_model.", "text_encoders." ],
-    "vae": [ "first_stage_model.", "vae." ]
+    "textEncoder": [
+      "conditioner.embedders.",
+      "cond_stage_model.",
+      "text_encoders."
+    ],
+    "vae": [
+      "first_stage_model.",
+      "vae."
+    ]
   },
   "families": [
     {
       "id": "z-image",
       "displayName": "Z-Image Turbo",
       "support": "supported",
-      "pipelines": [ "image", "img2img", "inpaint" ],
+      "pipelines": [
+        "image",
+        "img2img",
+        "inpaint"
+      ],
       "templateFile": "z-image-smoke-api.json",
-      "mainLoader": { "node": "1", "classType": "UNETLoader", "input": "unet_name", "folder": "diffusion_models" },
-      "requiredNodes": [ "UNETLoader", "CLIPLoader", "VAELoader", "ModelSamplingAuraFlow", "KSampler", "VAEDecode", "SaveImage" ],
+      "pipelineTemplates": {
+        "img2img": "z-image-img2img-api.json",
+        "inpaint": "z-image-inpaint-api.json"
+      },
+      "mainLoader": {
+        "node": "1",
+        "classType": "UNETLoader",
+        "input": "unet_name",
+        "folder": "diffusion_models"
+      },
+      "requiredNodes": [
+        "UNETLoader",
+        "CLIPLoader",
+        "VAELoader",
+        "ModelSamplingAuraFlow",
+        "KSampler",
+        "VAEDecode",
+        "SaveImage"
+      ],
       "signature": {
-        "requiredStems": [ "noise_refiner.", "context_refiner.", "cap_embedder.", "x_embedder." ],
+        "requiredStems": [
+          "noise_refiner.",
+          "context_refiner.",
+          "cap_embedder.",
+          "x_embedder."
+        ],
         "forbiddenStems": [],
         "shapeChecks": []
       },
       "companions": [
         {
-          "role": "text_encoder", "folder": "text_encoders", "fileName": "qwen_3_4b.safetensors", "clipType": "lumina2",
-          "sharedWith": [ "flux2-klein" ],
+          "role": "text_encoder",
+          "folder": "text_encoders",
+          "fileName": "qwen_3_4b.safetensors",
+          "clipType": "lumina2",
+          "sharedWith": [
+            "flux2-klein"
+          ],
           "notes": "The template uses CLIP type lumina2. docs/audits/parts/image-gen.md lists qwen_image as the alternative; not checked on a real install.",
-          "source": { "repository": "Comfy-Org/z_image_turbo", "path": null, "revision": null, "sizeBytes": null, "sha256": null }
+          "source": {
+            "repository": "Comfy-Org/z_image_turbo",
+            "path": "split_files/text_encoders/qwen_3_4b.safetensors",
+            "revision": "6fc90a3b1b653e935a0d175e260736de25b84df5",
+            "sizeBytes": 8044982048,
+            "sha256": "6c671498573ac2f7a5501502ccce8d2b08ea6ca2f661c458e708f36b36edfc5a"
+          },
+          "license": "apache-2.0"
         },
         {
-          "role": "vae", "folder": "vae", "fileName": "ae.safetensors",
-          "sharedWith": [ "flux1" ],
-          "source": { "repository": "Comfy-Org/z_image_turbo", "path": null, "revision": null, "sizeBytes": null, "sha256": null }
+          "role": "vae",
+          "folder": "vae",
+          "fileName": "ae.safetensors",
+          "sharedWith": [
+            "flux1",
+            "chroma"
+          ],
+          "source": {
+            "repository": "Comfy-Org/z_image_turbo",
+            "path": "split_files/vae/ae.safetensors",
+            "revision": "6fc90a3b1b653e935a0d175e260736de25b84df5",
+            "sizeBytes": 335304388,
+            "sha256": "afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38"
+          },
+          "license": "apache-2.0"
         }
       ]
     },
@@ -37,25 +94,70 @@
       "id": "flux2-klein",
       "displayName": "FLUX.2 Klein 4B",
       "support": "supported",
-      "pipelines": [ "edit" ],
+      "pipelines": [
+        "edit"
+      ],
       "templateFile": "flux2-klein-edit-api.json",
-      "mainLoader": { "node": "1", "classType": "UNETLoader", "input": "unet_name", "folder": "diffusion_models" },
-      "requiredNodes": [ "UNETLoader", "CLIPLoader", "VAELoader", "CFGGuider", "SamplerCustomAdvanced", "Flux2Scheduler", "ReferenceLatent", "EmptyFlux2LatentImage" ],
+      "mainLoader": {
+        "node": "1",
+        "classType": "UNETLoader",
+        "input": "unet_name",
+        "folder": "diffusion_models"
+      },
+      "requiredNodes": [
+        "UNETLoader",
+        "CLIPLoader",
+        "VAELoader",
+        "CFGGuider",
+        "SamplerCustomAdvanced",
+        "Flux2Scheduler",
+        "ReferenceLatent",
+        "EmptyFlux2LatentImage"
+      ],
       "signature": {
-        "requiredStems": [ "double_blocks.", "single_blocks.", "img_in.", "txt_in." ],
-        "forbiddenStems": [ "vector_in." ],
+        "requiredStems": [
+          "double_blocks.",
+          "single_blocks.",
+          "img_in.",
+          "txt_in."
+        ],
+        "forbiddenStems": [
+          "vector_in.",
+          "distilled_guidance_layer."
+        ],
         "shapeChecks": []
       },
       "companions": [
         {
-          "role": "text_encoder", "folder": "text_encoders", "fileName": "qwen_3_4b.safetensors", "clipType": "flux2",
-          "sharedWith": [ "z-image" ],
-          "source": { "repository": "Comfy-Org/z_image_turbo", "path": null, "revision": null, "sizeBytes": null, "sha256": null }
+          "role": "text_encoder",
+          "folder": "text_encoders",
+          "fileName": "qwen_3_4b.safetensors",
+          "clipType": "flux2",
+          "sharedWith": [
+            "z-image"
+          ],
+          "source": {
+            "repository": "Comfy-Org/z_image_turbo",
+            "path": "split_files/text_encoders/qwen_3_4b.safetensors",
+            "revision": "6fc90a3b1b653e935a0d175e260736de25b84df5",
+            "sizeBytes": 8044982048,
+            "sha256": "6c671498573ac2f7a5501502ccce8d2b08ea6ca2f661c458e708f36b36edfc5a"
+          },
+          "license": "apache-2.0"
         },
         {
-          "role": "vae", "folder": "vae", "fileName": "flux2-vae.safetensors",
+          "role": "vae",
+          "folder": "vae",
+          "fileName": "flux2-vae.safetensors",
           "sharedWith": [],
-          "source": { "repository": "Comfy-Org/vae-text-encorder-for-flux-klein-4b", "path": null, "revision": null, "sizeBytes": null, "sha256": null }
+          "source": {
+            "repository": "Comfy-Org/Flux-2-Klein-4B",
+            "path": "split_files/vae/flux2-vae.safetensors",
+            "revision": "533c4cbc3d3b89af1743d9466c434e89810391c0",
+            "sizeBytes": 336211292,
+            "sha256": "868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3"
+          },
+          "license": "apache-2.0"
         }
       ]
     },
@@ -63,25 +165,142 @@
       "id": "wan2.2-ti2v-5b",
       "displayName": "Wan 2.2 TI2V-5B",
       "support": "supported",
-      "pipelines": [ "video" ],
+      "pipelines": [
+        "video"
+      ],
       "templateFile": "wan-video-smoke-api.json",
-      "mainLoader": { "node": "1", "classType": "UNETLoader", "input": "unet_name", "folder": "diffusion_models" },
-      "requiredNodes": [ "UNETLoader", "CLIPLoader", "VAELoader", "Wan22ImageToVideoLatent", "ModelSamplingSD3", "KSampler", "VAEDecode", "CreateVideo", "SaveVideo" ],
+      "mainLoader": {
+        "node": "1",
+        "classType": "UNETLoader",
+        "input": "unet_name",
+        "folder": "diffusion_models"
+      },
+      "requiredNodes": [
+        "UNETLoader",
+        "CLIPLoader",
+        "VAELoader",
+        "Wan22ImageToVideoLatent",
+        "ModelSamplingSD3",
+        "KSampler",
+        "VAEDecode",
+        "CreateVideo",
+        "SaveVideo"
+      ],
       "signature": {
-        "requiredStems": [ "blocks.", "patch_embedding.", "text_embedding.", "time_embedding.", "head.head." ],
+        "requiredStems": [
+          "blocks.",
+          "patch_embedding.",
+          "text_embedding.",
+          "time_embedding.",
+          "head.head."
+        ],
         "forbiddenStems": [],
-        "shapeChecks": [ { "tensor": "patch_embedding.weight", "dim": 1, "equals": 48 } ]
+        "shapeChecks": [
+          {
+            "tensor": "patch_embedding.weight",
+            "dim": 1,
+            "equals": 48
+          }
+        ]
       },
       "companions": [
         {
-          "role": "text_encoder", "folder": "text_encoders", "fileName": "umt5_xxl_fp8_e4m3fn_scaled.safetensors", "clipType": "wan",
+          "role": "text_encoder",
+          "folder": "text_encoders",
+          "fileName": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+          "clipType": "wan",
           "sharedWith": [],
-          "source": { "repository": "Comfy-Org/Wan_2.1_ComfyUI_repackaged", "path": null, "revision": null, "sizeBytes": null, "sha256": null }
+          "source": {
+            "repository": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+            "path": "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+            "revision": "ee6f4a40737a995bf5818954cfce6d59443b0f04",
+            "sizeBytes": 6735906897,
+            "sha256": "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68"
+          },
+          "license": "apache-2.0"
         },
         {
-          "role": "vae", "folder": "vae", "fileName": "wan2.2_vae.safetensors",
+          "role": "vae",
+          "folder": "vae",
+          "fileName": "wan2.2_vae.safetensors",
           "sharedWith": [],
-          "source": { "repository": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "path": null, "revision": null, "sizeBytes": null, "sha256": null }
+          "source": {
+            "repository": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+            "path": "split_files/vae/wan2.2_vae.safetensors",
+            "revision": "ee6f4a40737a995bf5818954cfce6d59443b0f04",
+            "sizeBytes": 1409400960,
+            "sha256": "e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156"
+          },
+          "license": "apache-2.0"
+        }
+      ]
+    },
+    {
+      "id": "ltx-video",
+      "displayName": "LTX-Video 2B",
+      "support": "supported",
+      "pipelines": [
+        "video"
+      ],
+      "templateFile": "ltxv-t2v-api.json",
+      "startImageTemplate": "ltxv-i2v-api.json",
+      "mainLoader": {
+        "node": "1",
+        "classType": "CheckpointLoaderSimple",
+        "input": "ckpt_name",
+        "folder": "checkpoints"
+      },
+      "requiredNodes": [
+        "CheckpointLoaderSimple",
+        "CLIPLoader",
+        "CLIPTextEncode",
+        "EmptyLTXVLatentVideo",
+        "LTXVImgToVideo",
+        "LTXVConditioning",
+        "LTXVScheduler",
+        "KSamplerSelect",
+        "SamplerCustom",
+        "VAEDecode",
+        "LoadImage",
+        "CreateVideo",
+        "SaveVideo"
+      ],
+      "signature": {
+        "requiredStems": [
+          "model.diffusion_model.transformer_blocks.",
+          "model.diffusion_model.patchify_proj.",
+          "model.diffusion_model.caption_projection.",
+          "vae.decoder."
+        ],
+        "forbiddenStems": [],
+        "shapeChecks": [
+          {
+            "tensor": "model.diffusion_model.patchify_proj.weight",
+            "dim": 0,
+            "equals": 2048
+          },
+          {
+            "tensor": "model.diffusion_model.patchify_proj.weight",
+            "dim": 1,
+            "equals": 128
+          }
+        ]
+      },
+      "companions": [
+        {
+          "role": "text_encoder",
+          "folder": "text_encoders",
+          "fileName": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+          "clipType": "ltxv",
+          "sharedWith": ["chroma"],
+          "source": {
+            "repository": "comfyanonymous/flux_text_encoders",
+            "path": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+            "revision": "6af2a98e3f615bdfa612fbd85da93d1ed5f69ef5",
+            "sizeBytes": 5157348688,
+            "sha256": "a498f0485dc9536735258018417c3fd7758dc3bccc0a645feaa472b34955557a"
+          },
+          "license": "apache-2.0"
         }
       ]
     },
@@ -89,72 +308,286 @@
       "id": "flux1",
       "displayName": "FLUX.1 (schnell, dev)",
       "support": "resolver_only",
-      "reason": "PaRuX has no FLUX.1 workflow template. The resolver can describe its companions, but nothing in this list can be installed or run by PaRuX.",
+      "reason": "PaRuX runs FLUX.1 schnell only as the single-file checkpoint (family flux1-schnell). The split-file layout (separate diffusion model, two text encoders and VAE) has no workflow template, so nothing in this list can be installed or run by PaRuX.",
       "pipelines": [],
       "requiredNodes": [],
       "signature": {
-        "requiredStems": [ "double_blocks.", "single_blocks.", "vector_in." ],
+        "requiredStems": [
+          "double_blocks.",
+          "single_blocks.",
+          "vector_in."
+        ],
         "forbiddenStems": [],
         "shapeChecks": []
       },
       "companions": [
         {
-          "role": "vae", "folder": "vae", "fileName": "ae.safetensors",
-          "sharedWith": [ "z-image" ],
-          "source": { "repository": "Comfy-Org/z_image_turbo", "path": null, "revision": null, "sizeBytes": null, "sha256": null }
+          "role": "vae",
+          "folder": "vae",
+          "fileName": "ae.safetensors",
+          "sharedWith": [
+            "z-image",
+            "chroma"
+          ],
+          "source": {
+            "repository": "Comfy-Org/z_image_turbo",
+            "path": "split_files/vae/ae.safetensors",
+            "revision": "6fc90a3b1b653e935a0d175e260736de25b84df5",
+            "sizeBytes": 335304388,
+            "sha256": "afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38"
+          },
+          "license": "apache-2.0"
         },
         {
-          "role": "text_encoder", "folder": "text_encoders", "fileName": "t5xxl_fp8_e4m3fn.safetensors", "clipType": "flux",
+          "role": "text_encoder",
+          "folder": "text_encoders",
+          "fileName": "t5xxl_fp8_e4m3fn.safetensors",
+          "clipType": "flux",
           "sharedWith": [],
-          "source": { "repository": "comfyanonymous/flux_text_encoders", "path": null, "revision": null, "sizeBytes": null, "sha256": null }
+          "source": {
+            "repository": "comfyanonymous/flux_text_encoders",
+            "path": null,
+            "revision": null,
+            "sizeBytes": null,
+            "sha256": null
+          }
         },
         {
-          "role": "text_encoder", "folder": "text_encoders", "fileName": "clip_l.safetensors", "clipType": "flux",
+          "role": "text_encoder",
+          "folder": "text_encoders",
+          "fileName": "clip_l.safetensors",
+          "clipType": "flux",
           "sharedWith": [],
-          "source": { "repository": "comfyanonymous/flux_text_encoders", "path": null, "revision": null, "sizeBytes": null, "sha256": null }
+          "source": {
+            "repository": "comfyanonymous/flux_text_encoders",
+            "path": null,
+            "revision": null,
+            "sizeBytes": null,
+            "sha256": null
+          }
         }
       ]
     },
     {
       "id": "qwen-image",
       "displayName": "Qwen-Image",
-      "support": "resolver_only",
-      "reason": "PaRuX has no Qwen-Image workflow template. Its companions are listed only so the resolver does not confuse it with another family; nothing here is installable.",
-      "pipelines": [],
-      "requiredNodes": [],
+      "support": "supported",
+      "pipelines": [
+        "image",
+        "edit"
+      ],
+      "templateFile": "qwen-image-api.json",
+      "pipelineTemplates": {
+        "edit": "qwen-image-edit-api.json"
+      },
+      "mainLoader": {
+        "node": "1",
+        "classType": "UNETLoader",
+        "input": "unet_name",
+        "folder": "diffusion_models"
+      },
+      "requiredNodes": [
+        "UNETLoader",
+        "CLIPLoader",
+        "VAELoader",
+        "CLIPTextEncode",
+        "EmptySD3LatentImage",
+        "ModelSamplingAuraFlow",
+        "KSampler",
+        "VAEDecode",
+        "SaveImage",
+        "LoadImage",
+        "ImageScaleToTotalPixels",
+        "VAEEncode",
+        "TextEncodeQwenImageEdit",
+        "CFGNorm"
+      ],
       "signature": {
-        "requiredStems": [ "transformer_blocks.", "time_text_embed." ],
-        "forbiddenStems": [ "double_blocks.", "single_blocks." ],
+        "requiredStems": [
+          "transformer_blocks.",
+          "time_text_embed.",
+          "txt_norm.",
+          "img_in."
+        ],
+        "forbiddenStems": [
+          "double_blocks.",
+          "single_blocks."
+        ],
         "shapeChecks": []
       },
       "companions": [
         {
-          "role": "text_encoder", "folder": "text_encoders", "fileName": "qwen_2.5_vl_7b_fp8_scaled.safetensors", "clipType": "qwen_image",
+          "role": "text_encoder",
+          "folder": "text_encoders",
+          "fileName": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+          "clipType": "qwen_image",
           "sharedWith": [],
-          "notes": "File name not verified against the upstream repository.",
-          "source": { "repository": null, "path": null, "revision": null, "sizeBytes": null, "sha256": null }
+          "source": {
+            "repository": "Comfy-Org/Qwen-Image_ComfyUI",
+            "path": "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+            "revision": "1f12b17be14c89b026c51a91d67c32f84bb047bc",
+            "sizeBytes": 9384670680,
+            "sha256": "cb5636d852a0ea6a9075ab1bef496c0db7aef13c02350571e388aea959c5c0b4"
+          },
+          "license": "apache-2.0"
         },
         {
-          "role": "vae", "folder": "vae", "fileName": "qwen_image_vae.safetensors",
+          "role": "vae",
+          "folder": "vae",
+          "fileName": "qwen_image_vae.safetensors",
           "sharedWith": [],
-          "notes": "File name not verified against the upstream repository.",
-          "source": { "repository": null, "path": null, "revision": null, "sizeBytes": null, "sha256": null }
+          "source": {
+            "repository": "Comfy-Org/Qwen-Image_ComfyUI",
+            "path": "split_files/vae/qwen_image_vae.safetensors",
+            "revision": "1f12b17be14c89b026c51a91d67c32f84bb047bc",
+            "sizeBytes": 253806246,
+            "sha256": "a70580f0213e67967ee9c95f05bb400e8fb08307e017a924bf3441223e023d1f"
+          },
+          "license": "apache-2.0"
         }
       ]
     },
     {
       "id": "sdxl",
       "displayName": "SDXL (full checkpoint)",
-      "support": "unsupported",
-      "reason": "SDXL checkpoints embed their own text encoders and VAE, and PaRuX has no SDXL workflow template. It is recognised only so that a wrong-family file is refused by name.",
-      "pipelines": [],
-      "requiredNodes": [],
+      "support": "supported",
+      "pipelines": [
+        "image"
+      ],
+      "templateFile": "sdxl-checkpoint-api.json",
+      "mainLoader": {
+        "node": "1",
+        "classType": "CheckpointLoaderSimple",
+        "input": "ckpt_name",
+        "folder": "checkpoints"
+      },
+      "requiredNodes": [
+        "CheckpointLoaderSimple",
+        "CLIPTextEncode",
+        "EmptyLatentImage",
+        "KSampler",
+        "VAEDecode",
+        "SaveImage"
+      ],
       "signature": {
-        "requiredStems": [ "model.diffusion_model.input_blocks.", "conditioner.embedders." ],
+        "requiredStems": [
+          "model.diffusion_model.input_blocks.",
+          "conditioner.embedders.0.transformer.",
+          "conditioner.embedders.1.model."
+        ],
         "forbiddenStems": [],
         "shapeChecks": []
       },
       "companions": []
+    },
+    {
+      "id": "flux1-schnell",
+      "displayName": "FLUX.1 schnell (single-file checkpoint)",
+      "support": "supported",
+      "pipelines": [
+        "image"
+      ],
+      "templateFile": "flux1-schnell-api.json",
+      "mainLoader": {
+        "node": "1",
+        "classType": "CheckpointLoaderSimple",
+        "input": "ckpt_name",
+        "folder": "checkpoints"
+      },
+      "requiredNodes": [
+        "CheckpointLoaderSimple",
+        "CLIPTextEncode",
+        "EmptySD3LatentImage",
+        "KSampler",
+        "VAEDecode",
+        "SaveImage"
+      ],
+      "signature": {
+        "requiredStems": [
+          "model.diffusion_model.double_blocks.",
+          "model.diffusion_model.single_blocks.",
+          "model.diffusion_model.vector_in."
+        ],
+        "forbiddenStems": [
+          "model.diffusion_model.guidance_in."
+        ],
+        "shapeChecks": []
+      },
+      "companions": []
+    },
+    {
+      "id": "chroma",
+      "displayName": "Chroma1-HD",
+      "support": "supported",
+      "pipelines": [
+        "image"
+      ],
+      "templateFile": "chroma-api.json",
+      "mainLoader": {
+        "node": "1",
+        "classType": "UNETLoader",
+        "input": "unet_name",
+        "folder": "diffusion_models"
+      },
+      "requiredNodes": [
+        "UNETLoader",
+        "CLIPLoader",
+        "VAELoader",
+        "T5TokenizerOptions",
+        "CLIPTextEncode",
+        "EmptySD3LatentImage",
+        "ModelSamplingAuraFlow",
+        "KSampler",
+        "VAEDecode",
+        "SaveImage"
+      ],
+      "signature": {
+        "requiredStems": [
+          "distilled_guidance_layer.",
+          "double_blocks.",
+          "single_blocks.",
+          "img_in."
+        ],
+        "forbiddenStems": [
+          "vector_in."
+        ],
+        "shapeChecks": []
+      },
+      "companions": [
+        {
+          "role": "text_encoder",
+          "folder": "text_encoders",
+          "fileName": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+          "clipType": "chroma",
+          "sharedWith": ["ltx-video"],
+          "notes": "The ComfyUI Chroma template loads this scaled fp8 T5-XXL (CLIP type chroma).",
+          "source": {
+            "repository": "comfyanonymous/flux_text_encoders",
+            "path": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+            "revision": "6af2a98e3f615bdfa612fbd85da93d1ed5f69ef5",
+            "sizeBytes": 5157348688,
+            "sha256": "a498f0485dc9536735258018417c3fd7758dc3bccc0a645feaa472b34955557a"
+          },
+          "license": "apache-2.0"
+        },
+        {
+          "role": "vae",
+          "folder": "vae",
+          "fileName": "ae.safetensors",
+          "sharedWith": [
+            "z-image",
+            "flux1"
+          ],
+          "source": {
+            "repository": "Comfy-Org/z_image_turbo",
+            "path": "split_files/vae/ae.safetensors",
+            "revision": "6fc90a3b1b653e935a0d175e260736de25b84df5",
+            "sizeBytes": 335304388,
+            "sha256": "afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38"
+          },
+          "license": "apache-2.0"
+        }
+      ]
     }
   ]
 }

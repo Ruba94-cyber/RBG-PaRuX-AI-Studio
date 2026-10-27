@@ -449,8 +449,9 @@ namespace PaRuX.Services
                     await AgentOrchestratorClient.Current.UpdateStatusAsync(task.Id, new UpdateAgentTaskStatusRequest
                     {
                         Status = AgentTaskStatus.Failed,
-                        Stage = "Coding sandbox unavailable",
-                        Error = result.Summary
+                        Stage = CodingAgentStopReason.Stage(
+                            string.IsNullOrEmpty(result.StopKind) ? CodingAgentStopReason.Sandbox : result.StopKind),
+                        Error = result.Summary + CodingAgentStopReason.NextStep(result.StopKind)
                     }, CancellationToken.None).ConfigureAwait(false);
                     return;
                 }
@@ -500,8 +501,8 @@ namespace PaRuX.Services
                         Status = AgentTaskStatus.Failed,
                         Stage = result.GoalReported
                             ? "Coding attempt paused without verification"
-                            : "Coding attempt unfinished",
-                        Error = unverified
+                            : CodingAgentStopReason.Stage(result.StopKind),
+                        Error = unverified + CodingAgentStopReason.NextStep(result.StopKind)
                     }, CancellationToken.None).ConfigureAwait(false);
                     return;
                 }

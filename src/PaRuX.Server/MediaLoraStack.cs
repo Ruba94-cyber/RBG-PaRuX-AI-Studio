@@ -220,10 +220,11 @@ internal static class MediaLoraStack
     /// <summary>Reads the installed LoRAs and the checkpoint family the next job of <paramref name="checkpointType"/> loads,
     /// validates the request and returns the accepted stack. Throws <see cref="InvalidDataException"/> with the user-facing
     /// reason when it must be refused.</summary>
-    internal static MediaLoraStackCheck ResolveOrRefuse(string checkpointType, IReadOnlyList<MediaLoraSelection>? requested)
+    internal static MediaLoraStackCheck ResolveOrRefuse(MediaCheckpointEffective effective, IReadOnlyList<MediaLoraSelection>? requested)
     {
         if (requested == null || requested.Count == 0) return Validate(requested, Array.Empty<InstalledLora>(), null, null);
-        (string? key, string? label) = ActiveCheckpointFamily(checkpointType);
+        string? key = KeyForRegistryFamily(effective.FamilyId) ?? KeyForLabel(effective.File);
+        string? label = effective.File;
         MediaLoraStackCheck check = Validate(requested, LoraLibrary.List(), key, label);
         if (!check.Ok) throw new InvalidDataException(check.Reason);
         return check;

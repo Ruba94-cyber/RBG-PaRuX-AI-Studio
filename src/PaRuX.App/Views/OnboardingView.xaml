@@ -19,7 +19,7 @@
                         <TextBlock Text="Welcome to PaRuX" Style="{StaticResource PaRuXDisplayTextStyle}" VerticalAlignment="Center" />
                     </StackPanel>
                     <TextBlock Style="{StaticResource PaRuXBodyTextStyle}" TextWrapping="Wrap"
-                        Text="The installer includes a verified llama.cpp Vulkan engine, so the baseline runtime needs no extra download. A chat model is still required: choose one below and download it when you are ready. Optional accelerators and media tools can be installed later."
+                        Text="The installer includes verified llama.cpp engines (Vulkan, plus CUDA 13.4 for supported NVIDIA GPUs), so no runtime download is needed. A chat model is still required: Set up automatically picks one that fits this PC, or choose your own below. Optional accelerators and media tools can be installed later."
                         Margin="44,4,0,0" />
                 </StackPanel>
 

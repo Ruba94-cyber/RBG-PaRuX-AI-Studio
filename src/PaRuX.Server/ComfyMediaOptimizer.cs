@@ -183,7 +183,7 @@ internal sealed class ComfyMediaOptimizer
     internal const double StructuralSsim = 0.999;
     /// <summary>Lower-precision kernels change rounding; the image must still be the same picture.</summary>
     internal const double NumericSsim = 0.985;
-    internal const int MaximumCandidates = 7;
+    internal const int MaximumCandidates = 9;
     internal static readonly TimeSpan FailureBackoff = TimeSpan.FromHours(24);
 
     private readonly IComfyCalibrationHarness _harness;
@@ -194,6 +194,8 @@ internal sealed class ComfyMediaOptimizer
     private readonly object _statusGate = new();
     private ComfyOptimizationStatus _status = new("idle", null, 0, 0, null);
     private DateTime _lastFailureUtc = DateTime.MinValue;
+    /// <summary>Facts of the latest inspection/run, kept in memory only to word the "nothing faster" suggestions.</summary>
+    private MediaTuningFacts? _lastFacts;
 
     private readonly Func<Task>? _onFinished;
 
@@ -206,6 +208,57 @@ internal sealed class ComfyMediaOptimizer
         _store = store;
         _history = history;
         _now = utcNow ?? (() => DateTime.UtcNow);
+    }
+
+    /// <summary>Visible "tuning for your PC" state shared with the text calibration; null keeps the optimiser silent.</summary>
+    internal ModelTuningTracker? Tuning { get; set; }
+    /// <summary>True on battery, false on AC, null when unknown. Automatic runs wait while on battery.</summary>
+    internal Func<bool?> IsOnBattery { get; set; } = () => null;
+    /// <summary>A just-downloaded checkpoint waits only this short grace (and a quiet GPU) before its measurement starts.</summary>
+    internal static readonly TimeSpan CheckpointGrace = TimeSpan.FromSeconds(20);
+    internal const string AlreadyTunedPrefix = "Already optimised";
+    internal const string SyntheticPath = "media-engine";
+
+    private readonly object _pendingGate = new();
+    private readonly List<(string Path, string Label, DateTime QueuedUtc)> _pending = new();
+    private CancellationTokenSource? _runCts;
+
+    /// <summary>A media checkpoint finished downloading/activating: it joins the tuning queue and the visible tuning state.</summary>
+    internal void QueueCheckpoint(string path, string label)
+    {
+        Tuning?.Queued("media", path, label, WorkloadId, "Starts shortly if the PC is idle");
+        lock (_pendingGate)
+        {
+            _pending.RemoveAll(p => string.Equals(p.Path, path, StringComparison.OrdinalIgnoreCase));
+            _pending.Add((path, label, _now()));
+        }
+    }
+
+    internal int PendingCount { get { lock (_pendingGate) return _pending.Count; } }
+
+    /// <summary>The user pressed Cancel: stops a running automatic/manual measurement and drops queued checkpoints.</summary>
+    internal bool CancelCurrent()
+    {
+        bool any = false;
+        List<(string Path, string Label, DateTime QueuedUtc)> dropped;
+        lock (_pendingGate) { dropped = _pending.ToList(); _pending.Clear(); }
+        foreach (var d in dropped)
+        {
+            any = true;
+            Tuning?.Skipped(ModelTuningTracker.KeyOf("media", d.Path, WorkloadId), "Cancelled by you");
+        }
+        CancellationTokenSource? cts = _runCts;
+        if (cts is not null) { try { cts.Cancel(); any = true; } catch (ObjectDisposedException) { } }
+        return any;
+    }
+
+    private List<(string Path, string Label, DateTime QueuedUtc)> SnapshotPending() { lock (_pendingGate) return _pending.ToList(); }
+
+    private void ResolvePending(Action<ModelTuningTracker, string, string> apply)
+    {
+        List<(string Path, string Label, DateTime QueuedUtc)> items;
+        lock (_pendingGate) { items = _pending.ToList(); _pending.Clear(); }
+        if (Tuning is { } t) foreach (var i in items) apply(t, ModelTuningTracker.KeyOf("media", i.Path, WorkloadId), i.Label);
     }
 
     internal ComfyOptimizationStatus Status { get { lock (_statusGate) return _status; } }
@@ -254,6 +307,23 @@ internal sealed class ComfyMediaOptimizer
             Add("planned-sage", "Planned + SageAttention", new ComfyLaunchPlan(ComfyPlanTier.Aggressive, args,
                 safe.Decisions.Append(sage).ToList(), safe.TextEncoderDevice, safe.TiledVaeDecode));
         }
+        // Low-VRAM dimension: when the diffusion weights take most of the GPU, measure the precision / attention choices that
+        // lower memory pressure. Both are capability-checked, and the fp8 one must still reproduce the same picture (SSIM gate).
+        if (s.Footprint.DiffusionBytes > 0 && s.Gpu.TotalVramBytes > 0 && s.Footprint.DiffusionBytes > (long)(s.Gpu.TotalVramBytes * 0.55))
+        {
+            if (s.Caps.Supports("--fp8_e4m3fn-unet"))
+                Add("planned-fp8-unet", "Planned + fp8 diffusion weights (low VRAM)", new ComfyLaunchPlan(ComfyPlanTier.Aggressive,
+                    safe.Arguments.Append("--fp8_e4m3fn-unet").ToList(),
+                    safe.Decisions.Append(new ComfyPlanDecision("--fp8_e4m3fn-unet", null, "halves the diffusion weights when they take most of the VRAM; verified for equivalence", true)).ToList(),
+                    safe.TextEncoderDevice, safe.TiledVaeDecode));
+            if (s.Caps.Supports("--use-quad-cross-attention"))
+            {
+                var quad = safe.Arguments.Where(a => a != "--use-pytorch-cross-attention" && a != "--use-sage-attention").Append("--use-quad-cross-attention").ToList();
+                Add("planned-quad-attn", "Planned + memory-efficient attention (low VRAM)", new ComfyLaunchPlan(ComfyPlanTier.Safe, quad,
+                    safe.Decisions.Append(new ComfyPlanDecision("--use-quad-cross-attention", null, "sub-quadratic attention lowers peak memory when VRAM is tight", false)).ToList(),
+                    safe.TextEncoderDevice, safe.TiledVaeDecode));
+            }
+        }
         return list;
     }
 
@@ -300,13 +370,38 @@ internal sealed class ComfyMediaOptimizer
     {
         try
         {
-            if (!autoEnabled || _harness.IsGamingActive() || _harness.IsBusy()) return null;
+            var pending = SnapshotPending();
+            if (!autoEnabled)
+            {
+                ResolvePending((t, id, _) => t.Skipped(id, "Automatic media tuning is off in Settings > Automatic checks"));
+                return null;
+            }
+            if (_harness.IsGamingActive()) { Tuning?.Waiting("Paused: Gaming Mode is on"); return null; }
+            if (_harness.IsBusy()) { Tuning?.Waiting("Waiting: the GPU is busy with a generation"); return null; }
+            if (IsOnBattery() == true) { Tuning?.Waiting("Paused: running on battery"); return null; }
+            if (pending.Count > 0 && _now() - pending.Max(p => p.QueuedUtc) < CheckpointGrace) return null;
             if (_now() - _lastFailureUtc < FailureBackoff) return null;
             if (_gate.CurrentCount == 0) return null;
             ComfyEngineSnapshot snap = await _harness.InspectAsync(ct).ConfigureAwait(false);
-            if (!snap.Env.TorchHasCuda || !snap.Gpu.IsNvidia) return null;
-            if (_store.Find(snap.Fingerprint) is { } existing && existing.Outcome != "failed") return null;
-            ComfyOptimizationRecord r = await RunAsync(force: false, ct).ConfigureAwait(false);
+            if (!snap.Env.TorchHasCuda || !snap.Gpu.IsNvidia)
+            {
+                _lastFacts = FactsOf(snap);
+                ResolvePending((t, id, label) => t.Optimal(id, !snap.Env.TorchHasCuda
+                    ? "This media engine's PyTorch has no CUDA support; repair it first"
+                    : "Media tuning applies to NVIDIA GPUs only; this PC keeps the engine defaults",
+                    MediaSuggestions(label)));
+                return null;
+            }
+            if (_store.Find(snap.Fingerprint) is { } existing && existing.Outcome != "failed")
+            {
+                ResolvePending((t, id, _) => t.Skipped(id, "Already tuned for this PC and media engine"));
+                return null;
+            }
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            _runCts = cts;
+            ComfyOptimizationRecord r;
+            try { r = await RunAsync(force: false, cts.Token).ConfigureAwait(false); }
+            finally { _runCts = null; }
             if (r.Outcome == "failed") _lastFailureUtc = _now();
             return r;
         }
@@ -320,6 +415,102 @@ internal sealed class ComfyMediaOptimizer
 
     internal async Task<ComfyOptimizationRecord> RunAsync(bool force, CancellationToken ct)
     {
+        if (_gate.CurrentCount == 0) return await RunCoreAsync(force, ct).ConfigureAwait(false);
+        List<string> ids = StartTracking();
+        ComfyOptimizationRecord record;
+        try { record = await RunCoreAsync(force, ct).ConfigureAwait(false); }
+        catch (OperationCanceledException)
+        {
+            FinishTracking(ids, null, "Cancelled by you");
+            throw;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            FinishTracking(ids, null, "Tuning failed: " + Clip(ex.Message), failed: true);
+            throw;
+        }
+        FinishTracking(ids, record, null);
+        return record;
+    }
+
+    private List<string> StartTracking()
+    {
+        var ids = new List<string>();
+        if (Tuning is not { } t) return ids;
+        var pending = SnapshotPending();
+        if (pending.Count == 0)
+            ids.Add(t.Running("media", SyntheticPath, "Media engine (ComfyUI)", WorkloadId, "Measuring the fastest ComfyUI launch flags on this PC"));
+        foreach (var p in pending)
+            ids.Add(t.Running("media", p.Path, p.Label, WorkloadId, "Measuring the fastest ComfyUI launch flags on this PC"));
+        return ids;
+    }
+
+    private void FinishTracking(List<string> ids, ComfyOptimizationRecord? record, string? cancelledOrFailedText, bool failed = false)
+    {
+        if (Tuning is not { } t) return;
+        bool deferred = record is { Outcome: "deferred" };
+        if (!deferred) lock (_pendingGate) _pending.Clear();
+        foreach (string id in ids)
+        {
+            if (record is null)
+            {
+                if (failed) t.Failed(id, cancelledOrFailedText ?? "Tuning failed");
+                else t.Skipped(id, cancelledOrFailedText ?? "Cancelled");
+                continue;
+            }
+            switch (record.Outcome)
+            {
+                case "improved" when record.Summary.StartsWith(AlreadyTunedPrefix, StringComparison.Ordinal):
+                    t.Skipped(id, "Already tuned for this PC and media engine");
+                    break;
+                case "improved":
+                    t.Applied(id, SpeedGainPercent(record), $"Applied: +{SpeedGainPercent(record):0}% faster image generation ({record.ChosenId})");
+                    break;
+                case "no_improvement":
+                    t.Optimal(id, TuningSuggestions.MediaOptimalText(record.Candidates.FirstOrDefault(c => c.Status == "baseline")?.WarmSeconds),
+                        MediaSuggestions(t.Get(id)?.ModelLabel));
+                    break;
+                case "deferred":
+                    t.Requeue(id, record.Summary);
+                    break;
+                case "not_applicable":
+                    t.Optimal(id, record.Summary, MediaSuggestions(t.Get(id)?.ModelLabel));
+                    break;
+                default:
+                    t.Failed(id, record.Summary);
+                    break;
+            }
+        }
+    }
+
+    private static MediaTuningFacts FactsOf(ComfyEngineSnapshot snap) => new(
+        snap.ModelLabel, snap.Gpu.Name, snap.Gpu.IsNvidia, snap.Env.TorchHasCuda, snap.Gpu.TotalVramBytes, snap.Footprint.DiffusionBytes,
+        null, null, snap.Footprint.OutputWidth, snap.Footprint.OutputHeight);
+
+    private const string SyntheticLabel = "Media engine (ComfyUI)";
+
+    /// <summary>Concrete next steps for a checkpoint whose launch flags cannot be made faster; never empty, never throws.</summary>
+    private IReadOnlyList<PaRuX.Contracts.ModelTuningSuggestionDto> MediaSuggestions(string? label)
+    {
+        try
+        {
+            MediaTuningFacts facts = _lastFacts ?? new MediaTuningFacts(label ?? string.Empty, string.Empty, true, true, 0, 0, null, null, 0, 0);
+            if (!string.IsNullOrWhiteSpace(label) && label != SyntheticLabel) facts = facts with { ModelLabel = label };
+            return TuningSuggestions.ForMedia(facts);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { return Array.Empty<PaRuX.Contracts.ModelTuningSuggestionDto>(); }
+    }
+
+    /// <summary>Warm-run speed-up of the adopted flag set over the default flags, in percent of images per second.</summary>
+    internal static double SpeedGainPercent(ComfyOptimizationRecord record)
+    {
+        double? baseline = record.Candidates.FirstOrDefault(c => c.Status == "baseline")?.WarmSeconds;
+        double? chosen = record.Candidates.FirstOrDefault(c => c.Id == record.ChosenId && c.Status != "baseline")?.WarmSeconds;
+        return baseline is > 0 && chosen is > 0 ? (baseline.Value / chosen.Value - 1.0) * 100.0 : 0;
+    }
+
+    private async Task<ComfyOptimizationRecord> RunCoreAsync(bool force, CancellationToken ct)
+    {
         if (!await _gate.WaitAsync(0, ct).ConfigureAwait(false))
             return Finish(new ComfyOptimizationRecord { Outcome = "deferred", Summary = "Another media optimisation is already running." }, persist: false);
         DateTime started = _now();
@@ -331,6 +522,7 @@ internal sealed class ComfyMediaOptimizer
                 return Finish(new ComfyOptimizationRecord { Outcome = "deferred", Summary = "Gaming Mode is on: media optimisation waits." }, persist: false);
 
             ComfyEngineSnapshot snap = await _harness.InspectAsync(ct).ConfigureAwait(false);
+            _lastFacts = FactsOf(snap);
             var record = new ComfyOptimizationRecord
             {
                 Fingerprint = snap.Fingerprint, StackKey = snap.StackKey, GpuName = snap.Gpu.Name, ComfyVersion = snap.ComfyVersion,
@@ -424,6 +616,7 @@ internal sealed class ComfyMediaOptimizer
             }
 
             ComfyCandidateResult baseline = results[0];
+            if (_lastFacts is not null) _lastFacts = _lastFacts with { PeakVramBytes = baseline.PeakVramBytes, BaselineWarmSeconds = baseline.WarmSeconds };
             ComfyCandidateResult? best = null;
             foreach (ComfyCandidateResult c in results.Skip(1).Where(c => c.Status == "ok"))
             {

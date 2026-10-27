@@ -23,6 +23,20 @@ namespace PaRuX.Services
         public Task<SpeechEngineStatus> GetStatusAsync(CancellationToken ct) =>
             SendAsync<SpeechEngineStatus>(HttpMethod.Get, "/api/v1/speech/engine", null, ct);
 
+        /// <summary>
+        /// Synthesizes text and returns the WAV bytes only. Unlike <see cref="SynthesizeAsync"/> it
+        /// writes no managed file and registers no Artifact, so transient playback (Read aloud)
+        /// does not fill Artifact Workspace.
+        /// </summary>
+        public async Task<byte[]> SynthesizeBytesAsync(string text, string? voice, CancellationToken ct)
+        {
+            SynthesizeResponse result = await SendAsync<SynthesizeResponse>(HttpMethod.Post, "/api/v1/speech/synthesize",
+                new SynthesizeRequest { Text = text, Voice = voice ?? string.Empty }, ct).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(result.Base64Data))
+                throw new LocalAiException("The speech engine returned no audio.");
+            return Convert.FromBase64String(result.Base64Data);
+        }
+
         public async Task<SynthesizeResponse> SynthesizeAsync(string text, string? voice, CancellationToken ct)
         {
             SynthesizeResponse result = await SendAsync<SynthesizeResponse>(HttpMethod.Post, "/api/v1/speech/synthesize",

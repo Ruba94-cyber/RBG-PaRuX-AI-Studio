@@ -101,6 +101,8 @@ internal static class MediaSelectionEngine
     {
         string head = isRecommended ? "Best fit for this PC: " : string.Empty;
         string run = v.Family.IsSupported ? "PaRuX can run it." : "Listed only; PaRuX cannot run it yet.";
+        if (v.Variant.Discovery is { } d)
+            return $"{head}{v.Fit.Reason} Found on Hugging Face ({MediaDiscoveryCatalogue.N(d.Downloads)} downloads, {MediaDiscoveryCatalogue.N(d.Likes)} likes as published): {d.SourceLabel}, no tier claimed. {run}";
         return $"{head}{v.Fit.Reason} Declared tier {v.Variant.Tier} of 5 (declared, not measured). {run}";
     }
 }

@@ -99,6 +99,8 @@ namespace PaRuX.Views
         public ChatView()
         {
             InitializeComponent();
+            // Non-modal "Tuning for your PC" line: visible only while a model is queued or being tuned.
+            TuningStatusHost.Children.Add(new ModelTuningStatusControl(ModelTuningStatusControl.Mode.Line, "text"));
 
             _dispatcher = DispatcherQueue.GetForCurrentThread();
             ChatSession.Current.ComputerUseConsentPrompt = ShowComputerUseConsentAsync;
@@ -173,6 +175,10 @@ namespace PaRuX.Views
             _gameMarkerTimer.Start();
             Unloaded -= OnChatUnloadedStopGameMarkerTimer;
             Unloaded += OnChatUnloadedStopGameMarkerTimer;
+            Unloaded -= OnChatUnloadedStopVoice;
+            Unloaded += OnChatUnloadedStopVoice;
+            PreviewKeyDown -= OnChatPreviewKeyDownVoice;
+            PreviewKeyDown += OnChatPreviewKeyDownVoice;
             _ = LoadSkillsAsync();
         }
 
@@ -792,6 +798,23 @@ namespace PaRuX.Views
                         });
                         continue;
                     }
+                    if (attachment.MediaType != null
+                        && attachment.MediaType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var audioPlayer = new MediaPlayerElement
+                        {
+                            Source = MediaSource.CreateFromUri(new Uri(attachment.LocalPath)),
+                            AreTransportControlsEnabled = true,
+                            AutoPlay = false,
+                            Width = 520,
+                            Height = 110,
+                            HorizontalAlignment = alignment,
+                            Margin = new Thickness(0, 8, 0, 4)
+                        };
+                        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(audioPlayer, "Audio player: " + attachment.FileName);
+                        panel.Children.Add(audioPlayer);
+                        continue;
+                    }
                     if (attachment.MediaType == null
                         || !attachment.MediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
                     {
@@ -1239,6 +1262,10 @@ namespace PaRuX.Views
                 }
             };
             actions.Children.Add(copy);
+
+            Button readAloud = BuildActionButton("", "Read aloud");
+            ConfigureReadAloudButton(readAloud, message);
+            actions.Children.Add(readAloud);
 
             Button regenerate = BuildActionButton("\uE72C", "Regenerate");
             // Regenerate the reply whose button was selected. Using the conversation's latest
@@ -1918,6 +1945,309 @@ namespace PaRuX.Views
             }
         }
 
+        // ------------------------------------------------------------------
+        // Voice input (microphone) and Read aloud. Policy lives in VoiceRecordingSession,
+        // WavSilenceDetector, SpeechTextPreparer and VoiceMessages; this is only UI wiring.
+        // ------------------------------------------------------------------
+        private readonly VoiceRecordingSession _voice = new VoiceRecordingSession();
+        private MicrophoneRecorder? _recorder;
+        private DispatcherQueueTimer? _voiceTimer;
+        private bool _voiceStarting;
+
+        private readonly WavPlayer _wavPlayer = new WavPlayer();
+        private CancellationTokenSource? _readAloudCts;
+        private Button? _readAloudButton;
+        private bool _readAloudWired;
+
+        private async void Mic_Click(object sender, RoutedEventArgs e)
+        {
+            if (_voiceStarting) return;
+            switch (_voice.Phase)
+            {
+                case VoiceRecordingPhase.Recording:
+                    await StopVoiceAndTranscribeAsync(limitReached: false);
+                    return;
+                case VoiceRecordingPhase.Transcribing:
+                    ShowTransientStatus("Still transcribing the previous recording.");
+                    return;
+            }
+
+            if (GamingManager.Current.IsActive) { ShowTransientStatus(VoiceMessages.GamingMode("voice input")); return; }
+
+            _voiceStarting = true;
+            try
+            {
+                try
+                {
+                    SpeechEngineStatus engine = await SpeechClient.Current.GetStatusAsync(CancellationToken.None);
+                    if (!engine.SttInstalled) { ShowTransientStatus(VoiceMessages.SttNotInstalled()); return; }
+                }
+                catch (Exception ex)
+                {
+                    Log.Write("Voice input engine check failed: " + ex.Message);
+                    ShowTransientStatus("Couldn't check the local speech engine: " + ex.Message);
+                    return;
+                }
+
+                var recorder = new MicrophoneRecorder();
+                try { await recorder.StartAsync(); }
+                catch (VoiceCaptureException ex) { ShowTransientStatus(ex.Message); return; }
+
+                _recorder = recorder;
+                WarmSpeechEngineOnce();
+                _voice.TryStart(DateTime.UtcNow);
+                SetVoiceUi(recording: true);
+                _voiceTimer ??= CreateVoiceTimer();
+                _voiceTimer.Start();
+            }
+            finally { _voiceStarting = false; }
+        }
+
+        private static bool _sttWarmed;
+        private static Task? _sttWarmTask;
+
+        /// <summary>Loads the speech model while the user is still talking, so the first transcription is not a cold start.</summary>
+        private static void WarmSpeechEngineOnce()
+        {
+            if (_sttWarmed) return;
+            _sttWarmed = true;
+            _sttWarmTask = Task.Run(async () =>
+            {
+                try
+                {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(4));
+                    await SpeechClient.Current.TranscribeAsync(
+                        Convert.ToBase64String(WavSilenceDetector.BuildSilence(500)), "warmup.wav", cts.Token);
+                    Log.Write("Voice: speech engine warmed in " + sw.ElapsedMilliseconds + " ms");
+                }
+                catch (Exception ex) { _sttWarmed = false; Log.Write("Voice: warm-up skipped: " + ex.Message); }
+            });
+        }
+
+        private DispatcherQueueTimer CreateVoiceTimer()
+        {
+            DispatcherQueueTimer timer = _dispatcher.CreateTimer();
+            timer.Interval = TimeSpan.FromMilliseconds(250);
+            timer.Tick += async (s, e) =>
+            {
+                if (_voice.Phase != VoiceRecordingPhase.Recording) { timer.Stop(); return; }
+                DateTime now = DateTime.UtcNow;
+                VoiceIndicator.Text = "● " + VoiceRecordingSession.FormatElapsed(_voice.Elapsed(now));
+                if (_voice.IsLimitReached(now))
+                {
+                    timer.Stop();
+                    await StopVoiceAndTranscribeAsync(limitReached: true);
+                }
+            };
+            return timer;
+        }
+
+        private void SetVoiceUi(bool recording)
+        {
+            VoiceIndicator.Visibility = recording ? Visibility.Visible : Visibility.Collapsed;
+            if (recording) VoiceIndicator.Text = "● " + VoiceRecordingSession.FormatElapsed(TimeSpan.Zero);
+            MicIcon.Glyph = recording ? "" : "";
+            MicButton.Foreground = recording
+                ? (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
+                : LocalBrush("PaRuXTextTertiaryBrush");
+            ToolTipService.SetToolTip(MicButton, recording
+                ? "Stop recording and transcribe (Esc cancels)"
+                : "Dictate: click to start recording, click again to stop (Esc cancels, 2 min max)");
+            AutomationProperties.SetName(MicButton, recording ? "Stop recording" : "Record voice message");
+        }
+
+        private async Task StopVoiceAndTranscribeAsync(bool limitReached)
+        {
+            VoiceStopOutcome outcome = _voice.Stop(DateTime.UtcNow);
+            _voiceTimer?.Stop();
+            MicrophoneRecorder? recorder = _recorder;
+            _recorder = null;
+            SetVoiceUi(recording: false);
+            if (recorder == null) { _voice.Finish(); return; }
+
+            if (outcome != VoiceStopOutcome.Accepted)
+            {
+                await recorder.CancelAsync();
+                if (outcome == VoiceStopOutcome.TooShort) ShowTransientStatus(VoiceMessages.TooShort());
+                return;
+            }
+
+            try
+            {
+                if (limitReached) ShowTransientStatus(VoiceMessages.LimitReached());
+                byte[] wav = await recorder.StopAsync();
+                WavAnalysis analysis = WavSilenceDetector.Analyze(wav);
+                if (!analysis.Valid) { ShowTransientStatus(VoiceMessages.InvalidAudio(analysis.Problem)); return; }
+                if (analysis.IsSilent) { ShowTransientStatus(VoiceMessages.Silent()); return; }
+
+                ShowPersistentVoiceStatus("Transcribing locally… (the first use loads the speech model and can take about a minute)");
+                string header = BitConverter.ToString(wav, 0, Math.Min(48, wav.Length));
+                Log.Write("Voice: " + wav.Length + " bytes, " + analysis.DurationSeconds.ToString("0.00")
+                    + " s, peak " + analysis.Peak.ToString("0.0000") + ", rms " + analysis.Rms.ToString("0.0000")
+                    + ", variation " + analysis.Variation.ToString("0.0") + ", steadyNoise " + analysis.LooksLikeSteadyNoise + ", header " + header);
+                // Cold start: the model load (about 100 s while the LLM also loads) is a separate, bounded phase,
+                // so the transcription itself keeps its own 75 s limit.
+                Task? warming = _sttWarmTask;
+                if (warming != null && !warming.IsCompleted)
+                {
+                    ShowPersistentVoiceStatus("Loading the local speech model (first use only, up to two minutes)…");
+                    await Task.WhenAny(warming, Task.Delay(VoiceMessages.ModelLoadWait));
+                    ShowPersistentVoiceStatus("Transcribing locally…");
+                }
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                string text;
+                try
+                {
+                    using var timeout = new CancellationTokenSource(VoiceMessages.TranscribeTimeout);
+                    TranscribeResponse result = await SpeechClient.Current.TranscribeAsync(
+                        Convert.ToBase64String(wav), "voice-message.wav", timeout.Token);
+                    text = (result.Text ?? string.Empty).Trim();
+                    Log.Write("Voice transcription ok in " + sw.ElapsedMilliseconds + " ms: " + text.Length + " chars");
+                }
+                catch (OperationCanceledException)
+                {
+                    Log.Write("Voice transcription timed out after " + sw.ElapsedMilliseconds + " ms");
+                    ShowPersistentVoiceStatus(VoiceMessages.TranscribeTimedOut());
+                    return;
+                }
+                if (text.Length == 0) { ShowPersistentVoiceStatus(VoiceMessages.NoSpeechRecognized(analysis.LooksLikeSteadyNoise)); return; }
+
+                string existing = InputBox.Text ?? string.Empty;
+                InputBox.Text = existing.Length == 0 || char.IsWhiteSpace(existing[existing.Length - 1])
+                    ? existing + text
+                    : existing + " " + text;
+                InputBox.SelectionStart = InputBox.Text.Length;
+                InputBox.Focus(FocusState.Programmatic);
+
+                if (SettingsStore.Current.Data.SendVoiceMessagesAutomatically)
+                    Send();
+                else
+                    ShowTransientStatus("Voice transcribed. Review the text and press Enter to send.");
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Voice transcription failed: " + ex.GetType().Name + ": " + ex.Message);
+                if (GamingManager.Current.IsActive) ShowTransientStatus(VoiceMessages.GamingMode("voice input"));
+                else if (ex.Message.IndexOf("not installed", StringComparison.OrdinalIgnoreCase) >= 0)
+                    ShowPersistentVoiceStatus(VoiceMessages.SttNotInstalled());
+                else ShowPersistentVoiceStatus("Transcription failed: " + ex.Message);
+            }
+            finally { _voice.Finish(); }
+        }
+
+        /// <summary>Voice outcomes stay visible longer than the usual transient status so a failure is never missed.</summary>
+        private void ShowPersistentVoiceStatus(string text)
+        {
+            ShowTransientStatus(text);
+            _dispatcher.TryEnqueue(() =>
+            {
+                _statusTimer.Stop();
+                _statusTimer.Interval = TimeSpan.FromSeconds(20);
+                _statusTimer.Start();
+            });
+        }
+
+        private async void CancelVoiceRecording()
+        {
+            if (!_voice.Cancel()) return;
+            _voiceTimer?.Stop();
+            MicrophoneRecorder? recorder = _recorder;
+            _recorder = null;
+            SetVoiceUi(recording: false);
+            if (recorder != null) await recorder.CancelAsync();
+            ShowTransientStatus("Recording cancelled.");
+        }
+
+        private void OnChatPreviewKeyDownVoice(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == VirtualKey.Escape && _voice.Phase == VoiceRecordingPhase.Recording)
+            {
+                e.Handled = true;
+                CancelVoiceRecording();
+            }
+        }
+
+        private void OnChatUnloadedStopVoice(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (_voice.Phase == VoiceRecordingPhase.Recording) CancelVoiceRecording();
+                StopReadAloud();
+            }
+            catch (Exception ex) { Log.Write("Voice cleanup failed: " + ex.Message); }
+        }
+
+        private void ConfigureReadAloudButton(Button button, ChatMessage message)
+        {
+            AutomationProperties.SetAutomationId(button, "Chat_ReadAloud_Button");
+            SetReadAloudButtonState(button, active: false);
+            button.Click += async (s, e) => await ToggleReadAloudAsync(button, message);
+        }
+
+        private static void SetReadAloudButtonState(Button button, bool active)
+        {
+            if (button.Content is FontIcon icon) icon.Glyph = active ? "" : "";
+            string label = active ? "Stop reading" : "Read aloud";
+            ToolTipService.SetToolTip(button, label);
+            AutomationProperties.SetName(button, label);
+        }
+
+        private void StopReadAloud()
+        {
+            try { _readAloudCts?.Cancel(); } catch { }
+            _readAloudCts = null;
+            _wavPlayer.Stop();
+            if (_readAloudButton != null) SetReadAloudButtonState(_readAloudButton, active: false);
+            _readAloudButton = null;
+        }
+
+        private async Task ToggleReadAloudAsync(Button button, ChatMessage message)
+        {
+            if (ReferenceEquals(_readAloudButton, button)) { StopReadAloud(); return; }
+            StopReadAloud();
+
+            if (GamingManager.Current.IsActive) { ShowTransientStatus(VoiceMessages.GamingMode("Read aloud")); return; }
+            string text = SpeechTextPreparer.Prepare(message.Content);
+            if (text.Length == 0) { ShowTransientStatus(VoiceMessages.NothingToRead()); return; }
+
+            var cts = new CancellationTokenSource();
+            _readAloudCts = cts;
+            _readAloudButton = button;
+            SetReadAloudButtonState(button, active: true);
+            if (!_readAloudWired)
+            {
+                _readAloudWired = true;
+                _wavPlayer.Ended += () => _dispatcher.TryEnqueue(StopReadAloud);
+            }
+
+            try
+            {
+                SpeechEngineStatus engine = await SpeechClient.Current.GetStatusAsync(cts.Token);
+                if (!engine.TtsInstalled) { ShowTransientStatus(VoiceMessages.TtsNotInstalled()); StopReadAloudIf(cts); return; }
+                ShowTransientStatus("Preparing speech locally…");
+                byte[] wav = await SpeechClient.Current.SynthesizeBytesAsync(text, null, cts.Token);
+                if (cts.IsCancellationRequested) return;
+                await _wavPlayer.PlayAsync(wav);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Log.Write("Read aloud failed: " + ex.GetType().Name + ": " + ex.Message);
+                if (ex.Message.IndexOf("not installed", StringComparison.OrdinalIgnoreCase) >= 0)
+                    ShowTransientStatus(VoiceMessages.TtsNotInstalled());
+                else if (GamingManager.Current.IsActive) ShowTransientStatus(VoiceMessages.GamingMode("Read aloud"));
+                else ShowTransientStatus("Couldn't read this message aloud: " + ex.Message);
+                StopReadAloudIf(cts);
+            }
+        }
+
+        /// <summary>Resets the Read aloud state only if this attempt is still the current one.</summary>
+        private void StopReadAloudIf(CancellationTokenSource cts)
+        {
+            if (ReferenceEquals(_readAloudCts, cts)) StopReadAloud();
+        }
+
         private readonly Dictionary<string, TimeSpan?> _audioDurations = new Dictionary<string, TimeSpan?>();
 
         /// <summary>Shows the Computer Use consent dialog. Cancel is the default button; only an explicit Allow once returns true.</summary>
@@ -2288,6 +2618,7 @@ namespace PaRuX.Views
             {
                 ShowStatus(text, false);
                 _statusTimer.Stop();
+                _statusTimer.Interval = TimeSpan.FromSeconds(7);
                 _statusTimer.Start();
             });
         }

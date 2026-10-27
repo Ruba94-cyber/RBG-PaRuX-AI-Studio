@@ -31,6 +31,10 @@ internal sealed class AutoMaintenanceDependencies
     public ComfyMediaOptimizer? MediaOptimizer { get; init; }
     /// <summary>Optional read-only suggestions of better-fitting media models ("media_candidate" proposals). Never downloads.</summary>
     public Func<IReadOnlyList<MaintenanceProposal>>? SuggestMedia { get; init; }
+    /// <summary>Refreshes the Hugging Face media discovery catalogue (proposals only, never a download). Optional.</summary>
+    public Func<CancellationToken, Task<MediaDiscoveryRefreshResultDto>>? RefreshMediaDiscovery { get; init; }
+    /// <summary>True on battery, false on AC, null when unknown. Scheduled media discovery is skipped on battery.</summary>
+    public Func<bool?>? IsOnBattery { get; init; }
     public required Func<bool> IsGamingActive { get; init; }
     public Func<DateTime> UtcNow { get; init; } = () => DateTime.UtcNow;
 }
@@ -118,8 +122,9 @@ internal sealed class AutoMaintenanceService
                 else if (updater.IsRetryDue()) await updater.RunAsync(true, false, ct).ConfigureAwait(false);
             }
         // Opt-in idle optimisation of the media engine; it checks idleness, Gaming and its own failure backoff.
-        if (settings.AutoOptimizeMedia && _deps.MediaOptimizer is { } optimizer)
-            await optimizer.TickAsync(true, ct).ConfigureAwait(false);
+        // With the setting off a queued checkpoint is reported as skipped instead of waiting forever.
+        if (_deps.MediaOptimizer is { } optimizer)
+            await optimizer.TickAsync(settings.AutoOptimizeMedia, ct).ConfigureAwait(false);
     }
 
     /// <summary>When the next scheduled run is due (bounded backoff after failures), or null when disabled.</summary>
@@ -275,6 +280,7 @@ internal sealed class AutoMaintenanceService
             }
             await ProposeRuntimeBuildsAsync(report, ct, e => failed |= e, autoRuntimes, needsUser).ConfigureAwait(false);
             await ProposeBackendSuggestionsAsync(report, ct).ConfigureAwait(false);
+            await RefreshMediaDiscoveryAsync(report, trigger, ct).ConfigureAwait(false);
             ProposeMediaSuggestions(report);
 
             string outcome = failed ? "error"
@@ -386,6 +392,26 @@ internal sealed class AutoMaintenanceService
             markFailed(true);
             report.Errors.Add("runtime_check: " + Clip(ex.Message));
         }
+    }
+
+    /// <summary>Same gating as the rest of the pass (setting Enabled and Gaming are checked above) plus: not on battery unless the user
+    /// asked for this check. Offline or failed discovery is a note, never a maintenance failure; it never downloads anything.</summary>
+    private async Task RefreshMediaDiscoveryAsync(MaintenanceReport report, string trigger, CancellationToken ct)
+    {
+        if (_deps.RefreshMediaDiscovery is null) return;
+        if (trigger != "manual" && _deps.IsOnBattery?.Invoke() == true)
+        {
+            report.Changes.Add("media_discovery: skipped on battery");
+            return;
+        }
+        try
+        {
+            MediaDiscoveryRefreshResultDto r = await _deps.RefreshMediaDiscovery(ct).ConfigureAwait(false);
+            if (r.Outcome is "offline_cached" or "failed_cached")
+                report.Changes.Add(Clip("media_discovery: " + r.Outcome + " (" + r.ErrorCode + "), using the last known list"));
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { report.Changes.Add(Clip("media_discovery: " + ex.GetType().Name)); }
     }
 
     private void ProposeMediaSuggestions(MaintenanceReport report)

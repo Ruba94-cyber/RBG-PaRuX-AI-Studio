@@ -26,6 +26,13 @@ public sealed class CreatePersonaRequest
     public string SystemPrompt { get; set; } = string.Empty;
 }
 
+/// <summary>A character card file (SillyTavern/Chub JSON or PNG with an embedded card) to import as a persona.</summary>
+public sealed class ImportPersonaCardRequest
+{
+    public string FileName { get; set; } = string.Empty;
+    public string DataBase64 { get; set; } = string.Empty;
+}
+
 public sealed class SetActivePersonaRequest
 {
     public string PersonaId { get; set; } = string.Empty;

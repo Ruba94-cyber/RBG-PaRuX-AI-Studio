@@ -700,15 +700,52 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
         return new ModelRepoDetails { RepoId = details.RepoId, License = details.License, Revision = details.Revision };
     }
 
+    /// <summary>The Hugging Face repository a managed file was downloaded from, or null when unknown (imported / user-placed files).</summary>
+    internal static string? RepoIdFor(string fileName) =>
+        LoadRepoIds().TryGetValue(Path.GetFileName(fileName), out string? repo) && !string.IsNullOrWhiteSpace(repo) ? repo : null;
+
+    /// <summary>Read-only listing of the GGUF files of one repository (name, size). Nothing is downloaded.</summary>
+    internal async Task<IReadOnlyList<(string FileName, long SizeBytes)>> ListRepoGgufFilesAsync(string repoId, CancellationToken ct)
+    {
+        string[] repoParts = (repoId ?? string.Empty).Trim().Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (repoParts.Length != 2 || repoParts.Any(part => !IsSafeRepoPart(part)))
+            return Array.Empty<(string, long)>();
+        HfModelDetail? detail = await FetchHfModelDetailAsync(repoParts[0] + "/" + repoParts[1], ct).ConfigureAwait(false);
+        return (detail?.Siblings ?? new List<HfSibling>())
+            .Where(s => s.RFilename.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase))
+            .Select(s => (s.RFilename.Replace('\\', '/'), s.Size ?? s.Lfs?.Size ?? 0L))
+            .ToList();
+    }
+
+    private const int MaxHubApiRedirects = 3;
+
     private async Task<HfModelDetail?> FetchHfModelDetailAsync(string repoId, CancellationToken ct)
     {
-        string url = "https://huggingface.co/api/models/" + repoId + "?blobs=true";
-        using HttpRequestMessage request = new(HttpMethod.Get, url);
-        request.Headers.UserAgent.ParseAdd("PaRuX/1.0");
-        using HttpResponseMessage response = await _http.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
-        await using Stream stream = await response.Content.ReadAsStreamAsync(ct);
-        return await JsonSerializer.DeserializeAsync<HfModelDetail>(stream, JsonOptions, ct);
+        // Redirects are followed by hand (the client disables them for the file transfer). Hugging Face
+        // answers a renamed repository (for example Comfy-Org/Qwen-Image_ComfyUI) with 307 and a relative
+        // Location; without following it every such repository failed with a 500. Only huggingface.co
+        // over https is followed, with a small hop limit.
+        Uri uri = new("https://huggingface.co/api/models/" + repoId + "?blobs=true");
+        for (int hop = 0; ; hop++)
+        {
+            using HttpRequestMessage request = new(HttpMethod.Get, uri);
+            request.Headers.UserAgent.ParseAdd("PaRuX/1.0");
+            using HttpResponseMessage response = await _http.SendAsync(request, ct);
+            if ((int)response.StatusCode is >= 300 and < 400 && response.Headers.Location is { } location)
+            {
+                Uri next = location.IsAbsoluteUri ? location : new Uri(uri, location);
+                if (hop >= MaxHubApiRedirects
+                    || next.Scheme != Uri.UriSchemeHttps
+                    || !string.Equals(next.Host, "huggingface.co", StringComparison.OrdinalIgnoreCase)
+                    || !next.AbsolutePath.StartsWith("/api/models/", StringComparison.Ordinal))
+                    throw new HttpRequestException("Model Hub redirected the repository lookup somewhere PaRuX will not follow.");
+                uri = next;
+                continue;
+            }
+            response.EnsureSuccessStatusCode();
+            await using Stream stream = await response.Content.ReadAsStreamAsync(ct);
+            return await JsonSerializer.DeserializeAsync<HfModelDetail>(stream, JsonOptions, ct);
+        }
     }
 
     /// <summary>
@@ -935,8 +972,10 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
         try
         {
             string readmeRevision = revision ?? "main";
+            string[] canonicalParts = (detail?.Id ?? string.Empty).Split('/');
+            string readmeRepo = canonicalParts.Length == 2 && canonicalParts.All(IsSafeRepoPart) ? detail!.Id : repoId;
             using HttpResponseMessage readmeResponse = await _http.GetAsync(
-                "https://huggingface.co/" + repoId + "/raw/" + readmeRevision + "/README.md", ct);
+                "https://huggingface.co/" + readmeRepo + "/raw/" + readmeRevision + "/README.md", ct);
             if (readmeResponse.IsSuccessStatusCode)
             {
                 readme = await readmeResponse.Content.ReadAsStringAsync(ct);
@@ -997,6 +1036,17 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
         return CreateDownloadCoreAsync(request, ct, triggerCompletionHandler: false,
             candidateKey: null, exactSizeBytes: item.PinnedSizeBytes, requireAuthoritativeSize: false,
             allowUnclassifiedSafetensors: true, requiredSha256: sha256.ToLowerInvariant());
+    }
+
+    /// <summary>Guided media-setup checkpoint download: pinned size and SHA-256 are verified before the file is published.</summary>
+    internal Task<ModelDownloadStatus> CreateMediaCheckpointDownloadAsync(ModelDownloadRequest request, string requiredSha256, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (requiredSha256 is not { Length: 64 } || !requiredSha256.All(Uri.IsHexDigit))
+            throw new InvalidDataException("The checkpoint needs a pinned SHA-256 before download.");
+        return CreateDownloadCoreAsync(request, ct, triggerCompletionHandler: false, candidateKey: null,
+            exactSizeBytes: request.SizeBytes > 0 ? request.SizeBytes : null, requireAuthoritativeSize: false,
+            allowUnclassifiedSafetensors: false, requiredSha256: requiredSha256.ToLowerInvariant());
     }
 
     internal async Task<ModelDownloadStatus> CreateCandidateDownloadAsync(
@@ -1072,6 +1122,10 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
         request = loraLane
             ? ValidateLoraRequest(request)
             : ValidateDownloadRequest(ResolveDownloadRequest(request, out _), allowUnclassifiedSafetensors);
+        if (requiredSha256 != null && request.ExpectedSha256 != null
+            && !string.Equals(requiredSha256, request.ExpectedSha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Conflicting pinned SHA-256 values were supplied for this download.");
+        requiredSha256 ??= request.ExpectedSha256;
         ModelDownloadProvenanceManifestStore.AssertWritable(ModelsDirectory);
 
         if (!request.ReplaceExisting && GetCompletedFileReplacementFailure(request) is { } replacementFailure)
@@ -1277,6 +1331,10 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
         if (request.Revision != null && revision == null)
             throw new InvalidDataException("revision must be an immutable 40- or 64-character hexadecimal commit SHA.");
         ModelDownloadLicenseEvidence? licenseEvidence = ValidateLicenseEvidence(request.LicenseEvidence);
+        string? expectedSha256 = request.ExpectedSha256?.Trim();
+        if (expectedSha256 != null && (expectedSha256.Length != 64 || !expectedSha256.All(Uri.IsHexDigit)))
+            throw new InvalidDataException("expectedSha256 must be a 64-character hexadecimal digest.");
+        expectedSha256 = expectedSha256?.ToLowerInvariant();
 
         string repoId = request.RepoId.Trim();
         string[] repoParts = repoId.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -1376,6 +1434,7 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
             DiscardPartial = request.DiscardPartial,
             ReplaceExisting = request.ReplaceExisting,
             LicenseEvidence = licenseEvidence,
+            ExpectedSha256 = expectedSha256,
             ResumeFromDownloadId = null
         };
     }
@@ -1748,6 +1807,7 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
             ReviewAcknowledged = request.LicenseEvidence.ReviewAcknowledged,
             ReviewAcknowledgedUtc = request.LicenseEvidence.ReviewAcknowledgedUtc
         },
+        ExpectedSha256 = request.ExpectedSha256,
         ResumeFromDownloadId = null
     };
 
@@ -2526,10 +2586,30 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
         else if (entry.SplitSet is { } completedSet && completedSet.TryMarkLanded(entry.Status.FileName))
             _completionHandler?.OnGgufDownloaded(completedSet.FirstPartPath, completedSet.Label);
 
+        var finalInfo = new FileInfo(finalPath);
+        long finalLength = finalInfo.Length;
+        DateTime finalWriteUtc = finalInfo.LastWriteTimeUtc;
+        string publishedPath = finalPath;
+        if (!string.IsNullOrWhiteSpace(request.MediaCheckpointType))
+        {
+            // A media checkpoint belongs in ComfyUI's model folder, whichever UI started the download. Place it now, so it is listed as
+            // installed and tuning sees the real file. When ComfyUI is missing or the destination is taken, it stays here and the
+            // migration/"Install" step reports why; nothing is replaced or deleted.
+            try
+            {
+                MediaPlacementResult placed = MediaCheckpointPlacement.PlaceMainModel(finalPath);
+                if (placed.Installed && File.Exists(placed.Path)) publishedPath = placed.Path;
+                else if (placed.Outcome == MediaPlacementOutcome.Failed) System.Diagnostics.Trace.TraceWarning("Media checkpoint placement: " + placed.Message);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException) { System.Diagnostics.Trace.TraceWarning("Media checkpoint placement failed: " + ex.Message); }
+            // Media checkpoints join the automatic "tuning for your PC" queue; a failing observer never fails the download.
+            try { _completionHandler?.OnMediaCheckpointDownloaded(publishedPath, Path.GetFileNameWithoutExtension(publishedPath)); }
+            catch (Exception ex) when (ex is not OutOfMemoryException) { System.Diagnostics.Trace.TraceWarning("Media tuning hand-off failed: " + ex.Message); }
+        }
+
         ModelDownloadLicenseEvidence capturedLicense = request.LicenseEvidence ?? new ModelDownloadLicenseEvidence();
         var sourceIdentity = ModelDownloadProvenanceManifestStore.SourceIdentityFromValidatedUrl(
             request.RepoId, request.Revision, request.DownloadUrl);
-        var finalInfo = new FileInfo(finalPath);
         var provenance = new ModelDownloadProvenance
         {
             RepoId = request.RepoId,
@@ -2546,15 +2626,15 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
             ExpectedSha256 = entry.Status.Sha256,
             ComputedSha256 = computedSha256,
             IntegrityStatus = verificationStatus,
-            SizeBytes = finalInfo.Length,
-            FileLastWriteUtc = finalInfo.LastWriteTimeUtc,
+            SizeBytes = finalLength,
+            FileLastWriteUtc = finalWriteUtc,
             CompletedUtc = DateTime.UtcNow
         };
         ModelDownloadProvenanceManifestStore.Upsert(ModelsDirectory, request.FileName, provenance);
         lock (entry.Gate)
         {
             entry.Status.Status = "completed";
-            entry.Status.LocalPath = finalPath;
+            entry.Status.LocalPath = publishedPath;
             entry.Status.VerificationStatus = verificationStatus;
             entry.Status.Error = null;
             entry.Status.FailureClass = null;

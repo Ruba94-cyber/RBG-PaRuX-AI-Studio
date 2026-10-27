@@ -1,3 +1,4 @@
+using PaRuX.Contracts;
 using PaRuX.Server;
 using Xunit;
 
@@ -380,5 +381,133 @@ usage: main.py [--cuda-malloc | --disable-cuda-malloc] [--use-pytorch-cross-atte
         string fp = ComfyLaunchArguments.Resolve(store, h.Snapshot.StackKey, Caps).Fingerprint!;
         store.Invalidate(fp, "exited with code 1");
         Assert.Equal("default", ComfyLaunchArguments.Resolve(store, h.Snapshot.StackKey, Caps).Source);
+    }
+
+    // ---- automatic tuning right after a checkpoint download (visible state) -------------------------------------
+
+    private static ModelTuningItemDto Only(ModelTuningTracker t) => Assert.Single(t.Snapshot().Items);
+
+    [Fact]
+    public async Task A_downloaded_checkpoint_is_queued_visibly_and_measured_after_the_short_grace()
+    {
+        FakeHarness h = Scripted();
+        var (opt, _, _) = Make(h);
+        var tuning = new ModelTuningTracker();
+        opt.Tuning = tuning;
+
+        opt.QueueCheckpoint("C:/models/z_image_turbo.safetensors", "z_image_turbo");
+        Assert.Equal(ModelTuningStates.Queued, Only(tuning).State);
+        Assert.Equal("media", Only(tuning).Kind);
+
+        Assert.Null(await opt.TickAsync(true, default));      // still inside the grace
+        Assert.Empty(h.Runs);
+        _now = _now.AddSeconds(25);
+        Assert.NotNull(await opt.TickAsync(true, default));
+
+        ModelTuningItemDto item = Only(tuning);
+        Assert.Equal(ModelTuningStates.Applied, item.State);
+        Assert.Equal(22, item.GainPercent!.Value, 1);          // warm 10.0 s -> 8.2 s
+        Assert.Equal(0, opt.PendingCount);
+        Assert.Equal("z_image_turbo", item.ModelLabel);
+    }
+
+    [Fact]
+    public async Task A_queued_checkpoint_is_held_back_by_gaming_generation_and_battery_and_never_runs_then()
+    {
+        FakeHarness h = Scripted();
+        var (opt, _, _) = Make(h);
+        var tuning = new ModelTuningTracker();
+        opt.Tuning = tuning;
+        opt.QueueCheckpoint("C:/models/a.safetensors", "a");
+        _now = _now.AddMinutes(1);
+
+        h.Gaming = true;
+        Assert.Null(await opt.TickAsync(true, default));
+        Assert.Contains("Gaming", Only(tuning).Reason);
+        h.Gaming = false; h.Busy = true;
+        Assert.Null(await opt.TickAsync(true, default));
+        Assert.Contains("busy", Only(tuning).Reason);
+        h.Busy = false; opt.IsOnBattery = () => true;
+        Assert.Null(await opt.TickAsync(true, default));
+        Assert.Contains("battery", Only(tuning).Reason);
+
+        Assert.Empty(h.Runs);
+        Assert.Equal(ModelTuningStates.Queued, Only(tuning).State);
+        Assert.Equal(1, opt.PendingCount);
+    }
+
+    [Fact]
+    public async Task With_automatic_media_tuning_off_a_queued_checkpoint_is_skipped_not_left_waiting()
+    {
+        FakeHarness h = Scripted();
+        var (opt, _, _) = Make(h);
+        var tuning = new ModelTuningTracker();
+        opt.Tuning = tuning;
+        opt.QueueCheckpoint("C:/models/a.safetensors", "a");
+
+        Assert.Null(await opt.TickAsync(false, default));
+
+        Assert.Equal(ModelTuningStates.Skipped, Only(tuning).State);
+        Assert.Contains("Settings", Only(tuning).Reason);
+        Assert.Empty(h.Runs);
+    }
+
+    [Fact]
+    public async Task Cancelling_a_running_media_tuning_stops_it_cleanly_and_reports_it()
+    {
+        FakeHarness h = Scripted();
+        var (opt, _, _) = Make(h);
+        var tuning = new ModelTuningTracker();
+        opt.Tuning = tuning;
+        h.OnRun = _ => { opt.CancelCurrent(); return Task.CompletedTask; };
+        opt.QueueCheckpoint("C:/models/a.safetensors", "a");
+        _now = _now.AddMinutes(1);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => opt.TickAsync(true, default));
+
+        Assert.Equal(ModelTuningStates.Skipped, Only(tuning).State);
+        Assert.Equal("Cancelled by you", Only(tuning).Reason);
+        Assert.Equal(0, opt.PendingCount);
+    }
+
+    [Fact]
+    public async Task A_checkpoint_on_an_already_tuned_stack_is_reported_as_already_tuned()
+    {
+        FakeHarness h = Scripted();
+        var (opt, _, _) = Make(h);
+        await opt.RunAsync(false, default);
+        var tuning = new ModelTuningTracker();
+        opt.Tuning = tuning;
+        opt.QueueCheckpoint("C:/models/b.safetensors", "b");
+        _now = _now.AddMinutes(1);
+        int runs = h.Runs.Count;
+
+        Assert.Null(await opt.TickAsync(true, default));
+
+        Assert.Equal(ModelTuningStates.Skipped, Only(tuning).State);
+        Assert.Contains("Already tuned", Only(tuning).Reason);
+        Assert.Equal(runs, h.Runs.Count);
+    }
+
+    [Fact]
+    public async Task A_measurement_without_a_faster_flag_set_is_reported_as_no_faster_profile()
+    {
+        FakeHarness h = Scripted((hh, K) =>
+        {
+            hh.Script[K("planned-fp16acc")] = (30, 9.9, 9000, 1, true);
+            hh.Script[K("planned-fp8")] = (30, 9.9, 9000, 1, true);
+            hh.Script[K("planned-fast")] = (30, 9.9, 9000, 1, true);
+        });
+        var (opt, _, _) = Make(h);
+        var tuning = new ModelTuningTracker();
+        opt.Tuning = tuning;
+        opt.QueueCheckpoint("C:/models/a.safetensors", "a");
+        _now = _now.AddMinutes(1);
+
+        await opt.TickAsync(true, default);
+
+        Assert.Equal(ModelTuningStates.Skipped, Only(tuning).State);
+        Assert.StartsWith("Already optimal for this PC (measured", Only(tuning).Reason);
+        Assert.NotEmpty(Only(tuning).Suggestions);
     }
 }
