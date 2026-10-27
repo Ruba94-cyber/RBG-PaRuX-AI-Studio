@@ -1860,11 +1860,16 @@
                                        Text="Optimize the media engine for this PC automatically when idle"
                                        Style="{StaticResource PaRuXBodyStrongTextStyle}" />
                             <ToggleSwitch x:Name="Settings_AutoCheck_MediaOptimize_Toggle"
-                                          Grid.Column="1" IsOn="False"
+                                          Grid.Column="1" IsOn="True"
                                           AutomationProperties.AutomationId="Settings_AutoCheck_MediaOptimize_Toggle"
                                           AutomationProperties.Name="Optimize the media engine for this PC automatically when idle"
                                           Toggled="AutoCheckMediaOptimizeToggle_Toggled" />
                         </Grid>
+                        <TextBlock x:Name="Settings_AutoCheck_Tuning_Explanation_Text"
+                                   AutomationProperties.AutomationId="Settings_AutoCheck_Tuning_Explanation_Text"
+                                   AutomationProperties.Name="What automatic tuning does"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource PaRuXCaptionTextStyle}" />
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceS}">
                             <Button x:Name="Settings_AutoCheck_MediaOptimize_Button" Content="Optimize media engine for this PC"
                                     AutomationProperties.AutomationId="Settings_AutoCheck_MediaOptimize_Button"

@@ -77,6 +77,7 @@ internal sealed record RegistryEmbeddedStems(IReadOnlyList<string> TextEncoder, 
 internal sealed class MediaCompanionRegistry
 {
     public const string ResourceName = "PaRuX.Server.Assets.media.media-companion-registry.json";
+    internal const string CheckpointLoaderClass = "CheckpointLoaderSimple";
 
     private static readonly Regex FamilyIdPattern = new(@"^[a-z0-9][a-z0-9.\-]{0,39}$", RegexOptions.CultureInvariant);
     private static readonly Regex RepositoryPattern = new(@"^[A-Za-z0-9][A-Za-z0-9._\-]*/[A-Za-z0-9][A-Za-z0-9._\-]*$", RegexOptions.CultureInvariant);
@@ -239,7 +240,12 @@ internal sealed class MediaCompanionRegistry
                 Str(loader, where + ".mainLoader", "classType", 64),
                 Str(loader, where + ".mainLoader", "input", 64),
                 Str(loader, where + ".mainLoader", "folder", 32));
-            if (mainLoader.Folder != "diffusion_models") throw Invalid(where + ": the main loader must read diffusion_models.");
+            // A single-file checkpoint (CLIP and VAE embedded) is read by CheckpointLoaderSimple from ComfyUI's checkpoints folder;
+            // every other main model is a diffusion model read from diffusion_models.
+            bool checkpointLoader = mainLoader.ClassType == CheckpointLoaderClass;
+            if (checkpointLoader ? mainLoader.Folder != "checkpoints" || mainLoader.Input != "ckpt_name" : mainLoader.Folder != "diffusion_models")
+                throw Invalid(where + ": the main loader must read diffusion_models"
+                    + ", or checkpoints through " + CheckpointLoaderClass + ".ckpt_name.");
         }
         if (support == "supported" && (templateFile == null || !templateFile.EndsWith(".json", StringComparison.Ordinal) || mainLoader == null))
             throw Invalid(where + ": a supported family needs a workflow template and a main loader.");
