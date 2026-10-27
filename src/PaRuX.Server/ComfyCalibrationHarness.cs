@@ -124,11 +124,31 @@ print(json.dumps(out))";
         catch (JsonException) { return null; }
     }
 
-    private JsonObject LoadWorkflow()
+    internal JsonObject LoadWorkflow()
     {
         string path = _o.WorkflowTemplatePath ?? LocalAiPaths.ImageWorkflowTemplate;
         if (!File.Exists(path)) { ConfigAssets.EnsureAll(); }
-        return (JsonObject)JsonNode.Parse(File.ReadAllText(path))!;
+        JsonObject workflow = (JsonObject)JsonNode.Parse(File.ReadAllText(path))!;
+        SubstituteInstalledZImage(workflow);
+        return workflow;
+    }
+
+    /// <summary>The template names one Z-Image precision (nvfp4). A PC that installed another one (bf16, int8) would make ComfyUI reject
+    /// the calibration workflow ("value not in list"), so the measurement uses whichever Z-Image Turbo file is actually installed.</summary>
+    private void SubstituteInstalledZImage(JsonObject workflow)
+    {
+        JsonObject? inputs = workflow["prompt"]?["1"]?["inputs"] as JsonObject;
+        string? wanted = inputs?["unet_name"]?.GetValue<string>();
+        if (inputs is null || string.IsNullOrWhiteSpace(wanted) || FindModel(wanted, "diffusion_models", "unet") is not null) return;
+        foreach (string root in AllModelRoots())
+            foreach (string folder in new[] { "diffusion_models", "unet" })
+            {
+                string dir = Path.Combine(root, folder);
+                if (!Directory.Exists(dir)) continue;
+                string? alt = Directory.EnumerateFiles(dir, "z_image_turbo*.safetensors")
+                    .Select(Path.GetFileName).OfType<string>().OrderBy(n => n, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+                if (alt is not null) { inputs["unet_name"] = alt; return; }
+            }
     }
 
     private IEnumerable<string> AllModelRoots()
