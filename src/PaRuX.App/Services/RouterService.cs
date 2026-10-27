@@ -34,6 +34,35 @@ namespace PaRuX.Services
           + @"(?!\s+(?:(?:la|il|lo|le|i|gli|l['’]?|the|your|this|that|my|una?|an?)\s*)?"
           + @"(?:risposta|risposte|testo|riassunto|codice|answer|response|reply|text|summary|code|message|messaggio)))\b", Opts);
 
+        // "Replace the sky in the last image", "cambia solo il cielo": a change confined to one part of a picture. Chat cannot
+        // paint a mask, so these still run as a whole-image edit, and the reply points to Create > Image edit > Mask inpaint.
+        private const string RegionNounEn = @"(?:sky|clouds?|hair|shirt|dress|eyes|hat|grass|sea|water|mountains?|sun|moon|sunset|trees?|background|wall|floor)";
+        private const string RegionNounIt = @"(?:cielo|nuvole|capelli|camicia|vestito|occhi|cappello|erba|mare|acqua|montagne?|sole|luna|tramonto|alberi?|sfondo|muro|parete|pavimento)";
+
+        private static readonly Regex RegionEditRx = new Regex(
+            @"\b(?:(?:replace|change|swap|remove|recolou?r|fix|edit|repaint|redo)\s+(?:only\s+|just\s+)?(?:the|that|this|his|her|their)\s+" + RegionNounEn
+          + @"|(?:only|just)\s+(?:the\s+)?" + RegionNounEn
+          + @"|(?:cambia(?:re)?|sostituisci|rimuovi|modifica|ricolora|ridipingi)(?:mi)?\s+(?:solo\s+|soltanto\s+)?(?:il|lo|la|le|i|gli|l['’])\s*" + RegionNounIt
+          + @"|(?:solo|soltanto)\s+(?:il|lo|la|le|i|gli|l['’])\s*" + RegionNounIt + @")\b", Opts);
+
+        private static readonly Regex RegionContextRx = new Regex(
+            @"\b(?:(?:last|previous|latest|ultima|precedente|this|that|questa|quella)\s+(?:image|picture|photo|immagine|foto)"
+          + @"|(?:only|just|solo|soltanto))\b", Opts);
+
+        /// <summary>True when the request changes only one part of a picture (sky, hair, background...), in English or Italian.</summary>
+        public static bool IsRegionEditRequest(string? input) =>
+            !string.IsNullOrWhiteSpace(input) && RegionEditRx.IsMatch(input);
+
+        /// <summary>Routes a region request to image edit when nothing is attached only if it also points at an image or says "only".</summary>
+        internal static bool IsRegionEditWithoutAttachment(string input) =>
+            RegionEditRx.IsMatch(input) && RegionContextRx.IsMatch(input);
+
+        /// <summary>The note added to a chat edit reply when the request was about one region: the edit ran on the whole image.</summary>
+        public static string? RegionEditHint(string? input) =>
+            IsRegionEditRequest(input)
+                ? "This edit was applied to the whole image, so other parts may have changed. To change only one area, open Create > Image edit > Mask inpaint, paint over that area and run it there."
+                : null;
+
         private static readonly Regex VideoRx = new Regex(
             @"\b(genera(mi)?\s+(un\s+)?video|crea(mi)?\s+(un\s+)?video|fai\s+(un\s+)?video"
           + @"|generate\s+(a\s+)?video|create\s+(a\s+)?video|make\s+(me\s+)?(a\s+)?video"
@@ -156,7 +185,7 @@ namespace PaRuX.Services
             {
                 string text = input.Trim();
                 if (IsNativeCodeCommand(text)) return RouteKind.CodeHandoff;
-                if (ImageEditRx.IsMatch(text)) return RouteKind.ImageEdit;
+                if (ImageEditRx.IsMatch(text) || RegionEditRx.IsMatch(text)) return RouteKind.ImageEdit;
                 if (VideoRx.IsMatch(text)) return RouteKind.Video;
                 if (BinaryAnalysisRx.IsMatch(text)) return RouteKind.BinaryAnalysis;
             }
@@ -177,7 +206,7 @@ namespace PaRuX.Services
             // content heuristic so the text after the command cannot accidentally route elsewhere.
             if (IsNativeCodeCommand(text)) return RouteKind.CodeHandoff;
             if (ImageRx.IsMatch(text)) return RouteKind.Image;
-            if (ImageEditRx.IsMatch(text)) return RouteKind.ImageEdit;
+            if (ImageEditRx.IsMatch(text) || IsRegionEditWithoutAttachment(text)) return RouteKind.ImageEdit;
             if (VideoRx.IsMatch(text)) return RouteKind.Video;
             if (BinaryAnalysisRx.IsMatch(text)) return RouteKind.BinaryAnalysis;
             if (CodeDiscussionRx.IsMatch(text)) return RouteKind.ChatNormal;

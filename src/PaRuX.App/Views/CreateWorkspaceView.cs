@@ -146,6 +146,7 @@ namespace PaRuX.Views
             dimensions.Children.Add(Labeled("Width", _imageWidth));
             dimensions.Children.Add(Labeled("Height", _imageHeight));
             panel.Children.Add(dimensions);
+            panel.Children.Add(BuildLoraStackPanel());
             var run = new Button { Content = "Generate image" };
             run.Click += async (_, _) => await GenerateMediaAsync("image");
             _runButtons.Add(run);
@@ -248,8 +249,11 @@ namespace PaRuX.Views
             var imageVariation = new ComboBoxItem { Content = "Image variation", Tag = "img2img" };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(instructionEdit, "Create_EditMode_InstructionEdit_Item");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(imageVariation, "Create_EditMode_ImageVariation_Item");
+            var maskInpaint = new ComboBoxItem { Content = CreateInpaintPresenter.ModeLabel, Tag = CreateInpaintPresenter.ModeTag };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(maskInpaint, CreateInpaintPresenter.ModeItem);
             _editMode.Items.Add(instructionEdit);
             _editMode.Items.Add(imageVariation);
+            _editMode.Items.Add(maskInpaint);
             _editMode.SelectionChanged += (_, _) => UpdateEditModeDescription();
             _editMode.SelectedIndex = 0;
             panel.Children.Add(Labeled("Edit mode", _editMode));
@@ -260,9 +264,11 @@ namespace PaRuX.Views
             {
                 _editSourcePath = await PickFileAsync(new[] { ".png", ".jpg", ".jpeg", ".webp" });
                 _editSourceLabel.Text = _editSourcePath ?? "No source image selected";
+                await LoadInpaintSourceAsync();
             };
             panel.Children.Add(choose);
             panel.Children.Add(_editSourceLabel);
+            BuildInpaintControls(panel);
             panel.Children.Add(_editPrompt);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_variationStrengthPanel, "Create_EditVariationStrength_Panel");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_editStrength, "Create_EditVariationStrength_NumberBox");
@@ -277,18 +283,25 @@ namespace PaRuX.Views
             return panel;
         }
 
-        private string SelectedEditType() => (_editMode.SelectedItem as ComboBoxItem)?.Tag as string == "img2img"
-            ? "img2img"
-            : "edit";
+        private string SelectedEditType() => (_editMode.SelectedItem as ComboBoxItem)?.Tag as string switch
+        {
+            "img2img" => "img2img",
+            CreateInpaintPresenter.ModeTag => CreateInpaintPresenter.ModeTag,
+            _ => "edit"
+        };
 
         private void UpdateEditModeDescription()
         {
             bool variation = SelectedEditType() == "img2img";
+            bool inpaint = SelectedEditType() == CreateInpaintPresenter.ModeTag;
             _variationStrengthPanel.Visibility = variation ? Visibility.Visible : Visibility.Collapsed;
-            _editRunButton.Content = variation ? "Create variation" : "Edit image";
+            _editRunButton.Content = variation ? "Create variation" : inpaint ? "Repaint masked area" : "Edit image";
             _editModeDescription.Text = variation
                 ? "Create a variation of your source image. Strength controls how far the result can move from the original."
-                : "Describe the changes you want. The source image guides the edit while your instructions shape the result.";
+                : inpaint
+                    ? CreateInpaintPresenter.ModeDescription
+                    : "Describe the changes you want. The source image guides the edit while your instructions shape the result.";
+            ApplyInpaintModeVisibility();
         }
 
         private UIElement BuildThreedPanel()
@@ -363,6 +376,7 @@ namespace PaRuX.Views
                     if (!await ApplyPromptEnhancementAsync(_enhanceImage, request, "image")) return;
                     request.Width = IntValue(_imageWidth, 1024);
                     request.Height = IntValue(_imageHeight, 1024);
+                    ApplyLoraStack(request);
                 }
                 else if (type == "video")
                 {
@@ -379,17 +393,18 @@ namespace PaRuX.Views
                         request.SourceImageBase64 = Convert.ToBase64String(start);
                     }
                 }
-                else if (type is "edit" or "img2img")
+                else if (type is "edit" or "img2img" or "inpaint")
                 {
                     string source = _editSourcePath ?? throw new InvalidOperationException("Choose a source image first.");
-                    request.Prompt = RequireText(_editPrompt.Text, "Describe the image edit first.");
+                    if (type == "inpaint") ApplyInpaintRequest(request);
+                    request.Prompt = RequireText(_editPrompt.Text, type == "inpaint" ? "Describe what should appear in the painted area." : "Describe the image edit first.");
                     byte[] input = await File.ReadAllBytesAsync(source);
                     request.SourceImageBase64 = Convert.ToBase64String(input);
                     if (type == "img2img") request.Strength = Math.Clamp(_editStrength.Value, 0.05, 1);
                 }
                 else throw new InvalidOperationException("Unknown media generation mode.");
 
-                ticket = BeginOperation(type == "video" ? "Generating video…" : type == "image" ? "Generating image…" : "Editing image…");
+                ticket = BeginOperation(type == "video" ? "Generating video…" : type == "image" ? "Generating image…" : type == "inpaint" ? "Repainting masked area…" : "Editing image…");
                 if (ticket == null) return;
                 var progress = new Progress<MediaJobStatus>(job =>
                 {
@@ -401,6 +416,7 @@ namespace PaRuX.Views
                 string path = await SaveMediaAssetAsync(asset, type, ticket.Token);
                 _lastOutput.Text = "Output: " + path;
                 _status.Text = "Generation completed locally and registered in Artifact Workspace.";
+                if (type == "inpaint") await ShowInpaintResultAsync(path);
                 string modelName = !string.IsNullOrWhiteSpace(asset.FileName) ? asset.FileName : Path.GetFileName(path);
                 SetProvenance(new MediaProvenanceRecord
                 {

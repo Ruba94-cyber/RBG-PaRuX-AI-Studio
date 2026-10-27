@@ -1014,7 +1014,8 @@ namespace PaRuX.Services
                             FileName = edited.FileName, LocalPath = path,
                             MediaType = edited.MediaType, SizeBytes = bytes.LongLength
                         }, reply.MediaJobId ?? Guid.NewGuid().ToString("N"),
-                        "Edited locally · " + edited.Width + "×" + edited.Height + " · seed " + edited.Seed);
+                        "Edited locally · " + edited.Width + "×" + edited.Height + " · seed " + edited.Seed
+                        + (RouterService.RegionEditHint(request.Content) is { } regionHint ? "\n\n" + regionHint : string.Empty));
                     }
                 }
                 else if (route != RouteKind.Image)

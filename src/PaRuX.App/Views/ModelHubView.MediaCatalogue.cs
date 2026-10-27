@@ -16,12 +16,42 @@ namespace PaRuX.Views
     public sealed partial class ModelHubView
     {
         private MediaCatalogueResponse? _mediaCatalogue;
+        private (string CheckpointFamilyName, List<InstalledLoraChoice> Choices)? _mediaLoras;
+        private readonly StackPanel _mediaLoraList = new StackPanel { Spacing = 2, Margin = new Thickness(0, 12, 0, 0) };
         private string _mediaLane = MediaHubPresenter.Standard;
 
         private async Task<MediaCatalogueResponse?> TryGetMediaCatalogueAsync(CancellationToken ct)
         {
+            try { _mediaLoras = await MediaCheckpointsClient.Current.GetInstalledLorasAsync(ct); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { _mediaLoras = null; }
             try { return await MediaCheckpointsClient.Current.GetCatalogueAsync(_mediaLane, ct); }
             catch (Exception ex) when (ex is not OperationCanceledException) { return null; }
+        }
+
+        /// <summary>Installed LoRAs under the media catalogue, each marked against the active image model's family.</summary>
+        private void RenderInstalledLoras()
+        {
+            _mediaLoraList.Children.Clear();
+            AutomationProperties.SetAutomationId(_mediaLoraList, "ModelHub_Media_InstalledLoras");
+            if (_mediaLoras is not { } loras)
+            {
+                _mediaLoraList.Children.Add(new TextBlock { Text = "Installed LoRAs could not be read from PaRuX Core.", Opacity = 0.7, TextWrapping = TextWrapping.Wrap });
+                _media.Children.Add(_mediaLoraList);
+                return;
+            }
+            _mediaLoraList.Children.Add(new TextBlock
+            {
+                Text = CreateLoraStackPresenter.HubHeader(loras.Choices.Count, loras.CheckpointFamilyName),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            });
+            foreach (InstalledLoraChoice choice in loras.Choices)
+                _mediaLoraList.Children.Add(new TextBlock { Text = CreateLoraStackPresenter.HubLine(choice), TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.8 });
+            _mediaLoraList.Children.Add(new TextBlock
+            {
+                Text = "Pick up to " + CreateLoraStackPresenter.MaxSlots + " of these in Create > Image. A LoRA only works with the model family it was made for.",
+                TextWrapping = TextWrapping.Wrap, FontSize = 11, Opacity = 0.65
+            });
+            _media.Children.Add(_mediaLoraList);
         }
 
         /// <summary>Renders the catalogue UI into the media panel. False when the catalogue is unavailable, so the
@@ -84,6 +114,7 @@ namespace PaRuX.Views
                     foreach (MediaHubCard alt in cap.Alternatives) _media.Children.Add(BuildMediaCatalogueCard(alt));
                 }
             }
+            RenderInstalledLoras();
             return true;
         }
 

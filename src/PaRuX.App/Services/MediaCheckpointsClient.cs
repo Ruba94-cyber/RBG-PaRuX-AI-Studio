@@ -40,6 +40,13 @@ namespace PaRuX.Services
         public Task<MediaCatalogueResponse> GetCatalogueAsync(string lane, CancellationToken ct) =>
             SendAsync<MediaCatalogueResponse>(HttpMethod.Get, "/api/v1/media/catalogue?lane=" + Uri.EscapeDataString(lane), null, ct);
 
+        /// <summary>Installed LoRAs with their family and how each relates to the active image checkpoint (read-only).</summary>
+        public async Task<(string CheckpointFamilyName, List<InstalledLoraChoice> Choices)> GetInstalledLorasAsync(CancellationToken ct)
+        {
+            System.Text.Json.JsonElement body = await SendAsync<System.Text.Json.JsonElement>(HttpMethod.Get, "/api/v1/media/loras/installed", null, ct).ConfigureAwait(false);
+            return CreateLoraStackPresenter.ParseInstalled(body);
+        }
+
         /// <summary>Moves a downloaded checkpoint into ComfyUI's folder WITHOUT pinning it, so Automatic mode can pick it.</summary>
         public Task<MediaCheckpointStatus> InstallForAutomaticAsync(string type, string fileName, CancellationToken ct) =>
             SendAsync<MediaCheckpointStatus>(HttpMethod.Post, "/api/v1/media/checkpoints/activate",
