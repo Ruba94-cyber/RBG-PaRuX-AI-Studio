@@ -316,4 +316,57 @@ public class ChatVoiceTests
         Assert.Contains("silent", VoiceMessages.Silent());
         Assert.Contains("too short", VoiceMessages.TooShort());
     }
+
+    // ---- steady noise / warm-up / timeout ----
+
+    private static byte[] Tone(int seconds, int rate, Func<int, double> amp)
+    {
+        var data = new short[rate * seconds];
+        var rnd = new Random(1);
+        for (int i = 0; i < data.Length; i++) data[i] = (short)(amp(i) * 32767 * (rnd.NextDouble() * 2 - 1));
+        return Wav(16, 1, rate, Pcm16(data));
+    }
+
+    [Fact]
+    public void Constant_level_noise_is_steady_noise()
+    {
+        WavAnalysis a = WavSilenceDetector.Analyze(Tone(8, 16000, _ => 0.1));
+        Assert.True(a.Valid);
+        Assert.False(a.IsSilent);
+        Assert.True(a.LooksLikeSteadyNoise, "variation " + a.Variation);
+        Assert.True(a.Rms > 0.01);
+    }
+
+    [Fact]
+    public void Speech_like_bursts_are_not_steady_noise()
+    {
+        // loud 0.5 s bursts every second over a quiet floor
+        WavAnalysis a = WavSilenceDetector.Analyze(Tone(8, 16000, i => (i / 8000) % 2 == 0 ? 0.4 : 0.02));
+        Assert.False(a.LooksLikeSteadyNoise, "variation " + a.Variation);
+    }
+
+    [Fact]
+    public void Short_clips_and_silence_are_never_flagged_as_steady_noise()
+    {
+        Assert.False(WavSilenceDetector.Analyze(Tone(1, 16000, _ => 0.1)).LooksLikeSteadyNoise);
+        Assert.False(WavSilenceDetector.Analyze(Wav(16, 1, 16000, new byte[64000])).LooksLikeSteadyNoise);
+    }
+
+    [Fact]
+    public void BuildSilence_is_a_valid_silent_wav_of_requested_length()
+    {
+        WavAnalysis a = WavSilenceDetector.Analyze(WavSilenceDetector.BuildSilence(500));
+        Assert.True(a.Valid);
+        Assert.True(a.IsSilent);
+        Assert.Equal(0.5, a.DurationSeconds, 3);
+    }
+
+    [Fact]
+    public void Transcribe_timeout_is_bounded_to_90_seconds_and_message_says_so()
+    {
+        Assert.True(VoiceMessages.TranscribeTimeout <= TimeSpan.FromSeconds(90));
+        Assert.Contains("cancelled", VoiceMessages.TranscribeTimedOut());
+        Assert.Contains("steady noise", VoiceMessages.NoSpeechRecognized(true));
+        Assert.DoesNotContain("steady noise", VoiceMessages.NoSpeechRecognized());
+    }
 }

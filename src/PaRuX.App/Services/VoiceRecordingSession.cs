@@ -114,11 +114,17 @@ namespace PaRuX.Services
         public static string InvalidAudio(string? detail) =>
             "The recording could not be read" + (string.IsNullOrWhiteSpace(detail) ? "." : ": " + detail);
 
-        public static string NoSpeechRecognized() => "No speech was recognized in that recording. Nothing was added to the message.";
+        public static string NoSpeechRecognized(bool steadyNoise = false) =>
+            steadyNoise
+                ? "No speech was recognized: the microphone recorded only steady noise. Check the input device and level in Settings > System > Sound > Input, and speak close to the microphone. Nothing was added to the message."
+                : "No speech was recognized in that recording. Nothing was added to the message.";
 
         public static string NothingToRead() => "This message has no readable text (only code or links), so nothing was read aloud.";
 
         /// <summary>Upper bound for one transcription request so a stuck engine can never lock the microphone.</summary>
+        /// <summary>Extra bounded wait for the one-time speech model load before the transcription request starts.</summary>
+        public static readonly TimeSpan ModelLoadWait = TimeSpan.FromSeconds(150);
+
         public static readonly TimeSpan TranscribeTimeout = TimeSpan.FromSeconds(75);
 
         public static string TranscribeTimedOut() =>
