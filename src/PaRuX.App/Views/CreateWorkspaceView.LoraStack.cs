@@ -89,7 +89,18 @@ namespace PaRuX.Views
             panel.Children.Add(_loraStackStatus);
 
             ApplyLoraStackRowVisibility();
-            Loaded += async (_, _) => await RefreshLoraStackAsync();
+            // The view loads while PaRuX Core may still be starting (or restarting with a new token): retry a few times
+            // instead of leaving "Unauthorized" on screen until the user presses Refresh.
+            Loaded += async (_, _) =>
+            {
+                for (int attempt = 0; attempt < 4; attempt++)
+                {
+                    _loraStackLoadedOk = false;
+                    await RefreshLoraStackAsync();
+                    if (_loraStackLoadedOk) return;
+                    await Task.Delay(TimeSpan.FromSeconds(2 * (attempt + 1)));
+                }
+            };
             return panel;
         }
 
@@ -119,6 +130,8 @@ namespace PaRuX.Views
             _loraStackStatus.Text = _loraStackChoices.Count == 0 && CurrentLoraSlots().All(s => s.Name == null)
                 ? CreateLoraStackPresenter.EmptyList
                 : CreateLoraStackPresenter.Summary(CurrentLoraSlots(), _loraStackChoices);
+
+        private bool _loraStackLoadedOk;
 
         private async Task RefreshLoraStackAsync()
         {
@@ -151,6 +164,7 @@ namespace PaRuX.Views
                     combo.SelectedIndex = Math.Max(0, combo.Items.OfType<ComboBoxItem>().ToList().FindIndex(c => (c.Tag as string) == keep && c.IsEnabled));
                 }
                 UpdateLoraStackStatus();
+                _loraStackLoadedOk = true;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
