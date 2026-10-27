@@ -176,7 +176,10 @@ namespace PaRuX.Services
             // /code is an execution command, not a prompt-shaping Skill. Keep it ahead of every
             // content heuristic so the text after the command cannot accidentally route elsewhere.
             if (IsNativeCodeCommand(text)) return RouteKind.CodeHandoff;
-            if (ImageRx.IsMatch(text)) return RouteKind.Image;
+            MediaPhrasing.Kind phrased = MediaPhrasing.Detect(text);
+            bool howTo = MediaPhrasing.IsNotARequest(text);
+            if (phrased == MediaPhrasing.Kind.Video && !ImageEditRx.IsMatch(text)) return RouteKind.Video;
+            if (!howTo && ImageRx.IsMatch(text) || phrased == MediaPhrasing.Kind.Image) return RouteKind.Image;
             if (ImageEditRx.IsMatch(text)) return RouteKind.ImageEdit;
             if (VideoRx.IsMatch(text)) return RouteKind.Video;
             if (BinaryAnalysisRx.IsMatch(text)) return RouteKind.BinaryAnalysis;

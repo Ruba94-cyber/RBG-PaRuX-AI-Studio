@@ -44,6 +44,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\CodingWorkspacePath.cs" Link="CodingAgent\CodingWorkspacePath.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ManagedRuntimeEndpoint.cs" Link="Runtime\ManagedRuntimeEndpoint.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\RouterService.cs" Link="Routing\RouterService.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaPhrasing.cs" Link="Routing\MediaPhrasing.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatMediaJobReconciler.cs" Link="Chat\ChatMediaJobReconciler.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatRenderWindowPolicy.cs" Link="Chat\ChatRenderWindowPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatModelRouteInfo.cs" Link="Chat\ChatModelRouteInfo.cs" />
@@ -215,6 +216,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\OnboardingChatVerificationPolicy.cs" Link="Onboarding\OnboardingChatVerificationPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\OnboardingAutoSetup.cs" Link="Onboarding\OnboardingAutoSetup.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\OnboardingAutoSetupPresenter.cs" Link="Onboarding\OnboardingAutoSetupPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MediaSetupPresenter.cs" Link="Media\MediaSetupPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\BundledRuntimeOverviewPresenter.cs" Link="Onboarding\BundledRuntimeOverviewPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ComponentLifecyclePresenter.cs" Link="Lifecycle\ComponentLifecyclePresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\UserFailureRecoveryMapper.cs" Link="Diagnostics\UserFailureRecoveryMapper.cs" />

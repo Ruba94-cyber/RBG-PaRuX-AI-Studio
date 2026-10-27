@@ -117,24 +117,21 @@ public sealed class MediaCompanionFetchTests : IDisposable
     }
 
     [Fact]
-    public async Task Companions_without_a_pinned_source_are_named_and_never_downloaded()
+    public async Task Plan_for_a_stale_hash_is_refused_before_anything_is_downloaded()
     {
         MediaCompanionPlan plan = ShippedPlan(Models());
 
         MediaCompanionFetchResult result = await new MediaCompanionFetcher(Downloads(), Models())
-            .FetchAsync(plan, Request(plan), CancellationToken.None);
+            .FetchAsync(plan, Request(plan, hash: new string('0', 64)), CancellationToken.None);
 
         Assert.False(result.Ok);
-        Assert.Contains("Install them manually", result.Message);
-        Assert.Contains("qwen_3_4b.safetensors", result.Message);
-        Assert.Contains("ae.safetensors", result.Message);
-        Assert.Null(result.FailedStep);
+        Assert.Empty(result.Installed);
     }
 
     [Fact]
     public async Task Nothing_is_fetched_when_every_companion_is_already_installed()
     {
-        string models = Models(("text_encoders", "qwen_3_4b.safetensors", 10), ("vae", "ae.safetensors", 10));
+        string models = Models(("text_encoders", "qwen_3_4b.safetensors", 8044982048), ("vae", "ae.safetensors", 335304388));
         MediaCompanionPlan plan = ShippedPlan(models);
 
         MediaCompanionFetchResult result = await new MediaCompanionFetcher(Downloads(), models)

@@ -136,12 +136,12 @@ public sealed class MediaCompanionRegistryTests : IDisposable
     }
 
     [Fact]
-    public void Shipped_companions_are_not_fetchable_until_pinned()
+    public void Shipped_supported_companions_are_pinned_to_an_immutable_revision_size_and_digest()
     {
-        // No revision or digest is pinned in this repository yet, so nothing may claim to be fetchable.
-        foreach (RegistryFamily family in MediaCompanionRegistry.Shipped.Families)
+        // A clean PC has none of these files, so a supported family whose companions are not pinned can never be set up.
+        foreach (RegistryFamily family in MediaCompanionRegistry.Shipped.Families.Where(f => f.IsSupported))
             foreach (RegistryCompanion companion in family.Companions)
-                Assert.False(companion.Source.IsPinned, companion.FileName);
+                Assert.True(companion.Source.IsPinned, family.Id + "/" + companion.FileName);
     }
 
     // ---------- registry validation (fail closed) ----------
@@ -328,15 +328,15 @@ public sealed class MediaCompanionRegistryTests : IDisposable
     }
 
     [Fact]
-    public void Plan_is_not_installable_while_companions_have_no_pinned_source()
+    public void Plan_is_installable_and_every_missing_companion_fetchable_because_the_sources_are_pinned()
     {
         string root = MakeModels(("diffusion_models", "z_image_turbo_nvfp4.safetensors", 4));
 
         MediaCompanionPlan plan = PlanFor("image", "z_image_turbo_nvfp4.safetensors", ZImageLayout(), MediaCompanionRegistry.Shipped, root);
 
-        Assert.False(plan.Installable);
-        Assert.Contains("manually", plan.Reason);
-        Assert.All(plan.Missing, item => Assert.False(item.Fetchable));
+        Assert.True(plan.Installable);
+        Assert.Equal(2, plan.Missing.Count);
+        Assert.All(plan.Missing, item => Assert.True(item.Fetchable));
     }
 
     [Fact]
@@ -358,7 +358,7 @@ public sealed class MediaCompanionRegistryTests : IDisposable
     {
         // qwen_3_4b.safetensors is shared by z-image and flux2-klein; installed once, found by exact name.
         string root = MakeModels(("diffusion_models", "z_image_turbo_nvfp4.safetensors", 4),
-            ("text_encoders", "qwen_3_4b.safetensors", 1234));
+            ("text_encoders", "qwen_3_4b.safetensors", 8044982048));
 
         MediaCompanionPlan plan = PlanFor("image", "z_image_turbo_nvfp4.safetensors", ZImageLayout(), MediaCompanionRegistry.Shipped, root);
 

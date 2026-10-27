@@ -368,8 +368,19 @@ public static class LocalAiPaths
     public static string? UncensoredVision => GetRoleOverride("uncensored") != null
         ? null : GetBundledVisionProjectorForModel("uncensored", DefaultUncensoredModel);
 
-    public static string SmallModel => Path.Combine(ModelsPath, "Qwen3.5-4B-Q4_K_M.gguf");
-    public static string SmallUncensoredModel => Path.Combine(ModelsPath, "Qwen3.5-4B-Uncensored-Q4_K_M.gguf");
+    public static string SmallModel => ResolveAssistantModel("Qwen3.5-4B-Q4_K_M.gguf");
+    public static string SmallUncensoredModel => ResolveAssistantModel("Qwen3.5-4B-Uncensored-Q4_K_M.gguf");
+
+    /// <summary>The Local AI root's models folder wins; otherwise PaRuX's managed download folder, where the guided media setup
+    /// and the Model Hub put downloaded files on a clean install. Absent in both, the Local AI root path is returned so errors
+    /// name the expected location.</summary>
+    private static string ResolveAssistantModel(string fileName)
+    {
+        string inRoot = Path.Combine(ModelsPath, fileName);
+        if (File.Exists(inRoot)) return inRoot;
+        string managed = Path.Combine(ModelDownloadService.ModelsDirectory, fileName);
+        return File.Exists(managed) ? managed : inRoot;
+    }
 
     /// <summary>The bundled 4B pair exists only for the explicit no-heavy-GPU/media fallback
     /// paths. It must never be persisted as the user's primary Standard role.</summary>

@@ -244,14 +244,15 @@ public sealed class MediaCatalogueTests : IDisposable
     }
 
     [Fact]
-    public void View_never_offers_download_for_resolver_only_or_bundled_entries_and_marks_the_automatic_one()
+    public void View_never_offers_download_for_resolver_only_entries_offers_every_supported_default_and_marks_the_automatic_one()
     {
         MediaCatalogueResponse r = MediaCatalogueView.Build(MediaCatalogue.Shipped, Hw(24, 64), "test", "standard",
             Files("z_image_turbo_int8_convrot.safetensors"), NoSpeed);
         foreach (MediaCatalogueEntryDto e in r.Capabilities.SelectMany(c => c.Entries))
         {
             if (e.Support != "supported") { Assert.False(e.Downloadable); Assert.False(string.IsNullOrEmpty(e.SupportReason)); }
-            if (e.VariantId == "z-image-turbo-nvfp4") Assert.False(e.Downloadable);
+            // The PaRuX defaults used to be "bundled" with no source, so a clean PC could never fetch them.
+            if (e.VariantId is "z-image-turbo-nvfp4" or "flux2-klein-4b" or "wan2.2-ti2v-5b-fp16") Assert.True(e.Downloadable, e.VariantId);
         }
         MediaCatalogueEntryDto used = r.Capabilities.Single(c => c.CapabilityId == "image.generate").Entries.Single(e => e.UsedAutomatically);
         Assert.Equal("z_image_turbo_int8_convrot.safetensors", used.FileName);

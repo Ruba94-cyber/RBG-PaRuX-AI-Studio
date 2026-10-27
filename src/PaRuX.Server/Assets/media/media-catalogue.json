@@ -23,8 +23,8 @@
           "sizeBytes": 6201001296, "sizeBasis": "exact_listing", "license": "Apache-2.0", "tier": 3, "listingVerified": true,
           "baseCompat": "Same text encoder and VAE as the bundled Z-Image Turbo workflow." },
         { "id": "z-image-turbo-nvfp4", "title": "Z-Image Turbo (nvfp4, PaRuX default)", "lane": "standard", "precision": "nvfp4",
-          "repository": null, "path": null, "fileName": "z_image_turbo_nvfp4.safetensors",
-          "sizeBytes": null, "sizeBasis": "derived_from_parameters", "license": "Apache-2.0", "tier": 3, "listingVerified": false, "bundled": true,
+          "repository": "Comfy-Org/z_image_turbo", "path": "split_files/diffusion_models/z_image_turbo_nvfp4.safetensors", "fileName": "z_image_turbo_nvfp4.safetensors",
+          "sizeBytes": 4509509600, "sizeBasis": "exact_listing", "license": "Apache-2.0", "tier": 3, "listingVerified": true,
           "baseCompat": "The checkpoint PaRuX workflows load by default." }
       ]
     },
@@ -33,8 +33,8 @@
       "registryFamily": "flux2-klein", "parametersBillion": 4.0, "textEncoderGb": 8.0, "vaeGb": 0.34,
       "variants": [
         { "id": "flux2-klein-4b", "title": "FLUX.2 klein 4B (distilled, PaRuX default)", "lane": "standard", "precision": "bf16",
-          "repository": null, "path": null, "fileName": "flux-2-klein-4b.safetensors",
-          "sizeBytes": null, "sizeBasis": "derived_from_parameters", "license": "Apache-2.0", "tier": 4, "listingVerified": false, "bundled": true,
+          "repository": "Comfy-Org/Flux-2-Klein-4B", "path": "split_files/diffusion_models/flux-2-klein-4b.safetensors", "fileName": "flux-2-klein-4b.safetensors",
+          "sizeBytes": 7751105712, "sizeBasis": "exact_listing", "license": "Apache-2.0", "tier": 4, "listingVerified": true,
           "baseCompat": "The checkpoint PaRuX edit workflow loads by default." },
         { "id": "flux2-klein-base-4b", "title": "FLUX.2 klein 4B (base, non-distilled)", "lane": "standard", "precision": "bf16",
           "repository": "fwwrsd/comfy-org-flux2-klein-4b", "path": "split_files/diffusion_models/flux-2-klein-base-4b.safetensors", "fileName": "flux-2-klein-base-4b.safetensors",
@@ -47,8 +47,8 @@
       "registryFamily": "wan2.2-ti2v-5b", "parametersBillion": 5.0, "textEncoderGb": 6.7, "vaeGb": 1.4,
       "variants": [
         { "id": "wan2.2-ti2v-5b-fp16", "title": "Wan 2.2 TI2V 5B (fp16, PaRuX default)", "lane": "standard", "precision": "fp16",
-          "repository": null, "path": null, "fileName": "wan2.2_ti2v_5B_fp16.safetensors",
-          "sizeBytes": null, "sizeBasis": "derived_from_parameters", "license": "Apache-2.0", "tier": 3, "listingVerified": false, "bundled": true,
+          "repository": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "path": "split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors", "fileName": "wan2.2_ti2v_5B_fp16.safetensors",
+          "sizeBytes": 9999658848, "sizeBasis": "exact_listing", "license": "Apache-2.0", "tier": 3, "listingVerified": true,
           "baseCompat": "The checkpoint PaRuX video workflow loads by default; the repackage ships one precision." }
       ]
     },

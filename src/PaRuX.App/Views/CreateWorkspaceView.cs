@@ -31,6 +31,7 @@ namespace PaRuX.Views
         // One job at a time: starting a second is refused, and the run buttons stay disabled while a job runs.
         private readonly CreateOperationGate _operations = new();
         private readonly List<Button> _runButtons = new();
+        private readonly List<MediaSetupCard> _setupCards = new();
 
         private readonly TextBox _imagePrompt = new TextBox { PlaceholderText = "Describe the image to create", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 72 };
         private readonly NumberBox _imageWidth = DimensionBox(1024);
@@ -72,13 +73,14 @@ namespace PaRuX.Views
             _dispatcher = DispatcherQueue.GetForCurrentThread();
             Content = BuildUi();
             _runButtons.Add(_editRunButton);
-            Unloaded += (_, _) => _operations.CancelActive();
+            Unloaded += (_, _) => { _operations.CancelActive(); foreach (MediaSetupCard card in _setupCards) card.StopPolling(); };
         }
 
         public void OnShown()
         {
-            _status.Text = "Create is ready. Every generation runs locally through PaRuX Core.";
+            _status.Text = "Checking what image generation needs on this PC.";
             SetProvenance(null);
+            foreach (MediaSetupCard card in _setupCards) card.StartPolling();
         }
 
         private UIElement BuildUi()
@@ -137,9 +139,25 @@ namespace PaRuX.Views
             return scroll;
         }
 
+        private MediaSetupCard NewSetupCard(string type, string label)
+        {
+            var card = new MediaSetupCard(type, label, _dispatcher);
+            if (type == "image")
+                card.StatusChanged += status =>
+                {
+                    if (_operations.IsBusy) return;
+                    _status.Text = status.Ready
+                        ? "Create is ready. Every generation runs locally through PaRuX Core."
+                        : "Image generation needs a one-time setup. Use the setup card in the Image section; everything runs and stays on this PC.";
+                };
+            _setupCards.Add(card);
+            return card;
+        }
+
         private UIElement BuildImagePanel()
         {
             var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(NewSetupCard("image", "image generation"));
             panel.Children.Add(_imagePrompt);
             panel.Children.Add(_enhanceImage);
             var dimensions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
@@ -174,6 +192,7 @@ namespace PaRuX.Views
         private UIElement BuildVideoPanel()
         {
             var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(NewSetupCard("video", "video generation"));
             panel.Children.Add(_videoPrompt);
             panel.Children.Add(_enhanceVideo);
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
@@ -242,6 +261,7 @@ namespace PaRuX.Views
         private UIElement BuildEditPanel()
         {
             var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(NewSetupCard("edit", "image editing"));
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_editMode, "Create_EditMode_ComboBox");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_editMode, "Edit mode");
             var instructionEdit = new ComboBoxItem { Content = "Instruction edit", Tag = "edit" };

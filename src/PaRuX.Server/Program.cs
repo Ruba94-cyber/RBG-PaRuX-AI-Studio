@@ -51,6 +51,7 @@ builder.Services.AddSingleton<RuntimeManagerService>(services => new RuntimeMana
     services.GetRequiredService<ISystemRamSnapshotProvider>(),
     services.GetRequiredService<IGpuPerformanceTelemetrySnapshotProvider>()));
 builder.Services.AddSingleton<RuntimeInstallService>();
+builder.Services.AddSingleton<MediaSetupService>();
 builder.Services.AddSingleton<ComponentInventoryService>();
 builder.Services.AddSingleton<SmartRouterService>(services => new SmartRouterService(
     services.GetRequiredService<RuntimeManagerService>(),
@@ -3476,23 +3477,7 @@ static MediaCheckpointStatus DescribeCheckpoint(string type)
 }
 
 // The plan for the checkpoint a type's next job loads. Shared by the read-only endpoint and the fetch.
-static MediaCompanionPlan BuildCompanionPlan(string type)
-{
-    MediaCheckpointEffective effective = MediaCheckpointResolution.Resolve(type);
-    string checkpointPath = Path.Combine(LocalAiPaths.DiffusionModelsPath, effective.File);
-    MediaFamilyDetection detection = File.Exists(checkpointPath)
-        ? MediaFamilyDetector.DetectFile(checkpointPath, MediaCompanionRegistry.Shipped)
-        : new MediaFamilyDetection(null, null, "unidentified",
-            "The checkpoint " + effective.File + " is not installed in ComfyUI's diffusion_models folder.", false, false, 0);
-    string[] folders = MediaCompanionRegistry.Shipped.Families
-        .SelectMany(family => family.Companions)
-        .Select(companion => companion.Folder)
-        .Append("diffusion_models")
-        .Distinct(StringComparer.Ordinal)
-        .ToArray();
-    var installed = MediaCompanionResolver.ScanFolders(Path.Combine(LocalAiPaths.ComfyApp, "models"), folders);
-    return MediaCompanionResolver.BuildPlan(type, effective.File, detection, MediaCompanionRegistry.Shipped, installed);
-}
+static MediaCompanionPlan BuildCompanionPlan(string type) => MediaCompanionPlanReader.Build(type);
 
 app.MapGet("/api/v1/media/checkpoints", () => Results.Ok(new[]
 {
@@ -3539,6 +3524,11 @@ app.MapPost("/api/v1/media/companions/fetch", async (MediaCompanionFetchRequest 
     MediaCompanionFetchResult result = await fetcher.FetchAsync(BuildCompanionPlan(request.Type), request, ct);
     return result.Ok ? Results.Ok(result) : Results.Conflict(result);
 }).RequireDesktopOwner();
+
+// Guided first-run media setup: ComfyUI, the prompt-assistant model, a downloadable image checkpoint and its companions.
+app.MapGet("/api/v1/media/setup", (string? type, MediaSetupService setup) => Results.Ok(setup.GetStatus(type)));
+app.MapPost("/api/v1/media/setup/start", (string? type, MediaSetupService setup) => Results.Accepted("/api/v1/media/setup", setup.Start(type))).RequireDesktopOwner();
+app.MapPost("/api/v1/media/setup/cancel", (string? type, MediaSetupService setup) => { setup.Cancel(); return Results.Ok(setup.GetStatus(type)); }).RequireDesktopOwner();
 
 app.MapPost("/api/v1/media/checkpoints/activate", (ActivateCheckpointRequest request) =>
 {

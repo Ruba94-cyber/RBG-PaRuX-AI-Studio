@@ -91,7 +91,7 @@ public sealed class MediaCompanionGraphTests
                 folders.Add(companion.Folder, files);
             }
             files.Add(new InstalledComfyFile(
-                family.Id + "-" + companion.Role + "-selected.safetensors", 1024));
+                family.Id + "-" + companion.Role + "-selected.safetensors", companion.Source.SizeBytes ?? 1024));
         }
 
         return folders.ToDictionary(
