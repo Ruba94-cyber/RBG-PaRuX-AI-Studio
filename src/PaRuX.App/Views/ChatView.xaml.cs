@@ -1994,12 +1994,35 @@ namespace PaRuX.Views
                 catch (VoiceCaptureException ex) { ShowTransientStatus(ex.Message); return; }
 
                 _recorder = recorder;
+                WarmSpeechEngineOnce();
                 _voice.TryStart(DateTime.UtcNow);
                 SetVoiceUi(recording: true);
                 _voiceTimer ??= CreateVoiceTimer();
                 _voiceTimer.Start();
             }
             finally { _voiceStarting = false; }
+        }
+
+        private static bool _sttWarmed;
+        private static Task? _sttWarmTask;
+
+        /// <summary>Loads the speech model while the user is still talking, so the first transcription is not a cold start.</summary>
+        private static void WarmSpeechEngineOnce()
+        {
+            if (_sttWarmed) return;
+            _sttWarmed = true;
+            _sttWarmTask = Task.Run(async () =>
+            {
+                try
+                {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(4));
+                    await SpeechClient.Current.TranscribeAsync(
+                        Convert.ToBase64String(WavSilenceDetector.BuildSilence(500)), "warmup.wav", cts.Token);
+                    Log.Write("Voice: speech engine warmed in " + sw.ElapsedMilliseconds + " ms");
+                }
+                catch (Exception ex) { _sttWarmed = false; Log.Write("Voice: warm-up skipped: " + ex.Message); }
+            });
         }
 
         private DispatcherQueueTimer CreateVoiceTimer()
@@ -2058,11 +2081,37 @@ namespace PaRuX.Views
                 if (!analysis.Valid) { ShowTransientStatus(VoiceMessages.InvalidAudio(analysis.Problem)); return; }
                 if (analysis.IsSilent) { ShowTransientStatus(VoiceMessages.Silent()); return; }
 
-                ShowTransientStatus("Transcribing locally…");
-                TranscribeResponse result = await SpeechClient.Current.TranscribeAsync(
-                    Convert.ToBase64String(wav), "voice-message.wav", CancellationToken.None);
-                string text = (result.Text ?? string.Empty).Trim();
-                if (text.Length == 0) { ShowTransientStatus(VoiceMessages.NoSpeechRecognized()); return; }
+                ShowPersistentVoiceStatus("Transcribing locally… (the first use loads the speech model and can take about a minute)");
+                string header = BitConverter.ToString(wav, 0, Math.Min(48, wav.Length));
+                Log.Write("Voice: " + wav.Length + " bytes, " + analysis.DurationSeconds.ToString("0.00")
+                    + " s, peak " + analysis.Peak.ToString("0.0000") + ", rms " + analysis.Rms.ToString("0.0000")
+                    + ", variation " + analysis.Variation.ToString("0.0") + ", steadyNoise " + analysis.LooksLikeSteadyNoise + ", header " + header);
+                // Cold start: the model load (about 100 s while the LLM also loads) is a separate, bounded phase,
+                // so the transcription itself keeps its own 75 s limit.
+                Task? warming = _sttWarmTask;
+                if (warming != null && !warming.IsCompleted)
+                {
+                    ShowPersistentVoiceStatus("Loading the local speech model (first use only, up to two minutes)…");
+                    await Task.WhenAny(warming, Task.Delay(VoiceMessages.ModelLoadWait));
+                    ShowPersistentVoiceStatus("Transcribing locally…");
+                }
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                string text;
+                try
+                {
+                    using var timeout = new CancellationTokenSource(VoiceMessages.TranscribeTimeout);
+                    TranscribeResponse result = await SpeechClient.Current.TranscribeAsync(
+                        Convert.ToBase64String(wav), "voice-message.wav", timeout.Token);
+                    text = (result.Text ?? string.Empty).Trim();
+                    Log.Write("Voice transcription ok in " + sw.ElapsedMilliseconds + " ms: " + text.Length + " chars");
+                }
+                catch (OperationCanceledException)
+                {
+                    Log.Write("Voice transcription timed out after " + sw.ElapsedMilliseconds + " ms");
+                    ShowPersistentVoiceStatus(VoiceMessages.TranscribeTimedOut());
+                    return;
+                }
+                if (text.Length == 0) { ShowPersistentVoiceStatus(VoiceMessages.NoSpeechRecognized(analysis.LooksLikeSteadyNoise)); return; }
 
                 string existing = InputBox.Text ?? string.Empty;
                 InputBox.Text = existing.Length == 0 || char.IsWhiteSpace(existing[existing.Length - 1])
@@ -2081,10 +2130,22 @@ namespace PaRuX.Views
                 Log.Write("Voice transcription failed: " + ex.GetType().Name + ": " + ex.Message);
                 if (GamingManager.Current.IsActive) ShowTransientStatus(VoiceMessages.GamingMode("voice input"));
                 else if (ex.Message.IndexOf("not installed", StringComparison.OrdinalIgnoreCase) >= 0)
-                    ShowTransientStatus(VoiceMessages.SttNotInstalled());
-                else ShowTransientStatus("Transcription failed: " + ex.Message);
+                    ShowPersistentVoiceStatus(VoiceMessages.SttNotInstalled());
+                else ShowPersistentVoiceStatus("Transcription failed: " + ex.Message);
             }
             finally { _voice.Finish(); }
+        }
+
+        /// <summary>Voice outcomes stay visible longer than the usual transient status so a failure is never missed.</summary>
+        private void ShowPersistentVoiceStatus(string text)
+        {
+            ShowTransientStatus(text);
+            _dispatcher.TryEnqueue(() =>
+            {
+                _statusTimer.Stop();
+                _statusTimer.Interval = TimeSpan.FromSeconds(20);
+                _statusTimer.Start();
+            });
         }
 
         private async void CancelVoiceRecording()
@@ -2557,6 +2618,7 @@ namespace PaRuX.Views
             {
                 ShowStatus(text, false);
                 _statusTimer.Stop();
+                _statusTimer.Interval = TimeSpan.FromSeconds(7);
                 _statusTimer.Start();
             });
         }

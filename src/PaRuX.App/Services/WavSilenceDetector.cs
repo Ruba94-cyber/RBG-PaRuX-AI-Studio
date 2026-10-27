@@ -3,9 +3,15 @@ using System;
 namespace PaRuX.Services
 {
     /// <summary>Result of inspecting a recorded WAV. Peak is the largest absolute sample, 0..1.</summary>
-    public sealed record WavAnalysis(bool Valid, double DurationSeconds, double Peak, string? Problem)
+    public sealed record WavAnalysis(bool Valid, double DurationSeconds, double Peak, string? Problem, double Rms = 0, double Variation = 0)
     {
         public bool IsSilent => Valid && Peak < WavSilenceDetector.SilencePeakThreshold;
+
+        /// <summary>
+        /// True for a loud but featureless signal (hum, hiss, a mic that picks up only steady noise):
+        /// the 100 ms window loudness barely changes, which speech never does.
+        /// </summary>
+        public bool LooksLikeSteadyNoise => Valid && !IsSilent && DurationSeconds >= 2 && Variation < WavSilenceDetector.SteadyNoiseVariation;
     }
 
     /// <summary>
@@ -17,6 +23,24 @@ namespace PaRuX.Services
     {
         /// <summary>Peak below this (about -60 dBFS) counts as silence.</summary>
         public const double SilencePeakThreshold = 0.001;
+
+        /// <summary>Ratio of the loudest to the median 100 ms window below which a signal is considered steady noise.</summary>
+        public const double SteadyNoiseVariation = 2.0;
+
+        /// <summary>Builds a mono PCM16 WAV of silence (used to warm the speech engine).</summary>
+        public static byte[] BuildSilence(int milliseconds, int sampleRate = 16000)
+        {
+            int samples = Math.Max(1, sampleRate * milliseconds / 1000);
+            int dataLen = samples * 2;
+            var b = new byte[44 + dataLen];
+            void Put(int o, string t) { for (int i = 0; i < 4; i++) b[o + i] = (byte)t[i]; }
+            Put(0, "RIFF"); BitConverter.GetBytes(36 + dataLen).CopyTo(b, 4); Put(8, "WAVE"); Put(12, "fmt ");
+            BitConverter.GetBytes(16).CopyTo(b, 16); BitConverter.GetBytes((short)1).CopyTo(b, 20); BitConverter.GetBytes((short)1).CopyTo(b, 22);
+            BitConverter.GetBytes(sampleRate).CopyTo(b, 24); BitConverter.GetBytes(sampleRate * 2).CopyTo(b, 28);
+            BitConverter.GetBytes((short)2).CopyTo(b, 32); BitConverter.GetBytes((short)16).CopyTo(b, 34);
+            Put(36, "data"); BitConverter.GetBytes(dataLen).CopyTo(b, 40);
+            return b;
+        }
 
         public static WavAnalysis Analyze(byte[]? wav)
         {
@@ -71,6 +95,10 @@ namespace PaRuX.Services
             double peak = 0;
             long samples = frames * channels;
             int p = start;
+            long window = Math.Max(1, (long)(sampleRate * 0.1)) * channels;
+            var windows = new System.Collections.Generic.List<double>();
+            double sumSq = 0, windowSq = 0;
+            long inWindow = 0;
             for (long i = 0; i < samples; i++, p += bytesPerSample)
             {
                 double v;
@@ -81,8 +109,21 @@ namespace PaRuX.Services
                 else v = Math.Abs(BitConverter.ToInt32(wav, p) / 2147483648.0);
                 if (double.IsNaN(v)) continue;
                 if (v > peak) peak = v;
+                sumSq += v * v; windowSq += v * v; inWindow++;
+                if (inWindow == window) { windows.Add(Math.Sqrt(windowSq / inWindow)); windowSq = 0; inWindow = 0; }
             }
-            return new WavAnalysis(true, duration, Math.Min(peak, 1.0), null);
+            double rms = samples > 0 ? Math.Sqrt(sumSq / samples) : 0;
+            // Skip the first windows: device start-up ramps the level up and would fake "dynamics".
+            var steady = windows.Count > 12 ? windows.GetRange(5, windows.Count - 5) : windows;
+            double variation = 0;
+            if (steady.Count > 0)
+            {
+                var sorted = new System.Collections.Generic.List<double>(steady);
+                sorted.Sort();
+                double median = sorted[sorted.Count / 2];
+                variation = median > 0 ? sorted[sorted.Count - 1] / median : 0;
+            }
+            return new WavAnalysis(true, duration, Math.Min(peak, 1.0), null, rms, variation);
         }
 
         private static WavAnalysis Invalid(string problem) => new WavAnalysis(false, 0, 0, problem);
