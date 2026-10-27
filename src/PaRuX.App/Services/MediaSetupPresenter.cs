@@ -8,6 +8,23 @@ namespace PaRuX.Services
         bool Visible, string Headline, string Detail, string ButtonLabel, bool ButtonEnabled,
         bool ShowProgress, double Progress, bool Indeterminate);
 
+    /// <summary>
+    /// The Create status line shows the setup state only until something more specific replaces it (a validation error, a job,
+    /// a result). The card's periodic refresh must never overwrite such a message, or an error vanishes within seconds.
+    /// </summary>
+    public static class CreateSetupStatusLine
+    {
+        public const string Checking = "Checking what image generation needs on this PC.";
+        public const string Ready = "Create is ready. Every generation runs locally through PaRuX Core.";
+        public const string NeedsSetup = "Image generation needs a one-time setup. Use the setup card in the Image section; everything runs and stays on this PC.";
+
+        public static string For(bool ready) => ready ? Ready : NeedsSetup;
+
+        /// <summary>True when the line still shows only a setup-state message (or nothing), so the refresh may update it.</summary>
+        public static bool MayReplace(string? current) =>
+            string.IsNullOrWhiteSpace(current) || current == Checking || current == Ready || current == NeedsSetup;
+    }
+
     /// <summary>What the Create "Set up image generation" card shows for one server state. Pure, so tests can pin it.</summary>
     public static class MediaSetupPresenter
     {

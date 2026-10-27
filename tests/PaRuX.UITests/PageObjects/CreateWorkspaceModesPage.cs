@@ -29,6 +29,70 @@ internal sealed class CreateWorkspaceModesPage
         }, "Create workspace ready status visible");
     }
 
+    /// <summary>The Create status line before the media-setup check has answered.</summary>
+    internal const string CheckingStatus = "Checking what image generation needs on this PC.";
+    internal const string ReadyStatus = "Create is ready. Every generation runs locally through PaRuX Core.";
+    internal const string NeedsSetupStatus =
+        "Image generation needs a one-time setup. Use the setup card in the Image section; everything runs and stays on this PC.";
+
+    /// <summary>Waits until the status line has left the initial "Checking" text and returns the honest settled text.
+    /// Which of Ready / NeedsSetup it is depends on the Core the test runs against, so callers assert the pair, not one.</summary>
+    internal string WaitForSettledSetupStatus()
+    {
+        string text = string.Empty;
+        UiWait.For(() =>
+        {
+            text = GetStatusText();
+            return text == ReadyStatus || text == NeedsSetupStatus;
+        }, "Create status to settle on a ready or needs-setup message");
+        return text;
+    }
+
+    /// <summary>Selects a Create mode tab (Image, Video, Music, Edit, 3D, Speech, Workflows, Gallery) by AutomationId.</summary>
+    internal void SelectMode(string name)
+    {
+        _window.SetForeground();
+        AutomationElement tab = FindModeTab(name);
+        bool selected = false;
+        try
+        {
+            var selection = tab.Patterns.SelectionItem.PatternOrDefault;
+            if (selection != null) { selection.Select(); selected = true; }
+        }
+        catch { }
+        if (!selected)
+        {
+            try
+            {
+                var invoke = tab.Patterns.Invoke.PatternOrDefault;
+                if (invoke != null) { invoke.Invoke(); selected = true; }
+            }
+            catch { }
+        }
+        if (!selected) tab.Click(moveMouse: false);
+        UiWait.For(() => IsModeSelected(name), "Create mode tab " + name + " selected");
+    }
+
+    internal AutomationElement FindModeTab(string name)
+    {
+        AutomationElement? tab = null;
+        UiWait.For(() =>
+        {
+            tab = _app.FindRawDescendant(_window, el => el.Properties.AutomationId.ValueOrDefault == "Create_Mode_" + name);
+            return tab != null;
+        }, "Create mode tab " + name);
+        return tab!;
+    }
+
+    internal bool IsModeSelected(string name)
+    {
+        var tab = _app.FindRawDescendant(_window, el => el.Properties.AutomationId.ValueOrDefault == "Create_Mode_" + name);
+        return tab?.Patterns.SelectionItem.PatternOrDefault?.IsSelected.ValueOrDefault == true;
+    }
+
+    internal AutomationElement? FindRawById(string id) =>
+        _app.FindRawDescendant(_window, el => el.Properties.AutomationId.ValueOrDefault == id);
+
     internal AutomationElement StatusText =>
         UiWait.ById(_window, "Create_Operation_Status_Text", ControlType.Text);
 

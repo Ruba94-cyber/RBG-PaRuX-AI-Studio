@@ -16,7 +16,9 @@ public sealed class CreateEditModeTests
         using var app = new UiTestApplication(testName);
         try
         {
-            new MainWindowPage(app.MainWindow).Click("Navigation_Create_Item", ControlType.ListItem);
+            var page = new CreateWorkspaceModesPage(app.MainWindow, app);
+            page.OpenCreateWorkspace();
+            page.SelectMode("Edit");
             AutomationElement mode = UiWait.ById(app.MainWindow, "Create_EditMode_ComboBox", ControlType.ComboBox);
             mode.Patterns.ScrollItem.PatternOrDefault?.ScrollIntoView();
 
