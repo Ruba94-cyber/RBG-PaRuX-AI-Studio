@@ -20,6 +20,11 @@ namespace PaRuX.Services
             SendAsync<Persona>(HttpMethod.Post, "/api/v1/personas",
                 new CreatePersonaRequest { Name = name, SystemPrompt = systemPrompt }, ct);
 
+        /// <summary>Imports a SillyTavern/Chub character card (JSON or PNG) as a persona.</summary>
+        public Task<Persona> ImportCardAsync(string fileName, byte[] data, CancellationToken ct) =>
+            SendAsync<Persona>(HttpMethod.Post, "/api/v1/personas/import-card",
+                new ImportPersonaCardRequest { FileName = fileName, DataBase64 = Convert.ToBase64String(data) }, ct);
+
         public Task DeleteAsync(string id, CancellationToken ct) =>
             SendNoContentAsync(HttpMethod.Delete, "/api/v1/personas/" + Uri.EscapeDataString(id), null, ct);
 

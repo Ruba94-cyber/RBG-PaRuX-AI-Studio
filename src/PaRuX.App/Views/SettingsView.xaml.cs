@@ -263,6 +263,29 @@ namespace PaRuX.Views
             await RefreshPersonasAsync();
         }
 
+        /// <summary>Imports a SillyTavern/Chub character card (.json or .png with an embedded card) as a persona.</summary>
+        private async void ImportPersonaCard_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var picker = new Windows.Storage.Pickers.FileOpenPicker { SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary };
+                picker.FileTypeFilter.Add(".json");
+                picker.FileTypeFilter.Add(".png");
+                WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWin));
+                Windows.Storage.StorageFile? file = await picker.PickSingleFileAsync();
+                if (file == null) return;
+                byte[] data = await System.IO.File.ReadAllBytesAsync(file.Path);
+                Persona imported = await PersonaClient.Current.ImportCardAsync(file.Name, data, CancellationToken.None);
+                if (PersonaStatus != null) PersonaStatus.Text = "Imported \"" + imported.Name + "\" from " + file.Name + ". Set it active to use it in Chat.";
+                await RefreshPersonasAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Write("ImportPersonaCard failed: " + ex.Message);
+                if (PersonaStatus != null) PersonaStatus.Text = "Couldn't import the card: " + ex.Message;
+            }
+        }
+
         private async void CreatePersona_Click(object sender, RoutedEventArgs e)
         {
             string? name = (NewPersonaNameBox?.Text ?? string.Empty).Trim();

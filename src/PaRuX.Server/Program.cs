@@ -1041,6 +1041,19 @@ app.MapPost("/api/v1/personas", (CreatePersonaRequest request, PersonaService pe
     catch (InvalidDataException ex) { return Results.BadRequest(new { error = ex.Message }); }
 }).RequireDesktopOwner();
 
+app.MapPost("/api/v1/personas/import-card", (ImportPersonaCardRequest request, PersonaService personas) =>
+{
+    try
+    {
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(request.DataBase64 ?? string.Empty); }
+        catch (FormatException) { return Results.BadRequest(new { error = "The card data is not valid Base64." }); }
+        (string name, string prompt) = CharacterCardImporter.ToPersona(bytes, request.FileName ?? string.Empty);
+        return Results.Ok(personas.Create(name, prompt));
+    }
+    catch (InvalidDataException exception) { return Results.BadRequest(new { error = exception.Message }); }
+});
+
 app.MapDelete("/api/v1/personas/{id}", (string id, PersonaService personas) =>
 {
     try { personas.Delete(id); return Results.NoContent(); }

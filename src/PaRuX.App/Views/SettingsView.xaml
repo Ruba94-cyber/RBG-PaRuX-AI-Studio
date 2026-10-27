@@ -1363,7 +1363,10 @@
                         <TextBox x:Name="NewPersonaNameBox" PlaceholderText="Name, e.g. Sarcastic Reviewer" />
                         <TextBox x:Name="NewPersonaPromptBox" PlaceholderText="System-prompt instruction, e.g. Respond with dry, sarcastic wit while still being accurate."
                             TextWrapping="Wrap" AcceptsReturn="True" Height="72" />
-                        <Button Content="Create persona" HorizontalAlignment="Left" Click="CreatePersona_Click" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Create persona" HorizontalAlignment="Left" Click="CreatePersona_Click" />
+                            <Button x:Name="ImportPersonaCardButton" Content="Import character card…" AutomationProperties.AutomationId="Settings_Persona_ImportCard_Button" Click="ImportPersonaCard_Click" />
+                        </StackPanel>
                         <TextBlock x:Name="PersonaStatus" TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
                     </StackPanel>
                 </Border>
