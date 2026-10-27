@@ -74,7 +74,8 @@
           "folder": "vae",
           "fileName": "ae.safetensors",
           "sharedWith": [
-            "flux1"
+            "flux1",
+            "chroma"
           ],
           "source": {
             "repository": "Comfy-Org/z_image_turbo",
@@ -119,7 +120,8 @@
           "txt_in."
         ],
         "forbiddenStems": [
-          "vector_in."
+          "vector_in.",
+          "distilled_guidance_layer."
         ],
         "shapeChecks": []
       },
@@ -235,7 +237,7 @@
       "id": "flux1",
       "displayName": "FLUX.1 (schnell, dev)",
       "support": "resolver_only",
-      "reason": "PaRuX has no FLUX.1 workflow template. The resolver can describe its companions, but nothing in this list can be installed or run by PaRuX.",
+      "reason": "PaRuX runs FLUX.1 schnell only as the single-file checkpoint (family flux1-schnell). The split-file layout (separate diffusion model, two text encoders and VAE) has no workflow template, so nothing in this list can be installed or run by PaRuX.",
       "pipelines": [],
       "requiredNodes": [],
       "signature": {
@@ -253,7 +255,8 @@
           "folder": "vae",
           "fileName": "ae.safetensors",
           "sharedWith": [
-            "z-image"
+            "z-image",
+            "chroma"
           ],
           "source": {
             "repository": "Comfy-Org/z_image_turbo",
@@ -376,19 +379,144 @@
     {
       "id": "sdxl",
       "displayName": "SDXL (full checkpoint)",
-      "support": "unsupported",
-      "reason": "SDXL checkpoints embed their own text encoders and VAE, and PaRuX has no SDXL workflow template. It is recognised only so that a wrong-family file is refused by name.",
-      "pipelines": [],
-      "requiredNodes": [],
+      "support": "supported",
+      "pipelines": [
+        "image"
+      ],
+      "templateFile": "sdxl-checkpoint-api.json",
+      "mainLoader": {
+        "node": "1",
+        "classType": "CheckpointLoaderSimple",
+        "input": "ckpt_name",
+        "folder": "checkpoints"
+      },
+      "requiredNodes": [
+        "CheckpointLoaderSimple",
+        "CLIPTextEncode",
+        "EmptyLatentImage",
+        "KSampler",
+        "VAEDecode",
+        "SaveImage"
+      ],
       "signature": {
         "requiredStems": [
           "model.diffusion_model.input_blocks.",
-          "conditioner.embedders."
+          "conditioner.embedders.0.transformer.",
+          "conditioner.embedders.1.model."
         ],
         "forbiddenStems": [],
         "shapeChecks": []
       },
       "companions": []
+    },
+    {
+      "id": "flux1-schnell",
+      "displayName": "FLUX.1 schnell (single-file checkpoint)",
+      "support": "supported",
+      "pipelines": [
+        "image"
+      ],
+      "templateFile": "flux1-schnell-api.json",
+      "mainLoader": {
+        "node": "1",
+        "classType": "CheckpointLoaderSimple",
+        "input": "ckpt_name",
+        "folder": "checkpoints"
+      },
+      "requiredNodes": [
+        "CheckpointLoaderSimple",
+        "CLIPTextEncode",
+        "EmptySD3LatentImage",
+        "KSampler",
+        "VAEDecode",
+        "SaveImage"
+      ],
+      "signature": {
+        "requiredStems": [
+          "model.diffusion_model.double_blocks.",
+          "model.diffusion_model.single_blocks.",
+          "model.diffusion_model.vector_in."
+        ],
+        "forbiddenStems": [
+          "model.diffusion_model.guidance_in."
+        ],
+        "shapeChecks": []
+      },
+      "companions": []
+    },
+    {
+      "id": "chroma",
+      "displayName": "Chroma1-HD",
+      "support": "supported",
+      "pipelines": [
+        "image"
+      ],
+      "templateFile": "chroma-api.json",
+      "mainLoader": {
+        "node": "1",
+        "classType": "UNETLoader",
+        "input": "unet_name",
+        "folder": "diffusion_models"
+      },
+      "requiredNodes": [
+        "UNETLoader",
+        "CLIPLoader",
+        "VAELoader",
+        "T5TokenizerOptions",
+        "CLIPTextEncode",
+        "EmptySD3LatentImage",
+        "ModelSamplingAuraFlow",
+        "KSampler",
+        "VAEDecode",
+        "SaveImage"
+      ],
+      "signature": {
+        "requiredStems": [
+          "distilled_guidance_layer.",
+          "double_blocks.",
+          "single_blocks.",
+          "img_in."
+        ],
+        "forbiddenStems": [
+          "vector_in."
+        ],
+        "shapeChecks": []
+      },
+      "companions": [
+        {
+          "role": "text_encoder",
+          "folder": "text_encoders",
+          "fileName": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+          "clipType": "chroma",
+          "sharedWith": [],
+          "notes": "The ComfyUI Chroma template loads this scaled fp8 T5-XXL (CLIP type chroma).",
+          "source": {
+            "repository": "comfyanonymous/flux_text_encoders",
+            "path": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+            "revision": "6af2a98e3f615bdfa612fbd85da93d1ed5f69ef5",
+            "sizeBytes": 5157348688,
+            "sha256": "a498f0485dc9536735258018417c3fd7758dc3bccc0a645feaa472b34955557a"
+          },
+          "license": "apache-2.0"
+        },
+        {
+          "role": "vae",
+          "folder": "vae",
+          "fileName": "ae.safetensors",
+          "sharedWith": [
+            "z-image",
+            "flux1"
+          ],
+          "source": {
+            "repository": "Comfy-Org/z_image_turbo",
+            "path": "split_files/vae/ae.safetensors",
+            "revision": "6fc90a3b1b653e935a0d175e260736de25b84df5",
+            "sizeBytes": 335304388,
+            "sha256": "afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38"
+          },
+          "license": "apache-2.0"
+        }
+      ]
     }
   ]
 }

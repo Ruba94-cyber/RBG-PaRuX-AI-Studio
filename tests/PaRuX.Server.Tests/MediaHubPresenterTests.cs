@@ -69,10 +69,18 @@ public sealed class MediaHubPresenterTests
     }
 
     [Fact]
-    public void Uncensored_lane_is_empty_until_a_repository_declared_entry_exists_and_says_so()
+    public void Uncensored_lane_lists_only_repository_declared_image_entries_and_says_so_elsewhere()
     {
         var model = MediaHubPresenter.Build(Catalogue(), "uncensored");
-        Assert.All(model, m => { Assert.Null(m.Best); Assert.Empty(m.Alternatives); Assert.Contains("uncensored", m.EmptyMessage); });
+        MediaHubCapabilityModel img = model.Single(m => m.CapabilityId == "image.generate");
+        Assert.NotNull(img.Best);
+        Assert.All(img.Alternatives.Concat(new[] { img.Best! }), c =>
+        {
+            Assert.Equal("uncensored", c.Entry.Lane);
+            Assert.Contains(c.Entry.Evidence, line => line.StartsWith("lane: uncensored (", StringComparison.Ordinal));
+        });
+        Assert.All(model.Where(m => m.CapabilityId != "image.generate"),
+            m => { Assert.Null(m.Best); Assert.Empty(m.Alternatives); Assert.Contains("uncensored", m.EmptyMessage); });
     }
 
     [Fact]

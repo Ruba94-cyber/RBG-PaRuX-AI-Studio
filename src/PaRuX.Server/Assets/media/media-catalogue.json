@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogueVersion": 1,
-  "_comment": "Versioned, additive media catalogue for the Model Hub. A family is 'supported' ONLY when PaRuX owns a workflow template for it (registryFamily points at a supported media-companion-registry family); everything else is 'resolver_only' with an honest reason and is shown but never offered for download. 'tier' is a DECLARED quality tier (1-5) chosen by the catalogue author from public model-family positioning; it is not a benchmark and is always labelled declared in the UI. sizeBytes is set ONLY when listingVerified is true (checked against the repository listing); otherwise size is derived from parametersBillion x precision and labelled so. 'license' is the publisher's declared licence shown as a hint; the real licence evidence and consent come from the download consent flow. 'lane' is standard unless the repository itself declares an uncensored/abliterated nature, and an uncensored entry must carry laneEvidence. No uncensored media checkpoint has been verified against a repository listing yet, so that lane is intentionally empty rather than guessed.",
+  "_comment": "Versioned, additive media catalogue for the Model Hub. A family is 'supported' ONLY when PaRuX owns a workflow template for it (registryFamily points at a supported media-companion-registry family); everything else is 'resolver_only' with an honest reason and is shown but never offered for download. 'tier' is a DECLARED quality tier (1-5) chosen by the catalogue author from public model-family positioning; it is not a benchmark and is always labelled declared in the UI. sizeBytes is set ONLY when listingVerified is true (checked against the repository listing); otherwise size is derived from parametersBillion x precision and labelled so. 'license' is the publisher's declared licence shown as a hint; the real licence evidence and consent come from the download consent flow. 'lane' is standard unless the repository itself declares an uncensored/abliterated nature, and an uncensored entry must carry laneEvidence. Every uncensored entry was checked against its repository listing and quotes the evidence phrase from that repository's own README or tags; an entry whose repository does not say so stays in the standard lane. An optional per-variant sampling object (steps, cfg, sampler, scheduler) and promptPrefix carry what the checkpoint's own model card recommends.",
   "capabilities": [
     { "id": "image.generate", "label": "Image generation", "defaultJob": { "megapixels": 1.0, "frames": 1, "seconds": 0 } },
     { "id": "image.edit", "label": "Image editing", "defaultJob": { "megapixels": 1.0, "frames": 1, "seconds": 0 } },
@@ -146,6 +146,98 @@
           "repository": "hexgrad/Kokoro-82M", "path": "kokoro-v1_0.pth", "fileName": "kokoro-v1_0.pth",
           "sizeBytes": null, "sizeBasis": "derived_from_parameters", "license": "Apache-2.0", "tier": 3, "listingVerified": false,
           "baseCompat": "Small enough for any PC; runs outside ComfyUI." }
+      ]
+    },
+    {
+      "id": "sdxl", "displayName": "SDXL (single-file checkpoints)", "capability": "image.generate", "support": "supported",
+      "registryFamily": "sdxl", "parametersBillion": 2.6, "textEncoderGb": 0.0, "vaeGb": 0.0,
+      "strengths": ["photoreal", "illustration"],
+      "variants": [
+        { "id": "sdxl-base-1.0", "title": "SDXL base 1.0 (fp16)", "lane": "standard", "precision": "fp16",
+          "repository": "stabilityai/stable-diffusion-xl-base-1.0", "path": "sd_xl_base_1.0.safetensors", "revision": "462165984030d82259a11f4367a4eed129e94a7b", "fileName": "sd_xl_base_1.0.safetensors",
+          "sha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b", "sizeBytes": 6938078334, "sizeBasis": "exact_listing", "license": "OpenRAIL++ (CreativeML Open RAIL++-M)", "tier": 2, "listingVerified": true,
+          "sampling": { "steps": 25, "cfg": 7.0, "sampler": "dpmpp_2m", "scheduler": "karras" },
+          "baseCompat": "One file with both text encoders and the VAE inside, so nothing else is downloaded. Stability AI's own base model; ComfyUI's SDXL example uses 25 steps, CFG 7, dpmpp_2m with the karras scheduler. Native size 1024 x 1024." },
+        { "id": "juggernaut-xl-v9", "title": "Juggernaut XL v9 (photoreal, fp16)", "lane": "standard", "precision": "fp16",
+          "repository": "RunDiffusion/Juggernaut-XL-v9", "path": "Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors", "revision": "cf419233522daa0b9ea36c3aff98fa2cab1fb0fb", "fileName": "Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors",
+          "sha256": "c9e3e68f89b8e38689e1097d4be4573cf308de4e3fd044c64ca697bdb4aa8bca", "sizeBytes": 7105348188, "sizeBasis": "exact_listing", "license": "CreativeML OpenRAIL-M", "tier": 3, "listingVerified": true,
+          "sampling": { "steps": 35, "cfg": 5.0, "sampler": "dpmpp_2m", "scheduler": "karras" },
+          "baseCompat": "Single-file photoreal SDXL fine-tune with text encoders and VAE inside. Its model card recommends DPM++ 2M Karras, 30-40 steps and CFG 3-7; PaRuX uses 35 steps and CFG 5." }
+      ]
+    },
+    {
+      "id": "sdxl-anime", "displayName": "SDXL anime and illustration fine-tunes", "capability": "image.generate", "support": "supported",
+      "registryFamily": "sdxl", "parametersBillion": 2.6, "textEncoderGb": 0.0, "vaeGb": 0.0,
+      "strengths": ["anime", "illustration"],
+      "variants": [
+        { "id": "animagine-xl-4.0", "title": "Animagine XL 4.0 (anime, fp16)", "lane": "standard", "precision": "fp16",
+          "repository": "cagliostrolab/animagine-xl-4.0", "path": "animagine-xl-4.0.safetensors", "revision": "2b7c1b397761bf5bd3cc42e5b39ec99314a75a96", "fileName": "animagine-xl-4.0.safetensors",
+          "sha256": "1d5b43ff75b6ab598502d4c779d2fbfa3dceca51c60c3b609640a60772333916", "sizeBytes": 6938434056, "sizeBasis": "exact_listing", "license": "CreativeML Open RAIL++-M", "tier": 3, "listingVerified": true,
+          "sampling": { "steps": 28, "cfg": 5.0, "sampler": "euler_ancestral", "scheduler": "normal" },
+          "promptPrefix": "masterpiece, high score, great score, absurdres",
+          "baseCompat": "Single-file anime SDXL model that understands Danbooru-style tags. Its model card recommends Euler Ancestral, 28 steps and CFG 5, and ends prompts with the quality tags PaRuX adds for you." },
+        { "id": "pony-diffusion-v6-xl", "title": "Pony Diffusion V6 XL (fp16)", "lane": "uncensored",
+          "laneEvidence": "Repository README (LyliaEngine/Pony_Diffusion_V6_XL): \"Pony Diffusion V6 is a versatile SDXL finetune capable of producing stunning SFW and NSFW visuals of various anthro, feral, or humanoids species\"; it also lists the tags rating_safe, rating_questionable and rating_explicit.",
+          "precision": "fp16",
+          "repository": "LyliaEngine/Pony_Diffusion_V6_XL", "path": "ponyDiffusionV6XL_v6StartWithThisOne.safetensors", "revision": "14885f1c01d7723bcbf676773def286c1fd733bc", "fileName": "ponyDiffusionV6XL_v6StartWithThisOne.safetensors",
+          "sha256": "67ab2fd8ec439a89b3fedb15cc65f54336af163c7eb5e4f2acc98f090a29b0b3", "sizeBytes": 6938041050, "sizeBasis": "exact_listing",
+          "license": "Modified Fair AI Public License 1.0-SD per the card text (no monetised inference; the repository metadata says cdla-permissive-2.0)", "tier": 3, "listingVerified": true,
+          "sampling": { "steps": 25, "sampler": "euler_ancestral", "scheduler": "normal" },
+          "promptPrefix": "score_9, score_8_up, score_7_up, score_6_up, score_5_up, score_4_up",
+          "baseCompat": "Community mirror of the CivitAI release; Runware/Pony_Diffusion_V6_XL holds a file with the identical SHA-256. Single file with text encoders and VAE inside. The card asks for the score_* tags (added for you) and Euler a with 25 steps." },
+        { "id": "noobai-xl-1.1", "title": "NoobAI XL 1.1 (anime, bf16)", "lane": "uncensored",
+          "laneEvidence": "Repository README (Laxhar/noobai-XL-1.1): front-matter tag \"not-for-all-audiences\"; recommended negative prompt begins \"nsfw, worst quality, ...\" and recommended prefix contains \"safe\", i.e. the model draws NSFW content unless told not to; trained on the full Danbooru and e621 datasets.",
+          "precision": "bf16",
+          "repository": "Laxhar/noobai-XL-1.1", "path": "NoobAI-XL-v1.1.safetensors", "revision": "814a274af2b8097c0828819d561ec74c7d0c6cea", "fileName": "NoobAI-XL-v1.1.safetensors",
+          "sha256": "6681e8e4b134c81f16533acedb0d406d7e5e366e1624b4105178c64d00b05d51", "sizeBytes": 7105349958, "sizeBasis": "exact_listing",
+          "license": "Fair AI Public License 1.0-SD plus NoobAI terms (non-commercial use only; derivatives must be open)", "tier": 3, "listingVerified": true,
+          "sampling": { "steps": 28, "cfg": 5.5, "sampler": "euler_ancestral", "scheduler": "normal" },
+          "promptPrefix": "masterpiece, best quality, newest, absurdres, highres",
+          "baseCompat": "Single-file SDXL anime model built on Illustrious-XL. Its card recommends Euler a, 25-30 steps and CFG 5-6. The card's own prefix also contains the tag safe; PaRuX leaves it out because this is the uncensored lane." }
+      ]
+    },
+    {
+      "id": "realvisxl-v5", "displayName": "RealVisXL V5.0", "capability": "image.generate", "support": "supported",
+      "registryFamily": "sdxl", "parametersBillion": 2.6, "textEncoderGb": 0.0, "vaeGb": 0.0,
+      "strengths": ["photoreal"],
+      "variants": [
+        { "id": "realvisxl-v5.0-fp16", "title": "RealVisXL V5.0 (photoreal, fp16)", "lane": "uncensored",
+          "laneEvidence": "Repository README (SG161222/RealVisXL_V5.0): \"The model is aimed at photorealism. Can produce sfw and nsfw images of decent quality.\"",
+          "precision": "fp16",
+          "repository": "SG161222/RealVisXL_V5.0", "path": "RealVisXL_V5.0_fp16.safetensors", "revision": "ac93e0dda1f6d448cae19bbfab8c5e720a5e48bc", "fileName": "RealVisXL_V5.0_fp16.safetensors",
+          "sha256": "6a35a7855770ae9820a3c931d4964c3817b6d9e3c6f9c4dabb5b3a94e5643b80", "sizeBytes": 6938065488, "sizeBasis": "exact_listing", "license": "OpenRAIL++", "tier": 3, "listingVerified": true,
+          "sampling": { "steps": 30, "sampler": "dpmpp_sde", "scheduler": "karras" },
+          "baseCompat": "Single-file photoreal SDXL model. Its card recommends DPM++ SDE Karras with 30 or more steps." }
+      ]
+    },
+    {
+      "id": "flux1-schnell", "displayName": "FLUX.1 [schnell]", "capability": "image.generate", "support": "supported",
+      "registryFamily": "flux1-schnell", "parametersBillion": 12.0, "textEncoderGb": 0.0, "vaeGb": 0.0,
+      "strengths": ["fast", "photoreal"],
+      "variants": [
+        { "id": "flux1-schnell-fp8", "title": "FLUX.1 [schnell] (fp8, single file)", "lane": "standard", "precision": "fp8",
+          "repository": "Comfy-Org/flux1-schnell", "path": "flux1-schnell-fp8.safetensors", "revision": "c2b683ea00713d6feadcd54b39e3725bbc78638b", "fileName": "flux1-schnell-fp8.safetensors",
+          "sha256": "ead426278b49030e9da5df862994f25ce94ab2ee4df38b556ddddb3db093bf72", "sizeBytes": 17236328572, "sizeBasis": "exact_listing", "license": "Apache-2.0", "tier": 4, "listingVerified": true,
+          "baseCompat": "Comfy-Org's single-file build: fp8 diffusion model plus CLIP-L, T5-XXL and VAE in one file, so nothing else is downloaded. Four steps, CFG 1 (no negative prompt). FLUX.1 [dev] is not offered: its licence is non-commercial." }
+      ]
+    },
+    {
+      "id": "chroma", "displayName": "Chroma1-HD", "capability": "image.generate", "support": "supported",
+      "registryFamily": "chroma", "parametersBillion": 8.9, "textEncoderGb": 4.8, "vaeGb": 0.31,
+      "strengths": ["photoreal", "illustration"],
+      "variants": [
+        { "id": "chroma1-hd-bf16", "title": "Chroma1-HD (bf16)", "lane": "uncensored",
+          "laneEvidence": "Repository README (lodestones/Chroma1-HD): \"The model is released in a state as is and has not been aligned with a specific safety filter.\" and \"It has the potential to generate content that may be considered harmful, explicit, or offensive.\"",
+          "precision": "bf16",
+          "repository": "lodestones/Chroma1-HD", "path": "Chroma1-HD.safetensors", "revision": "0e0c60ece1e82b17cb7f77342d765ba5024c40c0", "fileName": "Chroma1-HD.safetensors",
+          "sha256": "d446d9695d08276f61e53653e025289dd96f7a489c27982a1fa54ecabc06642a", "sizeBytes": 17800038288, "sizeBasis": "exact_listing", "license": "Apache-2.0", "tier": 4, "listingVerified": true,
+          "baseCompat": "FLUX.1-schnell derivative without safety tuning. Needs the t5xxl_fp8_e4m3fn_scaled text encoder (4.8 GB) and the FLUX ae VAE, both fetched with checksums. ComfyUI's Chroma graph: 26 steps, CFG 3.5, euler with the beta scheduler." },
+        { "id": "chroma1-hd-fp8mixed", "title": "Chroma1-HD (fp8 mixed, lower memory)", "lane": "uncensored",
+          "laneEvidence": "Repository README (silveroxides/Chroma1-HD-fp8-scaled, which reproduces the model card): \"The model is released in a state as is and has not been aligned with a specific safety filter.\"",
+          "precision": "fp8",
+          "repository": "silveroxides/Chroma1-HD-fp8-scaled", "path": "Chroma1-HD-fp8mixed.safetensors", "revision": "fbe39b414a315a02558ec25a3a55b14db1f6599f", "fileName": "Chroma1-HD-fp8mixed.safetensors",
+          "sha256": "a2928ca6075f308f4d5e2182e2b96120fa8ad270ec6ea9b1b5c724c85c49a575", "sizeBytes": 9193379316, "sizeBasis": "exact_listing", "license": "Apache-2.0", "tier": 3, "listingVerified": true,
+          "baseCompat": "The fp8 file ComfyUI's own Chroma template loads (byte-identical to Comfy-Org/Chroma1-HD_repackaged). Same text encoder and VAE as the bf16 file." }
       ]
     }
   ]

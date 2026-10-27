@@ -984,18 +984,66 @@ public static class LocalAiPaths
 
     public static string DiffusionModelsPath => Path.Combine(ComfyApp, "models", "diffusion_models");
 
-    public static List<string> ListDiffusionModelCheckpoints()
+    /// <summary>ComfyUI's checkpoints folder: where single-file checkpoints (SDXL, FLUX.1 schnell; text encoders and VAE embedded) live.</summary>
+    public static string CheckpointsPath => Path.Combine(ComfyApp, "models", "checkpoints");
+
+    /// <summary>The ComfyUI models folder that holds a family's main model, by the registry's main-loader folder.</summary>
+    public static string MainModelFolderPath(string comfyFolder) =>
+        string.Equals(comfyFolder, "checkpoints", StringComparison.Ordinal) ? CheckpointsPath : DiffusionModelsPath;
+
+    /// <summary>The full path of an installed main model: diffusion_models first, then a recognised single-file checkpoint in checkpoints.
+    /// When the file is in neither, the diffusion_models path is returned so callers report the usual "not installed" reason.</summary>
+    public static string MainModelPath(string fileName)
     {
-        if (!Directory.Exists(DiffusionModelsPath)) return new List<string>();
+        string diffusion = Path.Combine(DiffusionModelsPath, fileName);
+        if (File.Exists(diffusion)) return diffusion;
+        string checkpoint = Path.Combine(CheckpointsPath, fileName);
+        return File.Exists(checkpoint) && IsRecognisedCheckpointFile(checkpoint) ? checkpoint : diffusion;
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Length, DateTime WrittenUtc, bool Recognised)> CheckpointRecognition =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>True when a file in the checkpoints folder is a single-file checkpoint of a family PaRuX can run. The checkpoints folder
+    /// also holds other things (the music model), which must not be offered as image models. The verdict is cached per size and write time.</summary>
+    private static bool IsRecognisedCheckpointFile(string path)
+    {
         try
         {
-            return Directory.EnumerateFiles(DiffusionModelsPath)
-                .Where(f => new FileInfo(f).Length > 0)
-                .Select(f => Path.GetFileName(f)!)
-                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            var info = new FileInfo(path);
+            if (info.Length <= 0 || !string.Equals(info.Extension, ".safetensors", StringComparison.OrdinalIgnoreCase)) return false;
+            if (CheckpointRecognition.TryGetValue(path, out var cached) && cached.Length == info.Length && cached.WrittenUtc == info.LastWriteTimeUtc)
+                return cached.Recognised;
+            MediaCompanionRegistry registry = MediaCompanionRegistry.Shipped;
+            MediaFamilyDetection detection = MediaFamilyDetector.DetectFile(path, registry);
+            RegistryFamily? family = detection.FamilyId is null ? null : registry.FindFamily(detection.FamilyId);
+            bool recognised = family is { IsSupported: true, MainLoader.Folder: "checkpoints" };
+            CheckpointRecognition[path] = (info.Length, info.LastWriteTimeUtc, recognised);
+            return recognised;
         }
-        catch { return new List<string>(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+    }
+
+    public static List<string> ListDiffusionModelCheckpoints()
+    {
+        var names = new List<string>();
+        try
+        {
+            if (Directory.Exists(DiffusionModelsPath))
+                names.AddRange(Directory.EnumerateFiles(DiffusionModelsPath)
+                    .Where(f => new FileInfo(f).Length > 0)
+                    .Select(f => Path.GetFileName(f)!));
+        }
+        catch { names.Clear(); }
+        try
+        {
+            if (Directory.Exists(CheckpointsPath))
+                names.AddRange(Directory.EnumerateFiles(CheckpointsPath, "*.safetensors")
+                    .Where(IsRecognisedCheckpointFile)
+                    .Select(f => Path.GetFileName(f)!));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        return names.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private static string MediaCheckpointOverridesPath => Path.Combine(
@@ -1007,10 +1055,10 @@ public static class LocalAiPaths
     public static void SetMediaCheckpointOverride(string type, string fileName)
     {
         if (string.IsNullOrWhiteSpace(fileName) || !ListDiffusionModelCheckpoints().Contains(fileName, StringComparer.OrdinalIgnoreCase))
-            throw new InvalidDataException("That checkpoint file was not found in the diffusion_models folder.");
+            throw new InvalidDataException("That checkpoint file was not found in the diffusion_models or checkpoints folder.");
         // Family gate: an override is saved only if this workflow can run the file's family. A wrong-family
         // file would otherwise fail late, inside ComfyUI.
-        MediaCheckpointResolution.EnsureFamilyAllowed(type, Path.Combine(DiffusionModelsPath, fileName));
+        MediaCheckpointResolution.EnsureFamilyAllowed(type, MainModelPath(fileName));
 
         MutateOverrides(MediaCheckpointOverridesPath, working => { working[type] = fileName; return true; });
     }

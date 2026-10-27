@@ -40,6 +40,13 @@
       "optional": [],
       "outputs": 1
     },
+    "CheckpointLoaderSimple": {
+      "required": [
+        "ckpt_name"
+      ],
+      "optional": [],
+      "outputs": 3
+    },
     "ConditioningZeroOut": {
       "required": [
         "conditioning"
@@ -61,6 +68,15 @@
       "outputs": 1
     },
     "EmptyFlux2LatentImage": {
+      "required": [
+        "batch_size",
+        "height",
+        "width"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "EmptyLatentImage": {
       "required": [
         "batch_size",
         "height",
@@ -204,6 +220,15 @@
       "optional": [
         "codec"
       ],
+      "outputs": 1
+    },
+    "T5TokenizerOptions": {
+      "required": [
+        "clip",
+        "min_length",
+        "min_padding"
+      ],
+      "optional": [],
       "outputs": 1
     },
     "TextEncodeQwenImageEdit": {

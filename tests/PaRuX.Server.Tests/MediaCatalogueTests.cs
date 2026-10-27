@@ -73,7 +73,7 @@ public sealed class MediaCatalogueTests : IDisposable
     public void Shipped_catalogue_loads_and_marks_only_validated_families_supported()
     {
         MediaCatalogue c = MediaCatalogue.Shipped;
-        Assert.Equal(new[] { "flux2-klein", "qwen-image", "qwen-image-edit", "wan2.2-ti2v-5b", "z-image" },
+        Assert.Equal(new[] { "chroma", "flux1-schnell", "flux2-klein", "qwen-image", "qwen-image-edit", "realvisxl-v5", "sdxl", "sdxl-anime", "wan2.2-ti2v-5b", "z-image" },
             c.Families.Where(f => f.IsSupported).Select(f => f.Id).OrderBy(x => x, StringComparer.Ordinal).ToArray());
         foreach (string id in new[] { "qwen-image-gguf", "wan2.2-14b", "ltx-video", "ace-step" })
         {
@@ -296,7 +296,10 @@ public sealed class MediaCatalogueTests : IDisposable
     public void Uncensored_lane_without_installed_entries_falls_back_to_standard_and_says_so()
     {
         MediaSelection s = Sel("image.generate", Hw(24, 64), Files("z_image_turbo_bf16.safetensors"), lane: "uncensored");
-        Assert.Null(s.Recommended);
+        // Uncensored entries exist (each backed by laneEvidence), so one is recommended for download; none is installed,
+        // so Automatic still uses the installed standard model.
+        Assert.Equal("uncensored", s.Recommended!.Variant.Lane);
+        Assert.False(string.IsNullOrWhiteSpace(s.Recommended.Variant.LaneEvidence));
         Assert.Equal("z_image_turbo_bf16.safetensors", s.Automatic!.Variant.FileName);
         Assert.Contains(s.Trace, t => t.StartsWith("no_installed_uncensored", StringComparison.Ordinal));
     }
