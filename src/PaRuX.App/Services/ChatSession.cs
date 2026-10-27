@@ -258,6 +258,8 @@ namespace PaRuX.Services
             // Audio is not an image: it goes to the local speech engine via Core, so the Vision route does not apply.
             if (audioOnly && route is RouteKind.VisionDelegated) route = RouteKind.ChatNormal;
             LastRoute = route;
+            // A message that asks for an image or video will take the GPU in a moment: let Core start ComfyUI now (a hint; Core may refuse).
+            if (route is RouteKind.Image or RouteKind.ImageEdit or RouteKind.Video) MediaPrewarmClient.Request("chat-media-intent");
 
             var userMessage = new ChatMessage
             {

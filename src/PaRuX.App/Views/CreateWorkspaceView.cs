@@ -80,6 +80,7 @@ namespace PaRuX.Views
         {
             _status.Text = CreateSetupStatusLine.Checking;
             SetProvenance(null);
+            PaRuX.Services.MediaPrewarmClient.Request("create-opened");
             foreach (MediaModelRow row in new[] { _imageModelRow, _videoModelRow, _editModelRow }) _ = row.RefreshAsync();
             foreach (MediaSetupCard card in _setupCards) card.StartPolling();
         }

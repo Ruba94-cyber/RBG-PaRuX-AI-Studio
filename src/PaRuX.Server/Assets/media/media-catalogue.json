@@ -63,7 +63,7 @@
         { "id": "qwen-image-fp8", "title": "Qwen-Image (fp8)", "lane": "standard", "precision": "fp8",
           "repository": "Comfy-Org/Qwen-Image_ComfyUI", "path": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors", "revision": "1f12b17be14c89b026c51a91d67c32f84bb047bc", "fileName": "qwen_image_fp8_e4m3fn.safetensors",
           "sha256": "98763a127701eb6fb59096f7742cb3aa7d64ed510b9f4e882d8351f8176e3ce3", "sizeBytes": 20430635136, "sizeBasis": "exact_listing", "license": "Apache-2.0", "tier": 5, "listingVerified": true,
-          "baseCompat": "Qwen-Image text-to-image graph (20 steps, CFG 4) with the qwen_2.5_vl_7b_fp8_scaled text encoder and qwen_image_vae. About 20 GB of weights: more than a 16 GB card holds, so ComfyUI offloads part of them to system RAM (slower; not yet timed on this PC)." }
+          "baseCompat": "Qwen-Image text-to-image graph (20 steps, CFG 4) with the qwen_2.5_vl_7b_fp8_scaled text encoder and qwen_image_vae. About 20 GB of weights: more than a 16 GB card holds, so ComfyUI offloads part of them to system RAM (slower). Timed on an RTX 5080 16 GB: about 52 s for a 1024 x 1024 image once warm (67 s the first), with the card full; that is the cost of 20 GB of weights streaming through 16 GB, not a graph setting, and 40 transformer passes (20 steps at CFG 4)." }
       ]
     },
     {
