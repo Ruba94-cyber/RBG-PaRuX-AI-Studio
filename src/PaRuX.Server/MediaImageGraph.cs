@@ -23,7 +23,25 @@ internal static class MediaImageGraph
 
     /// <summary>The sampler hint of the catalogue variant installed under the effective file name, when the catalogue lists one.</summary>
     internal static MediaSamplingHint? SamplingFor(MediaCheckpointEffective effective) =>
-        effective.IsOverridden ? MediaCatalogue.Shipped.FindByFileName(effective.File)?.Variant.Sampling : null;
+        !effective.IsOverridden ? null
+            : MediaCatalogue.Shipped.FindByFileName(effective.File)?.Variant.Sampling
+              ?? DistilledSdxlSampling(effective.FamilyId, effective.File);
+
+    /// <summary>
+    /// A step-distilled SDXL checkpoint that is not in the catalogue (SDXL-Turbo, SDXL-Lightning, LCM) must not run the base graph's
+    /// 28 steps at CFG 6: it was trained for 1 to 8 steps and CFG about 1, which also lets ComfyUI skip the negative-prompt pass.
+    /// Running it at base settings is what made SDXL-Turbo (5.7 s) slower than FLUX schnell (3.7 s) in the measured comparison, and it
+    /// produces over-baked images besides. Recognised by the file name only, for the SDXL family only; anything else keeps the template.
+    /// </summary>
+    internal static MediaSamplingHint? DistilledSdxlSampling(string? familyId, string? fileName)
+    {
+        if (!string.Equals(familyId, "sdxl", StringComparison.Ordinal) || string.IsNullOrWhiteSpace(fileName)) return null;
+        string name = Path.GetFileNameWithoutExtension(fileName).ToLowerInvariant();
+        if (name.Contains("turbo", StringComparison.Ordinal)) return new MediaSamplingHint(4, 1.0, "euler_ancestral", "simple");
+        if (name.Contains("lightning", StringComparison.Ordinal)) return new MediaSamplingHint(4, 1.0, "euler", "sgm_uniform");
+        if (name.Contains("lcm", StringComparison.Ordinal)) return new MediaSamplingHint(6, 1.5, "lcm", "sgm_uniform");
+        return null;
+    }
 
     internal static void ApplySampling(JsonObject request, MediaSamplingHint hint)
     {

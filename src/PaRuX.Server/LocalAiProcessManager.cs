@@ -1181,7 +1181,7 @@ public sealed class LocalAiProcessManager
         try
         {
             if (GamingActive) return new RuntimeResult(false, "A game is currently active; local AI start is blocked.");
-            if (!StopMedia()) return new RuntimeResult(false, "The media runtime did not stop, so local text was not started.");
+            if (!await StopMediaAwaitingVramReleaseAsync(ct).ConfigureAwait(false)) return new RuntimeResult(false, "The media runtime did not stop, so local text was not started.");
             // One inventory decides the tier and the backend: nvidia-smi for an NVIDIA device, DXGI for every other adapter. The launch reads
             // that same decision, so the tier, the build and the status line cannot disagree about the GPU.
             GpuInventoryStatus inventory = InventoryProbe();
@@ -1417,7 +1417,12 @@ public sealed class LocalAiProcessManager
         finally { _gate.Release(); }
     }
 
-    public async Task<RuntimeResult> StartMediaAssistantAsync(CancellationToken ct)
+    public Task<RuntimeResult> StartMediaAssistantAsync(CancellationToken ct) => StartMediaAssistantAsync(ct, null);
+
+    /// <param name="onOutgoingTextReleased">Runs once, right before the assistant's own (slow) model load begins, i.e. after
+    /// the previous text resident has stopped and every precondition has passed. StartMediaAsync starts ComfyUI there so the
+    /// two cold starts overlap instead of queueing. It is not called when the assistant is already resident or the start is refused.</param>
+    internal async Task<RuntimeResult> StartMediaAssistantAsync(CancellationToken ct, Action? onOutgoingTextReleased)
     {
         string wanted = MediaAssistantProfileLabel;
         if (ReadTrimmed(LocalAiPaths.ActiveProfileFile) == wanted && await IsTextHealthyAsync(ct).ConfigureAwait(false))
@@ -1441,10 +1446,22 @@ public sealed class LocalAiProcessManager
             "--device", "Vulkan0", "--gpu-layers", "all", "--sleep-idle-seconds", "-1"
         };
         args.AddRange(WebUiArguments());
-        return await LaunchAndWaitAsync(exe, args, LocalAiPaths.RuntimeVulkanPath, wanted, LocalAiPaths.TextPidFile,
+        onOutgoingTextReleased?.Invoke();
+        var assistantWatch = Stopwatch.StartNew();
+        RuntimeResult assistantResult = await LaunchAndWaitAsync(exe, args, LocalAiPaths.RuntimeVulkanPath, wanted, LocalAiPaths.TextPidFile,
             null, () => IsTextHealthyAsync(ct), () => StopText(), TimeSpan.FromMinutes(3), ct,
             ProbeTextOutputSanityAsync).ConfigureAwait(false);
+        MediaSwapTimings.Record("media-assistant-launch", assistantWatch.Elapsed, assistantResult.Success ? "ready" : "failed");
+        return assistantResult;
     }
+
+    /// <summary>What an in-flight ComfyUI launch has done to the machine, so a failed or cancelled caller can undo exactly that.</summary>
+    private sealed class ComfyLaunchState
+    {
+        public volatile bool ProcessStarted;
+    }
+
+    private const int LaunchHealthPollMs = 500;
 
     public async Task<RuntimeResult> StartMediaAsync(CancellationToken ct)
     {
@@ -1455,46 +1472,213 @@ public sealed class LocalAiProcessManager
             if (!await HasHeavyGpuAsync(ct).ConfigureAwait(false))
                 return new RuntimeResult(false, "No sufficiently powerful GPU detected; this feature needs one.");
 
-            RuntimeResult assistant = await StartMediaAssistantAsync(ct).ConfigureAwait(false);
-            if (!assistant.Success) return assistant;
-            if (await IsMediaHealthyAsync(ct).ConfigureAwait(false)) return new RuntimeResult(true, "Already running.");
-            if (ManagedRuntimeMayBeRunning(LocalAiPaths.MediaPidFile, "python", "pythonw") && !StopMedia())
-                return new RuntimeResult(false, "The media runtime did not stop, so it was not restarted.");
-            if (!File.Exists(LocalAiPaths.ComfyPython) || !File.Exists(LocalAiPaths.ComfyMain))
-                return new RuntimeResult(false, "ComfyUI is incomplete at " + LocalAiPaths.ComfyRoot);
+            var total = Stopwatch.StartNew();
+            // The assistant's model load and ComfyUI's cold start are independent and both slow. ComfyUI begins as soon as the
+            // outgoing text resident has stopped (so the RAM admission that discounted it still holds) and runs beside the
+            // assistant load. Neither touches the other's VRAM: the assistant is a small Vulkan model, ComfyUI loads no weights yet.
+            using var overlapCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var comfyState = new ComfyLaunchState();
+            Task<RuntimeResult>? comfy = null;
+            long comfyStartedAtMs = -1;
+            void BeginComfy()
+            {
+                if (comfy != null) return;
+                comfyStartedAtMs = total.ElapsedMilliseconds;
+                comfy = Task.Run(() => EnsureComfyRunningAsync(comfyState, overlapCts.Token), CancellationToken.None);
+            }
 
-            // Tuning flags: the ones measured faster AND output-equivalent on this PC for this exact ComfyUI + PyTorch (see
-            // ComfyMediaOptimizer), otherwise the defaults PaRuX has always used. A launch failure with measured flags forgets them.
-            ComfyLaunchArguments.Resolution tuning = ComfyLaunchArguments.ResolveForLaunch();
-            List<string> BuildArgs(IEnumerable<string> flags)
+            RuntimeResult assistant;
+            try { assistant = await StartMediaAssistantAsync(ct, BeginComfy).ConfigureAwait(false); }
+            catch
             {
-                var list = new List<string>
-                {
-                    "-s", LocalAiPaths.ComfyMain, "--windows-standalone-build", "--listen", "127.0.0.1",
-                    "--port", MediaPort.ToString(), "--disable-auto-launch", "--preview-method", "auto"
-                };
-                list.AddRange(flags);
-                return list;
+                await AbandonOverlappedComfyAsync(comfy, comfyState, overlapCts).ConfigureAwait(false);
+                throw;
             }
-            RuntimeResult launched = await LaunchAndWaitAsync(LocalAiPaths.ComfyPython, BuildArgs(tuning.Arguments), LocalAiPaths.ComfyApp, null,
-                LocalAiPaths.MediaPidFile, null, () => IsMediaHealthyAsync(ct), () => StopMedia(), TimeSpan.FromMinutes(3), ct).ConfigureAwait(false);
-            if (!launched.Success && tuning.Fingerprint is not null && !ct.IsCancellationRequested)
+            if (!assistant.Success)
             {
-                new ComfyOptimizationStore().Invalidate(tuning.Fingerprint, launched.Message);
-                launched = await LaunchAndWaitAsync(LocalAiPaths.ComfyPython, BuildArgs(ComfyLaunchArguments.Legacy), LocalAiPaths.ComfyApp, null,
-                    LocalAiPaths.MediaPidFile, null, () => IsMediaHealthyAsync(ct), () => StopMedia(), TimeSpan.FromMinutes(3), ct).ConfigureAwait(false);
+                await AbandonOverlappedComfyAsync(comfy, comfyState, overlapCts).ConfigureAwait(false);
+                return assistant;
             }
-            // A freshly adopted ComfyUI build is on probation: its first real launches decide whether it stays or is rolled back.
-            ManagedRuntimeLaunchObserver.Report(LocalAiPaths.ComfyRoot, launched.Success, launched.Message);
+
+            bool overlapped = comfy != null;
+            BeginComfy();
+            RuntimeResult launched;
+            try { launched = await comfy!.WaitAsync(ct).ConfigureAwait(false); }
+            catch
+            {
+                await AbandonOverlappedComfyAsync(comfy, comfyState, overlapCts).ConfigureAwait(false);
+                throw;
+            }
+            MediaSwapTimings.Record("media-runtime-start", total.Elapsed,
+                (overlapped ? "comfy overlapped with assistant, began at +" + comfyStartedAtMs + " ms; " : "comfy after assistant; ")
+                + (launched.Success ? "ready" : "failed"));
             return launched;
         }
         finally { _gate.Release(); }
     }
 
+    /// <summary>A start that failed or was cancelled after ComfyUI had already begun must not leave that ComfyUI behind: before
+    /// the overlap, nothing started ComfyUI unless the assistant had come up first.</summary>
+    private async Task AbandonOverlappedComfyAsync(Task<RuntimeResult>? comfy, ComfyLaunchState state, CancellationTokenSource overlapCts)
+    {
+        if (comfy == null) return;
+        overlapCts.Cancel();
+        try { await comfy.ConfigureAwait(false); } catch { /* cancelled or failed: the stop below is the cleanup */ }
+        if (state.ProcessStarted && !StopMedia())
+            Trace.TraceWarning("An overlapped ComfyUI start was abandoned, but its process did not stop and stays tracked.");
+    }
+
+    /// <summary>ComfyUI half of the media start: reuse a healthy one, replace a half-dead one, otherwise launch with the measured flags.</summary>
+    private async Task<RuntimeResult> EnsureComfyRunningAsync(ComfyLaunchState state, CancellationToken ct)
+    {
+        if (await IsMediaHealthyAsync(ct).ConfigureAwait(false)) return new RuntimeResult(true, "Already running.");
+        if (ManagedRuntimeMayBeRunning(LocalAiPaths.MediaPidFile, "python", "pythonw") && !StopMedia())
+            return new RuntimeResult(false, "The media runtime did not stop, so it was not restarted.");
+        if (!File.Exists(LocalAiPaths.ComfyPython) || !File.Exists(LocalAiPaths.ComfyMain))
+            return new RuntimeResult(false, "ComfyUI is incomplete at " + LocalAiPaths.ComfyRoot);
+
+        var comfyWatch = Stopwatch.StartNew();
+        // Tuning flags: the ones measured faster AND output-equivalent on this PC for this exact ComfyUI + PyTorch (see
+        // ComfyMediaOptimizer), otherwise the defaults PaRuX has always used. A launch failure with measured flags forgets them.
+        ComfyLaunchArguments.Resolution tuning = ComfyLaunchArguments.ResolveForLaunch();
+        List<string> BuildArgs(IEnumerable<string> flags)
+        {
+            var list = new List<string>
+            {
+                "-s", LocalAiPaths.ComfyMain, "--windows-standalone-build", "--listen", "127.0.0.1",
+                "--port", MediaPort.ToString(), "--disable-auto-launch", "--preview-method", "auto"
+            };
+            list.AddRange(flags);
+            return list;
+        }
+        state.ProcessStarted = true;
+        RuntimeResult launched = await LaunchAndWaitAsync(LocalAiPaths.ComfyPython, BuildArgs(tuning.Arguments), LocalAiPaths.ComfyApp, null,
+            LocalAiPaths.MediaPidFile, null, () => IsMediaHealthyAsync(ct), () => StopMedia(), TimeSpan.FromMinutes(3), ct).ConfigureAwait(false);
+        if (!launched.Success && tuning.Fingerprint is not null && !ct.IsCancellationRequested)
+        {
+            new ComfyOptimizationStore().Invalidate(tuning.Fingerprint, launched.Message);
+            launched = await LaunchAndWaitAsync(LocalAiPaths.ComfyPython, BuildArgs(ComfyLaunchArguments.Legacy), LocalAiPaths.ComfyApp, null,
+                LocalAiPaths.MediaPidFile, null, () => IsMediaHealthyAsync(ct), () => StopMedia(), TimeSpan.FromMinutes(3), ct).ConfigureAwait(false);
+        }
+        MediaSwapTimings.Record("comfyui-launch", comfyWatch.Elapsed, launched.Success ? "ready" : "failed");
+        // A freshly adopted ComfyUI build is on probation: its first real launches decide whether it stays or is rolled back.
+        ManagedRuntimeLaunchObserver.Report(LocalAiPaths.ComfyRoot, launched.Success, launched.Message);
+        return launched;
+    }
+
+    /// <summary>
+    /// Starts only ComfyUI, with no text swap, so the first image after text work does not pay ComfyUI's cold start. The caller's
+    /// <paramref name="admit"/> returns a refusal reason (RAM/VRAM admission against the text model that stays resident) or null.
+    /// Gaming Mode refuses. Honest results only: the returned message says warm, already warm, or why not.
+    /// </summary>
+    internal async Task<RuntimeResult> PrewarmMediaRuntimeAsync(Func<CancellationToken, Task<string?>> admit, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(admit);
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (GamingActive) return new RuntimeResult(false, "A game is currently active; local AI start is blocked.");
+            if (!await HasHeavyGpuAsync(ct).ConfigureAwait(false))
+                return new RuntimeResult(false, "No sufficiently powerful GPU detected; this feature needs one.");
+            if (await IsMediaHealthyAsync(ct).ConfigureAwait(false)) return new RuntimeResult(true, "Already warm.");
+            string? refusal = await admit(ct).ConfigureAwait(false);
+            if (refusal != null) return new RuntimeResult(false, refusal);
+            if (GamingActive) return new RuntimeResult(false, "A game is currently active; local AI start is blocked.");
+
+            var state = new ComfyLaunchState();
+            RuntimeResult result = await EnsureComfyRunningAsync(state, ct).ConfigureAwait(false);
+            if (!result.Success && state.ProcessStarted && ct.IsCancellationRequested) StopMedia();
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            // A cancelled prewarm (Gaming Mode, timeout, shutdown) must not leave the half-started ComfyUI it began.
+            StopMedia();
+            throw;
+        }
+        finally { _gate.Release(); }
+    }
+
+    /// <summary>
+    /// Stops a ComfyUI that was started only as a prewarm and was never needed. A ComfyUI that serves the media assistant profile is
+    /// left alone (a media job is in its burst window and the text restore stops it). Returns whether something was stopped.
+    /// </summary>
+    internal async Task<bool> ReleaseUnusedPrewarmedMediaAsync(CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (ReadTrimmed(LocalAiPaths.ActiveProfileFile) == MediaAssistantProfileLabel) return false;
+            if (!ManagedRuntimeMayBeRunning(LocalAiPaths.MediaPidFile, "python", "pythonw")) return false;
+            return StopMedia();
+        }
+        finally { _gate.Release(); }
+    }
+
+    /// <summary>Stops ComfyUI and, if it was really running, waits (bounded) for the driver to hand its VRAM back before a text model sizes
+    /// its GPU offload against the card. Returns false only when ComfyUI would not stop.</summary>
+    private async Task<bool> StopMediaAwaitingVramReleaseAsync(CancellationToken ct)
+    {
+        bool wasRunning = ManagedRuntimeMayBeRunning(LocalAiPaths.MediaPidFile, "python", "pythonw");
+        if (!StopMedia()) return false;
+        if (!wasRunning) return true;
+        GpuMemoryReleaseWaiter.Result released = await GpuMemoryReleaseWaiter.WaitForSettledAsync(ct).ConfigureAwait(false);
+        MediaSwapTimings.Record("comfyui-vram-release-wait", released.Waited,
+            released.Measured
+                ? (released.Settled ? "settled" : "limit reached") + ", used " + released.FirstUsedMib + " -> " + released.LastUsedMib + " MiB"
+                : "VRAM not measurable");
+        return true;
+    }
+
     public async Task<RuntimeResult> RestoreTextProfileAsync(CancellationToken ct)
     {
         if (!await HasHeavyGpuAsync(ct).ConfigureAwait(false)) return new RuntimeResult(true, "No capable GPU; nothing to restore.");
-        return await StartTextAsync(ct).ConfigureAwait(false);
+        var restoreWatch = Stopwatch.StartNew();
+        RuntimeResult restored = await StartTextAsync(ct).ConfigureAwait(false);
+        MediaSwapTimings.Record("text-restore", restoreWatch.Elapsed, restored.Success ? "ready" : "failed");
+        if (restored.Success && !GamingActive) await WarmRestoredTextAsync(ct).ConfigureAwait(false);
+        return restored;
+    }
+
+    /// <summary>Test seam: replaces the network step of the post-restore warm-up. Production code never sets it.</summary>
+    internal Func<CancellationToken, Task>? TextWarmupForTests { get; set; }
+
+    /// <summary>
+    /// One short real completion right after a restore, so the first user message does not also pay the one-time cost of the first
+    /// real request (kernel/graph set-up, chat template, sampler init) on a freshly loaded model. Bounded and best-effort: it cannot
+    /// fail the restore, it is skipped in Gaming Mode, and cancellation still propagates to the caller.
+    /// </summary>
+    private async Task WarmRestoredTextAsync(CancellationToken ct)
+    {
+        var watch = Stopwatch.StartNew();
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(TimeSpan.FromSeconds(20));
+        string outcome = "warmed";
+        try
+        {
+            if (TextWarmupForTests is { } warmup) await warmup(limit.Token).ConfigureAwait(false);
+            else
+            {
+                string payload = JsonSerializer.Serialize(new
+                {
+                    model = "local-coder",
+                    messages = new[] { new { role = "user", content = "Hi" } },
+                    max_tokens = 8,
+                    stream = false,
+                    cache_prompt = true
+                });
+                using var request = new HttpRequestMessage(HttpMethod.Post, TextEndpoint + "/v1/chat/completions")
+                {
+                    Content = new StringContent(payload, Encoding.UTF8, "application/json")
+                };
+                using HttpResponseMessage response = await OutputSanityHttp.SendAsync(request, limit.Token).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode) outcome = "HTTP " + (int)response.StatusCode;
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException) { outcome = "timed out"; }
+        catch (Exception ex) { outcome = "failed: " + ex.GetType().Name; }
+        MediaSwapTimings.Record("text-restore-warmup", watch.Elapsed, outcome);
     }
 
     public async Task WaitForIdleAsync(CancellationToken ct)
@@ -1527,7 +1711,7 @@ public sealed class LocalAiProcessManager
             if (GamingActive) return new RuntimeResult(false, "A game is currently active; local AI start is blocked.");
             if (string.IsNullOrWhiteSpace(modelPath) || !File.Exists(modelPath))
                 return new RuntimeResult(false, "File not found: " + modelPath);
-            if (!StopMedia()) return new RuntimeResult(false, "The media runtime did not stop, so the requested model was not started.");
+            if (!await StopMediaAwaitingVramReleaseAsync(ct).ConfigureAwait(false)) return new RuntimeResult(false, "The media runtime did not stop, so the requested model was not started.");
 
             bool hasGpu = await HasHeavyGpuAsync(ct).ConfigureAwait(false);
             string runtime = LocalAiPaths.ResolveGpuTextRuntimePath(hasGpu);
@@ -2012,7 +2196,7 @@ public sealed class LocalAiProcessManager
                 string cause = diagnosis is null ? string.Empty : " " + diagnosis.Cause + " " + diagnosis.SuggestedBuildVariant;
                 return new RuntimeResult(false, Path.GetFileName(exe) + " exited unexpectedly." + cause + "\n" + tail);
             }
-            await Task.Delay(2000, ct).ConfigureAwait(false);
+            await Task.Delay(LaunchHealthPollMs, ct).ConfigureAwait(false);
         }
         stopOnFailure();
         return new RuntimeResult(false, "Timed out waiting for " + Path.GetFileName(exe) + " to become healthy.");

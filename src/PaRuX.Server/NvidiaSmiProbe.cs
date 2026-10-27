@@ -16,6 +16,8 @@ internal static class NvidiaSmiProbe
     internal static readonly TimeSpan Timeout = TimeSpan.FromMilliseconds(1500);
 
     internal const string TotalMemoryArguments = "--query-gpu=memory.total --format=csv,noheader,nounits";
+    internal const string UsedMemoryArguments = "--query-gpu=memory.used --format=csv,noheader,nounits";
+    internal const string FreeMemoryArguments = "--query-gpu=memory.free --format=csv,noheader,nounits";
     internal const string ComputeAppMemoryArguments = "--query-compute-apps=pid,used_memory --format=csv,noheader,nounits";
 
     internal static readonly string[] Candidates =

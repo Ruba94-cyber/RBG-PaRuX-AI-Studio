@@ -76,6 +76,7 @@ builder.Services.AddSingleton<ContextEngineService>();
 builder.Services.AddSingleton<IModalityChatBackend, ModalityChatBackend>();
 builder.Services.AddSingleton<ChatProxyService>();
 builder.Services.AddSingleton<MediaGenerationService>();
+builder.Services.AddSingleton<MediaPrewarmService>();
 // Media job intent and status survive a Core restart in the local state folder (see MediaJobService.RecoverAsync).
 builder.Services.AddSingleton<MediaJobStore>(_ => new MediaJobStore(Path.Combine(LocalAiPaths.StateDir, "media-jobs")));
 builder.Services.AddSingleton<MediaJobService>(services => new MediaJobService(
@@ -721,6 +722,12 @@ app.MapPost("/api/v1/images/generations", async (
             statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 }).RequireDesktopOwner();
+
+// Starts ComfyUI ahead of the first media job (Create opened, or a chat message asking for an image/video). Never blocks: the
+// response is the current honest state (starting / warm / skipped / failed / cancelled). Gaming Mode and a busy GPU refuse.
+app.MapPost("/api/v1/media/prewarm", (MediaPrewarmService prewarm, string? reason) =>
+    Results.Accepted("/api/v1/media/prewarm", prewarm.Request(reason))).RequireDesktopOwner();
+app.MapGet("/api/v1/media/prewarm", (MediaPrewarmService prewarm) => Results.Ok(prewarm.Snapshot())).RequireDesktopOwner();
 
 app.MapGet("/api/v1/conversations",(ConversationStore store) => Results.Ok(store.List()));
 
