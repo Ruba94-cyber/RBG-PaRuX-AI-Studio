@@ -24,7 +24,8 @@ public sealed class LoraCivitAiAdapter : ILoraCatalogAdapter
         if (text.Length == 0 || text.Length > 100) throw new InvalidDataException("Enter a search of 1-100 characters.");
         int page = Math.Clamp(query.Page, 1, MaxPage);
         int limit = Math.Clamp(query.Limit, 1, MaxLimit);
-        string url = new Uri(Base, "api/v1/models").ToString() + "?types=LORA&limit=" + limit + "&page=" + page
+        string url = new Uri(Base, "api/v1/models").ToString() + "?types=LORA&limit=" + limit
+            // CivitAI rejects the page parameter on a query search (HTTP 400, cursor pagination only), so it is not sent.
             + "&query=" + Uri.EscapeDataString(text) + (query.IncludeNsfw ? "&nsfw=true" : "&nsfw=false");
         if (!string.IsNullOrWhiteSpace(query.BaseModel)) url += "&baseModels=" + Uri.EscapeDataString(query.BaseModel.Trim());
 

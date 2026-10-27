@@ -43,7 +43,7 @@ public sealed class LoraTests : IDisposable
         Assert.Equal("civitai.com", h.Last.Host);
         Assert.Contains("types=LORA", q);
         Assert.Contains("limit=20", q);
-        Assert.Contains("page=5", q);
+        Assert.DoesNotContain("page=", q); // CivitAI answers 400 to page + query
         Assert.Contains("query=style%20x", q);
         var item = Assert.Single(page.Items); // the Checkpoint entry is dropped
         Assert.True(item.Nsfw);
