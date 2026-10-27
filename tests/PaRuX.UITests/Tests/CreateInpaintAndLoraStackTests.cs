@@ -26,6 +26,8 @@ public sealed class CreateInpaintAndLoraStackTests
             UiWait.ById(app.MainWindow, "Create_LoraStack_Slot1_Strength_Slider", ControlType.Slider);
             UiWait.ById(app.MainWindow, "Create_LoraStack_Add_Button", ControlType.Button);
 
+            // Edit lives on its own Create tab; the LoRA slots above are on the Image tab.
+            new MainWindowPage(app.MainWindow).Click("Create_Mode_Edit", ControlType.ListItem);
             AutomationElement mode = UiWait.ById(app.MainWindow, "Create_EditMode_ComboBox", ControlType.ComboBox);
             mode.Patterns.ScrollItem.PatternOrDefault?.ScrollIntoView();
             mode.Patterns.ExpandCollapse.Pattern.Expand();
