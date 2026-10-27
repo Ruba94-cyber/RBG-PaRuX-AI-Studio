@@ -1226,7 +1226,11 @@ namespace PaRuX.Views
             }
 #endif
 
-            List<GgufModelInfo> models = await Task.Run(ModelManagerService.ListInstalledModels);
+            // Same source as the Model Hub: the managed library served by PaRuX Core, plus the external Local AI folder.
+            List<ManagedModelInfo> managedModels;
+            try { managedModels = await ModelDownloadClient.Current.ListManagedModelsAsync(CancellationToken.None); }
+            catch (Exception ex) { Log.Write("Managed library unavailable for the Settings model list: " + ex.Message); managedModels = new List<ManagedModelInfo>(); }
+            List<GgufModelInfo> models = await Task.Run(() => ModelManagerService.ListInstalledModels(managedModels));
             ResourceSnapshot resources = await ResourceMonitorService.GetSnapshotAsync(CancellationToken.None);
 
             List<ModelRoleStatus> roles;
@@ -1242,7 +1246,7 @@ namespace PaRuX.Views
             DetectedModelsList.Children.Clear();
             if (models.Count == 0)
             {
-                var empty = new TextBlock { Text = "No .gguf models found (or the LocalAI model folder could not be located)." };
+                var empty = new TextBlock { Text = "No .gguf models found in the PaRuX model library or the Local AI model folder." };
                 ApplyCaptionStyle(empty);
                 DetectedModelsList.Children.Add(empty);
                 return;
@@ -3486,17 +3490,23 @@ namespace PaRuX.Views
                     ApplyCaptionStyle(label);
                     row.Children.Add(label);
                     string capturedName = model.FileName;
-                    var delete = new Button { Content = "Delete", FontSize = 12, Padding = new Thickness(8, 2, 8, 2) };
+                    long capturedSize = model.SizeBytes;
+                    var delete =new Button { Content = "Delete", FontSize = 12, Padding = new Thickness(8, 2, 8, 2) };
                     delete.Click += async (s, e2) =>
                     {
                         delete.IsEnabled = false;
-                        try
+                        (bool deleted, string message) = await ManagedModelDeleteFlow.RunAsync(XamlRoot, capturedName, capturedSize);
+                        if (deleted)
                         {
-                            await ModelDownloadClient.Current.DeleteManagedModelAsync(capturedName, CancellationToken.None);
                             await RefreshManagedModelsAsync();
                             await RefreshModelBudgetAsync();
+                            await RefreshDetectedModelsAsync();
                         }
-                        catch (Exception ex) { Log.Write("Delete managed model failed: " + ex.Message); delete.IsEnabled = true; }
+                        else
+                        {
+                            delete.IsEnabled = true;
+                            Log.Write("Settings delete: " + message);
+                        }
                     };
                     Grid.SetColumn(delete, 1);
                     row.Children.Add(delete);
