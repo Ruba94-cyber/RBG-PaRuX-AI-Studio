@@ -124,6 +124,23 @@ public sealed class MediaSetupPlannerTests
     }
 
     [Fact]
+    public void Music_plan_needs_comfyui_and_the_pinned_music_checkpoint_but_not_the_prompt_assistant()
+    {
+        MediaSetupPlan clean = MediaSetupPlanner.PlanMusic(comfyInstalled: false, musicModelInstalled: false);
+        Assert.Equal(new[] { "comfyui", "music-model" }, clean.Steps.Select(s => s.Id));
+        MediaSetupStep model = clean.Steps.Single(s => s.Id == "music-model");
+        Assert.Equal(MediaSetupStepState.Pending, model.State);
+        Assert.Equal(10_025_478_736, model.SizeBytes);
+        Assert.Equal("Apache-2.0", model.License);
+        Assert.Matches("^[0-9a-f]{64}$", model.Sha256 ?? string.Empty);
+        Assert.Matches("^[0-9a-f]{40}$", model.Revision ?? string.Empty);
+
+        Assert.False(MediaSetupPlanner.PlanMusic(true, false).Ready);
+        Assert.True(MediaSetupPlanner.PlanMusic(true, true).Ready);
+        Assert.Equal("music", MediaSetupService.NormalizeType("music"));
+    }
+
+    [Fact]
     public void A_pc_too_small_for_every_checkpoint_is_blocked_with_a_reason_instead_of_downloading_something_unusable()
     {
         MediaSetupPlan plan = Plan(Facts(true, true), Hw(1, 4));

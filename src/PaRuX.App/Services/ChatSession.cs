@@ -809,7 +809,7 @@ namespace PaRuX.Services
                 return;
             }
 
-            if (!RouterService.IsChatRoute(route) && route != RouteKind.Image && route != RouteKind.Video && route != RouteKind.ImageEdit)
+            if (!RouterService.IsChatRoute(route) && route != RouteKind.Image && route != RouteKind.Video && route != RouteKind.ImageEdit && route != RouteKind.Music)
             {
                 var deferred = new ChatMessage
                 {
@@ -1012,6 +1012,24 @@ namespace PaRuX.Services
                         }, reply.MediaJobId ?? Guid.NewGuid().ToString("N"),
                         "Edited locally · " + edited.Width + "×" + edited.Height + " · seed " + edited.Seed);
                     }
+                }
+                else if (route == RouteKind.Music)
+                {
+                    ChatMessage request = Conversation.Messages.Last(m => m.Role == "user");
+                    Status = "Composing your music locally…";
+                    RaiseState();
+                    PaRuX.Contracts.MediaAsset song = await MusicClient.Current.GenerateAsync(new PaRuX.Contracts.MusicGenerateRequest
+                    {
+                        Prompt = request.Content, WriteLyrics = true, Language = MediaPhrasing.GuessLanguage(request.Content),
+                        DurationSeconds = 45, Seed = -1
+                    }, cts.Token).ConfigureAwait(false);
+                    string songPath = await MusicClient.SaveAsync(song, cts.Token).ConfigureAwait(false);
+                    ChatMediaJobReconciler.ApplyCompleted(reply, new ChatAttachment
+                    {
+                        FileName = song.FileName, LocalPath = songPath, MediaType = song.MediaType, SizeBytes = new FileInfo(songPath).Length
+                    }, reply.MediaJobId ?? Guid.NewGuid().ToString("N"),
+                    "Composed locally · ACE-Step 1.5 · " + song.DurationSeconds.ToString("0") + "s · seed " + song.Seed);
+                    Persist();
                 }
                 else if (route != RouteKind.Image)
                 {

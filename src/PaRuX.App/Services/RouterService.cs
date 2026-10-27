@@ -214,6 +214,7 @@ namespace PaRuX.Services
             if (IsNativeCodeCommand(text)) return RouteKind.CodeHandoff;
             MediaPhrasing.Kind phrased = MediaPhrasing.Detect(text);
             bool howTo = MediaPhrasing.IsNotARequest(text);
+            if (phrased == MediaPhrasing.Kind.Music) return RouteKind.Music;
             if (phrased == MediaPhrasing.Kind.Video && !ImageEditRx.IsMatch(text)) return RouteKind.Video;
             if (!howTo && ImageRx.IsMatch(text) || phrased == MediaPhrasing.Kind.Image) return RouteKind.Image;
             if (ImageEditRx.IsMatch(text)) return RouteKind.ImageEdit;
@@ -286,6 +287,7 @@ namespace PaRuX.Services
                 case RouteKind.Image: return "Image";
                 case RouteKind.ImageEdit: return "Image edit";
                 case RouteKind.Video: return "Video";
+                case RouteKind.Music: return "Music";
                 case RouteKind.CodeHandoff: return "Code";
                 default: return "Normal";
             }

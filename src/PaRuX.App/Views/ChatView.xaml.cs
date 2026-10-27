@@ -792,6 +792,23 @@ namespace PaRuX.Views
                         });
                         continue;
                     }
+                    if (attachment.MediaType != null
+                        && attachment.MediaType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var audioPlayer = new MediaPlayerElement
+                        {
+                            Source = MediaSource.CreateFromUri(new Uri(attachment.LocalPath)),
+                            AreTransportControlsEnabled = true,
+                            AutoPlay = false,
+                            Width = 520,
+                            Height = 110,
+                            HorizontalAlignment = alignment,
+                            Margin = new Thickness(0, 8, 0, 4)
+                        };
+                        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(audioPlayer, "Audio player: " + attachment.FileName);
+                        panel.Children.Add(audioPlayer);
+                        continue;
+                    }
                     if (attachment.MediaType == null
                         || !attachment.MediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
                     {

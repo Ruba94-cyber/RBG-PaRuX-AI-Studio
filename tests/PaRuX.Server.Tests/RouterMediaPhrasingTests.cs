@@ -73,3 +73,52 @@ public sealed class RouterMediaPhrasingTests
         Assert.NotEqual(RouteKind.ImageEdit, route);
     }
 }
+
+public sealed class RouterMusicPhrasingTests
+{
+    [Theory]
+    [InlineData("Compose a song about the sea at night")]
+    [InlineData("Can you make a lofi beat for studying?")]
+    [InlineData("generate some relaxing piano music")]
+    [InlineData("Create an upbeat jingle for my coffee shop")]
+    [InlineData("I want a song about summer rain")]
+    [InlineData("Produce an epic cinematic soundtrack")]
+    [InlineData("Componi una canzone sul mare")]
+    [InlineData("Puoi creare una musica rilassante con il pianoforte?")]
+    [InlineData("Fammi un brano rock con la chitarra")]
+    [InlineData("Genera una base strumentale lo-fi")]
+    [InlineData("Voglio una canzone sull'estate")]
+    public void Music_requests_in_english_and_italian_route_to_music(string text)
+    {
+        Assert.Equal(RouteKind.Music, RouterService.Classify(text));
+    }
+
+    [Theory]
+    [InlineData("How do I compose a song in Ableton?")]
+    [InlineData("Make a music video of waves on a beach")]
+    [InlineData("Write the lyrics of a song about love")]
+    [InlineData("Explain the music theory behind a chord progression")]
+    [InlineData("What is the best music player for Windows?")]
+    [InlineData("Come si compone una canzone?")]
+    [InlineData("Create a playlist name for my road trip")]
+    [InlineData("Scrivi il testo di una canzone sull'amore")]
+    public void Ordinary_prompts_about_music_do_not_start_music_generation(string text)
+    {
+        Assert.NotEqual(RouteKind.Music, RouterService.Classify(text));
+    }
+}
+
+public sealed class MusicLanguageGuessTests
+{
+    [Theory]
+    [InlineData("Componi una canzone sul mare", "it")]
+    [InlineData("Fammi un brano rock con la chitarra", "it")]
+    [InlineData("Voglio una canzone sull'estate", "it")]
+    [InlineData("Compose a song about the sea at night", "en")]
+    [InlineData("Make a lofi beat for studying", "en")]
+    [InlineData("", "en")]
+    public void The_lyrics_language_follows_the_language_of_the_request(string text, string expected)
+    {
+        Assert.Equal(expected, PaRuX.Services.MediaPhrasing.GuessLanguage(text));
+    }
+}

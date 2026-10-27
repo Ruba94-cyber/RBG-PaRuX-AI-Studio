@@ -25,6 +25,10 @@ namespace PaRuX.Services
             @"\b(?:videos?|clips?|films?|short\s+films?|movies?|animations?|footage|gifs?|"
           + @"filmat[oi]|cortometragg[io]|animazion[ei]|spezzone)\b", Opts);
 
+        private static readonly Regex MusicNoun = new Regex(
+            @"\b(?:songs?|tunes?|melod(?:y|ies)|beats?|jingles?|soundtracks?|instrumentals?|backing\s+tracks?|music|lo-?fi|ballad|anthem|"
+          + @"canzon[ei]|brano|brani|music[ah]e?|melodia|melodie|strumental[ei]|colonna\s+sonora|base\s+musicale|motivetto|inno)\b", Opts);
+
         private static readonly Regex RequestVerb = new Regex(@"\b" + Verbs + @"\b", Opts);
 
         // A question about HOW to do something, or a programming context, is not a request to make a picture.
@@ -34,7 +38,11 @@ namespace PaRuX.Services
           + @"workflow|transcript|trascrizione|recipe|ricetta)\b"
           // Compound nouns that are not pictures or clips: "video call", "photo editor", "picture frame", "image file", "videochiamata".
           + @"|\b(?:video|photo|image|picture|immagine|foto)\s+(?:calls?|chats?|conferences?|editors?|editing|players?|games?|frames?|files?|formats?|sizes?|uploads?|tutorials?|courses?|booths?|albums?)\b"
-          + @"|\b(?:videochiamat\w*|videogiochi\w*|videogam\w*|fotocamer\w*)|\beditor\s+di\s+(?:foto|video|immagini)", Opts);
+          + @"|\b(?:videochiamat\w*|videogiochi\w*|videogam\w*|fotocamer\w*)|\beditor\s+di\s+(?:foto|video|immagini)"
+          // Music compounds and lyrics-as-text: "music video", "music player", "song lyrics", "playlist", "testo di una canzone".
+          + @"|\bmusic\s+(?:videos?|players?|apps?|streaming|theory|teachers?|lessons?|class(?:es)?|store|festival|charts?|library)\b"
+          + @"|\b(?:video\s+music\w*|videoclip|lyrics?|playlists?|ableton|fl\s*studio|garageband|midi|daw|chord\s+progressions?|testo\s+di|testi\s+di|"
+          + @"video\s+musical\w*)\b|\bcome\s+si\s+compon\w+", Opts);
 
         // Weaker request verbs ("I want", "show me", "voglio") name a thing, not a task: they count only as "I want a picture OF ...".
         private static readonly Regex WeakVerb = new Regex(
@@ -46,12 +54,14 @@ namespace PaRuX.Services
         private static readonly Regex PaintVerb = new Regex(
             @"^\s*(?:(?:please|can\s+you|could\s+you|puoi|per\s+favore)\s+)?(?:paint|dipingi)\s+(?:me\s+|mi\s+)?\w+", Opts);
 
-        public enum Kind { None, Image, Video }
+        public enum Kind { None, Image, Video, Music }
 
         public static Kind Detect(string? text)
         {
             if (string.IsNullOrWhiteSpace(text) || NotARequest.IsMatch(text)) return Kind.None;
             if (PaintVerb.IsMatch(text)) return Kind.Image;
+            Kind music = DetectMusic(text);
+            if (music != Kind.None) return music;
             foreach (Match verb in RequestVerb.Matches(text))
             {
                 // The noun must follow the verb closely, in the same sentence.
@@ -73,6 +83,38 @@ namespace PaRuX.Services
             }
             return Kind.None;
         }
+
+        private static readonly Regex MusicVerb = new Regex(
+            @"\b(?:compos(?:e|ing)|generate|create|make|produce|record|i\s+want|i\s*'?d\s+like|i\s+need|"
+          + @"compon[ie]|componimi|genera(?:mi)?|crea(?:mi)?|fai(?:mi)?|fammi|realizza(?:mi)?|produci|voglio|vorrei|puoi\s+(?:comporre|creare|fare|generare))\b", Opts);
+
+        private static readonly Regex MusicWeakVerb = new Regex(
+            @"^(?:i\s+want|i\s*'?d\s+like|i\s+need|voglio|vorrei)$", Opts);
+
+        private static Kind DetectMusic(string text)
+        {
+            foreach (Match verb in MusicVerb.Matches(text))
+            {
+                int start = verb.Index + verb.Length;
+                string window = text.Substring(start, Math.Min(text.Length - start, 48));
+                int stop = window.IndexOfAny(new[] { '.', '?', '!', '\n' });
+                if (stop >= 0) window = window.Substring(0, stop);
+                Match noun = MusicNoun.Match(window);
+                if (!noun.Success) continue;
+                // "I want a song" names a thing: accept it only as "a song ABOUT/FOR ..." or when a sentence follows.
+                if (MusicWeakVerb.IsMatch(verb.Value.Trim()) && !Regex.IsMatch(window.Substring(noun.Index + noun.Length),
+                        @"^\s+(?:about|for|on|of|with|sull[a'’o]?|sul|su|per|di|con|about)\b|^\s*[a-z'’]+\s+(?:about|sull)", Opts)) continue;
+                return Kind.Music;
+            }
+            return Kind.None;
+        }
+
+        private static readonly Regex ItalianHint = new Regex(
+            @"\b(?:compon[ie]|canzone|brano|musica|melodia|fammi|voglio|vorrei|puoi|crea(?:mi)?|genera(?:mi)?|sul|sulla|sull['’]|della|dello|per|con|una|un'|di)\b", Opts);
+
+        /// <summary>"it" when the request is plainly Italian, otherwise "en" (the lyrics language for generated songs).</summary>
+        public static string GuessLanguage(string? text) =>
+            !string.IsNullOrWhiteSpace(text) && ItalianHint.Matches(text).Count >= 2 ? "it" : "en";
 
         /// <summary>True when the text is a how-to, explanation or programming prompt that merely mentions drawing or images.</summary>
         public static bool IsNotARequest(string? text) => !string.IsNullOrWhiteSpace(text) && NotARequest.IsMatch(text);

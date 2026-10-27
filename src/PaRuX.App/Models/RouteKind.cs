@@ -26,6 +26,8 @@ namespace PaRuX.Models
         Image,
         ImageEdit,
         Video,
+        /// <summary>Local music generation (ACE-Step) from a natural request such as "compose a song about the sea".</summary>
+        Music,
         CodeHandoff
     }
 }

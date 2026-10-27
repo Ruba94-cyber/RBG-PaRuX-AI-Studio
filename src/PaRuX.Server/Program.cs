@@ -194,6 +194,7 @@ builder.Services.AddHostedService(services => services.GetRequiredService<Candid
 builder.Services.AddSingleton<ModelCompareService>();
 builder.Services.AddSingleton<GroupChatService>();
 builder.Services.AddSingleton<ThreedService>();
+builder.Services.AddSingleton<MusicService>();
 builder.Services.AddSingleton<TaskStore>();
 builder.Services.AddSingleton<AgentOrchestrator>();
 builder.Services.AddSingleton<ILocalCompletionClient, LlamaServerCompletionClient>();
@@ -3652,6 +3653,25 @@ app.MapPost("/api/v1/threed/generate", async (ThreedGenerateRequest request, Thr
         return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 });
+
+// Local music (ACE-Step 1.5 through the managed ComfyUI): returns the saved FLAC as a MediaAsset.
+app.MapPost("/api/v1/music/generate", async (MusicGenerateRequest request, MusicService music, LocalRuntimeService runtime, CancellationToken ct) =>
+{
+    try
+    {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, runtime.GamingCancellationToken);
+        return Results.Ok(await music.GenerateAsync(request, linked.Token));
+    }
+    catch (InvalidDataException exception) { return Results.BadRequest(new { error = exception.Message }); }
+    catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+    {
+        return Results.Conflict(new { error = "Gaming Mode activated; music generation was stopped." });
+    }
+    catch (Exception exception) when (exception is not OperationCanceledException)
+    {
+        return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+}).RequireDesktopOwner();
 
 app.MapGamingEndpoints();
 app.MapMcp("/mcp");

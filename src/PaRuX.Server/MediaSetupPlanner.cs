@@ -74,6 +74,24 @@ internal static class MediaSetupPlanner
                 License: SpeechLicense)
     });
 
+    internal const string MusicStepId = "music-model";
+
+    /// <summary>Music (ACE-Step 1.5) runs in ComfyUI: the engine plus one pinned all-in-one checkpoint. No prompt assistant is needed.</summary>
+    internal static MediaSetupPlan PlanMusic(bool comfyInstalled, bool musicModelInstalled) => new(new[]
+    {
+        comfyInstalled
+            ? new MediaSetupStep(ComfyStepId, "Image engine (ComfyUI)", MediaSetupStepState.Done, 0, "Installed.", License: ComfyLicense)
+            : new MediaSetupStep(ComfyStepId, "Image engine (ComfyUI)", MediaSetupStepState.Pending, ComfyApproxBytes,
+                "PaRuX installs the official portable ComfyUI build with CUDA PyTorch.", License: ComfyLicense),
+        musicModelInstalled
+            ? new MediaSetupStep(MusicStepId, "Music model (ACE-Step 1.5)", MediaSetupStepState.Done, 0, "Installed.",
+                MusicWorkflow.CheckpointFileName, License: MusicWorkflow.License)
+            : new MediaSetupStep(MusicStepId, "Music model (ACE-Step 1.5)", MediaSetupStepState.Pending, MusicWorkflow.CheckpointBytes,
+                "One checksum-verified all-in-one checkpoint that writes full songs with vocals and instruments on this PC.",
+                MusicWorkflow.CheckpointFileName, MusicWorkflow.Repository, null, MusicWorkflow.Revision, MusicWorkflow.License,
+                MusicWorkflow.CheckpointSha256)
+    });
+
     internal const string ThreedStepId = "threed-engine";
     internal const long ThreedApproxBytes = 3_500_000_000;
     internal const string ThreedLicense = "BSD-3 (PyTorch), MIT (trimesh), Apache-2.0 (transformers)";

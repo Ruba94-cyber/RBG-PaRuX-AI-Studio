@@ -148,6 +148,7 @@ namespace PaRuX.Views
             {
                 ("Image", Section("IMAGE", BuildImagePanel())),
                 ("Video", Section("VIDEO", BuildVideoPanel())),
+                ("Music", Section("MUSIC", BuildMusicPanel())),
                 ("Edit", Section("IMAGE EDIT", BuildEditPanel())),
                 ("3D", Section("IMAGE → 3D", ThreedWithSetup())),
                 ("Speech", speech),
@@ -200,7 +201,7 @@ namespace PaRuX.Views
             if (type == "image")
                 card.StatusChanged += status =>
                 {
-                    if (_operations.IsBusy) return;
+                    if (_operations.IsBusy || _operationMessageSticky) return;
                     _status.Text = status.Ready
                         ? "Create is ready. Every generation runs locally through PaRuX Core."
                         : "Image generation needs a one-time setup. Use the setup card in the Image section; everything runs and stays on this PC.";
@@ -727,6 +728,7 @@ namespace PaRuX.Views
                 _status.Text = "A Create job is still running. Cancel it first, or wait for it to finish.";
                 return null;
             }
+            _operationMessageSticky = false;
             _progress.Value = 0;
             _progress.Visibility = Visibility.Visible;
             SetRunButtonsEnabled(false);
@@ -746,8 +748,15 @@ namespace PaRuX.Views
                 _progress.Visibility = Visibility.Collapsed;
                 SetRunButtonsEnabled(true);
             }
-            if (!string.IsNullOrWhiteSpace(message)) _status.Text = message;
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                _status.Text = message;
+                // The result of the last job stays on screen: the setup card's periodic refresh must not replace it with "Create is ready".
+                _operationMessageSticky = true;
+            }
         }
+
+        private bool _operationMessageSticky;
 
         private void SetRunButtonsEnabled(bool enabled)
         {

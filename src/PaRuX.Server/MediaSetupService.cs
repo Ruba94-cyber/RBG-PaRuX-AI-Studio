@@ -59,6 +59,10 @@ public sealed class MediaSetupService
     private MediaSetupPlan PlanFor(string type, bool freshSpeech = false)
     {
         if (type == "3d") return MediaSetupPlanner.PlanThreed(ReadThreedInstalled(freshSpeech));
+        if (type == "music")
+            return MediaSetupPlanner.PlanMusic(
+                File.Exists(LocalAiPaths.ComfyMain) && File.Exists(LocalAiPaths.ComfyPython),
+                File.Exists(MusicService.CheckpointPath));
         if (type != "speech") return CurrentPlan(type);
         SpeechEngineStatus engine = ReadSpeechStatus(freshSpeech);
         return MediaSetupPlanner.PlanSpeech(engine.SttInstalled, engine.TtsInstalled);
@@ -85,7 +89,7 @@ public sealed class MediaSetupService
             MediaCatalogueLive.SpeedLookup(MediaSetupPlanner.CapabilityFor(type), digest), type);
     }
 
-    internal static string NormalizeType(string? type) => type is "video" or "edit" or "speech" or "3d" ? type : "image";
+    internal static string NormalizeType(string? type) => type is "video" or "edit" or "speech" or "3d" or "music" ? type : "image";
 
     public MediaSetupStatus GetStatus(string? type = null)
     {
@@ -120,6 +124,7 @@ public sealed class MediaSetupService
         "edit" => "Image editing",
         "speech" => "Speech",
         "3d" => "Image to 3D",
+        "music" => "Music",
         _ => "Image generation"
     };
 
@@ -170,7 +175,8 @@ public sealed class MediaSetupService
                 Update(step.Id, "Setting up: " + step.Title, 0, step.SizeBytes);
                 try
                 {
-                    if (step.Id == MediaSetupPlanner.ThreedStepId) await InstallThreedAsync(step, stepTimeout.Token);
+                    if (step.Id == MediaSetupPlanner.MusicStepId) await InstallMusicModelAsync(step, stepTimeout.Token);
+                    else if (step.Id == MediaSetupPlanner.ThreedStepId) await InstallThreedAsync(step, stepTimeout.Token);
                     else if (step.Id == MediaSetupPlanner.SpeechStepId) await InstallSpeechAsync(step, stepTimeout.Token);
                     else if (step.Id == MediaSetupPlanner.ComfyStepId) await InstallComfyAsync(step, stepTimeout.Token);
                     else if (step.Id == MediaSetupPlanner.AssistantStepId) await DownloadAssistantAsync(step, stepTimeout.Token);
@@ -203,6 +209,25 @@ public sealed class MediaSetupService
         {
             Finish("failed", "Media setup failed: " + ex.Message, ex.Message, null);
         }
+    }
+
+    private async Task InstallMusicModelAsync(MediaSetupStep step, CancellationToken ct)
+    {
+        string source = Path.Combine(ModelDownloadService.ModelsDirectory, MusicWorkflow.CheckpointFileName);
+        string destination = MusicService.CheckpointPath;
+        if (!File.Exists(source) || new FileInfo(source).Length != MusicWorkflow.CheckpointBytes)
+        {
+            var item = new MediaCompanionItem
+            {
+                Role = "music", Folder = "checkpoints", FileName = MusicWorkflow.CheckpointFileName, Fetchable = true,
+                Repository = MusicWorkflow.Repository, RepositoryPath = MusicWorkflow.RepositoryPath, Revision = MusicWorkflow.Revision,
+                PinnedSizeBytes = MusicWorkflow.CheckpointBytes, Sha256 = MusicWorkflow.CheckpointSha256
+            };
+            ModelDownloadStatus job = await _downloads.CreateCompanionDownloadAsync(item, ct);
+            await WaitForDownloadsAsync(step, new List<string> { job.Id }, ct);
+        }
+        try { MediaCheckpointPlacement.MoveIntoPlace(source, destination, MusicWorkflow.CheckpointBytes); }
+        catch (IOException ex) { throw new MediaSetupException(step.Id, step.Title + " could not be installed: " + ex.Message); }
     }
 
     private async Task InstallThreedAsync(MediaSetupStep step, CancellationToken ct)
