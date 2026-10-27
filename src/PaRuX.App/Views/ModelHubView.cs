@@ -4263,9 +4263,9 @@ namespace PaRuX.Views
                 bool queued;
                 if (ModelRevisionIdentity.IsValid(checkpoint.Revision))
                 {
-                    // The catalogue's licence hint is not live metadata fetched at this commit.
-                    // Treat it as unavailable so the exact-revision UI always requires review.
-                    var decision = ModelLicenseConsentPolicy.Evaluate(checkpoint.License, metadataRetrieved: false);
+                    // The catalogue pins repository + revision + SHA-256 and carries its declared licence:
+                    // that is the review text. No second live metadata lookup is made or needed.
+                    var decision = ModelLicenseConsentPolicy.EvaluateCatalogue(checkpoint.License);
                     queued = await ModelLicenseConsentPrompt.ConfirmAndStartAtRevisionAsync(
                         XamlRoot, checkpoint.HuggingFaceRepoId, checkpoint.FileName,
                         decision, checkpoint.Revision, StartPinnedDownload);

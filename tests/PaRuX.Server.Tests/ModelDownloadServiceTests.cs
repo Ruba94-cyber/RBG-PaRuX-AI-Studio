@@ -902,6 +902,81 @@ public sealed class ModelDownloadServiceTests : IDisposable
         Assert.Contains("/test/repo/raw/main/README.md", requestedReadmes, StringComparer.Ordinal);
     }
 
+    // Regression: Hugging Face answers a renamed repository (Comfy-Org/Qwen-Image_ComfyUI ->
+    // Comfy-Org/Qwen-Image, Comfy-Org/z_image_turbo -> Comfy-Org/Z-Image-Turbo) with 307 and a
+    // relative Location. The service disables automatic redirects, so the details endpoint threw
+    // and answered 500 for every media safetensors repo while GGUF repos worked.
+    [Fact]
+    public async Task GetDetailsAsync_follows_a_renamed_repository_redirect_and_reports_the_canonical_repo()
+    {
+        string revision = new string('d', 40);
+        var requested = new List<string>();
+        var handler = new FakeHandler
+        {
+            OnSend = (req, ct) =>
+            {
+                string path = req.RequestUri!.AbsolutePath;
+                requested.Add(path);
+                if (path == "/api/models/Comfy-Org/Qwen-Image_ComfyUI")
+                {
+                    var redirect = new HttpResponseMessage(HttpStatusCode.TemporaryRedirect);
+                    redirect.Headers.Location = new Uri("/api/models/Comfy-Org/Qwen-Image?blobs=true", UriKind.Relative);
+                    return Task.FromResult(redirect);
+                }
+                string body = path == "/api/models/Comfy-Org/Qwen-Image"
+                    ? "{\"id\":\"Comfy-Org/Qwen-Image\",\"sha\":\"" + revision + "\",\"cardData\":{\"license\":\"apache-2.0\"},"
+                        + "\"siblings\":[{\"rfilename\":\"split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors\",\"size\":20430635136}]}"
+                    : "readme";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+                });
+            }
+        };
+        var service = new ModelDownloadService(new HttpClient(handler), new HttpClient(handler));
+
+        ModelRepoDetails details = await service.GetDetailsAsync("Comfy-Org/Qwen-Image_ComfyUI", CancellationToken.None);
+
+        Assert.Equal("Comfy-Org/Qwen-Image", details.RepoId);
+        Assert.Equal(revision, details.Revision);
+        Assert.Equal("apache-2.0", details.License, ignoreCase: true);
+        Assert.Contains("/Comfy-Org/Qwen-Image/raw/" + revision + "/README.md", requested);
+        Assert.Empty(details.Files); // safetensors-only repository: no GGUF rows, but also no failure
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_refuses_a_redirect_to_another_host_and_loops()
+    {
+        int calls = 0;
+        var handler = new FakeHandler
+        {
+            OnSend = (req, ct) =>
+            {
+                calls++;
+                var redirect = new HttpResponseMessage(HttpStatusCode.TemporaryRedirect);
+                redirect.Headers.Location = calls == 1
+                    ? new Uri("https://evil.example/api/models/x/y")
+                    : new Uri("/api/models/test/repo", UriKind.Relative);
+                return Task.FromResult(redirect);
+            }
+        };
+        var service = new ModelDownloadService(new HttpClient(handler), new HttpClient(handler));
+        await Assert.ThrowsAsync<HttpRequestException>(() => service.GetDetailsAsync("test/repo", CancellationToken.None));
+
+        calls = 1; // relative-only loop must stop after the hop limit
+        var loop = new FakeHandler
+        {
+            OnSend = (req, ct) =>
+            {
+                var redirect = new HttpResponseMessage(HttpStatusCode.TemporaryRedirect);
+                redirect.Headers.Location = new Uri("/api/models/test/repo", UriKind.Relative);
+                return Task.FromResult(redirect);
+            }
+        };
+        var looping = new ModelDownloadService(new HttpClient(loop), new HttpClient(loop));
+        await Assert.ThrowsAsync<HttpRequestException>(() => looping.GetDetailsAsync("test/repo", CancellationToken.None));
+    }
+
     private sealed class GatedStream : Stream
     {
         private readonly byte[] _data;

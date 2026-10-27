@@ -122,4 +122,20 @@ public sealed class ModelLicenseConsentPolicyTests
     {
         Assert.Null(ModelLicenseConsentPolicy.GetModelCardUri(repoId));
     }
+
+    [Fact]
+    public void Catalogue_licence_is_the_review_text_without_a_live_lookup()
+    {
+        var apache = ModelLicenseConsentPolicy.EvaluateCatalogue("Apache-2.0");
+        Assert.False(apache.RequiresReview);
+        Assert.True(apache.MetadataRetrieved);
+        Assert.DoesNotContain("unavailable", apache.MetadataStatus, StringComparison.OrdinalIgnoreCase);
+
+        var custom = ModelLicenseConsentPolicy.EvaluateCatalogue("flux-1-dev-non-commercial-license");
+        Assert.True(custom.RequiresReview);
+        Assert.True(custom.MetadataRetrieved);
+        Assert.Contains("flux-1-dev-non-commercial-license", custom.MetadataStatus);
+
+        Assert.True(ModelLicenseConsentPolicy.EvaluateCatalogue(null).RequiresReview);
+    }
 }

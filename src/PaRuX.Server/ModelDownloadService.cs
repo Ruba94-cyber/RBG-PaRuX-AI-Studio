@@ -717,15 +717,35 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
             .ToList();
     }
 
+    private const int MaxHubApiRedirects = 3;
+
     private async Task<HfModelDetail?> FetchHfModelDetailAsync(string repoId, CancellationToken ct)
     {
-        string url = "https://huggingface.co/api/models/" + repoId + "?blobs=true";
-        using HttpRequestMessage request = new(HttpMethod.Get, url);
-        request.Headers.UserAgent.ParseAdd("PaRuX/1.0");
-        using HttpResponseMessage response = await _http.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
-        await using Stream stream = await response.Content.ReadAsStreamAsync(ct);
-        return await JsonSerializer.DeserializeAsync<HfModelDetail>(stream, JsonOptions, ct);
+        // Redirects are followed by hand (the client disables them for the file transfer). Hugging Face
+        // answers a renamed repository (for example Comfy-Org/Qwen-Image_ComfyUI) with 307 and a relative
+        // Location; without following it every such repository failed with a 500. Only huggingface.co
+        // over https is followed, with a small hop limit.
+        Uri uri = new("https://huggingface.co/api/models/" + repoId + "?blobs=true");
+        for (int hop = 0; ; hop++)
+        {
+            using HttpRequestMessage request = new(HttpMethod.Get, uri);
+            request.Headers.UserAgent.ParseAdd("PaRuX/1.0");
+            using HttpResponseMessage response = await _http.SendAsync(request, ct);
+            if ((int)response.StatusCode is >= 300 and < 400 && response.Headers.Location is { } location)
+            {
+                Uri next = location.IsAbsoluteUri ? location : new Uri(uri, location);
+                if (hop >= MaxHubApiRedirects
+                    || next.Scheme != Uri.UriSchemeHttps
+                    || !string.Equals(next.Host, "huggingface.co", StringComparison.OrdinalIgnoreCase)
+                    || !next.AbsolutePath.StartsWith("/api/models/", StringComparison.Ordinal))
+                    throw new HttpRequestException("Model Hub redirected the repository lookup somewhere PaRuX will not follow.");
+                uri = next;
+                continue;
+            }
+            response.EnsureSuccessStatusCode();
+            await using Stream stream = await response.Content.ReadAsStreamAsync(ct);
+            return await JsonSerializer.DeserializeAsync<HfModelDetail>(stream, JsonOptions, ct);
+        }
     }
 
     /// <summary>
@@ -952,8 +972,10 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
         try
         {
             string readmeRevision = revision ?? "main";
+            string[] canonicalParts = (detail?.Id ?? string.Empty).Split('/');
+            string readmeRepo = canonicalParts.Length == 2 && canonicalParts.All(IsSafeRepoPart) ? detail!.Id : repoId;
             using HttpResponseMessage readmeResponse = await _http.GetAsync(
-                "https://huggingface.co/" + repoId + "/raw/" + readmeRevision + "/README.md", ct);
+                "https://huggingface.co/" + readmeRepo + "/raw/" + readmeRevision + "/README.md", ct);
             if (readmeResponse.IsSuccessStatusCode)
             {
                 readme = await readmeResponse.Content.ReadAsStringAsync(ct);

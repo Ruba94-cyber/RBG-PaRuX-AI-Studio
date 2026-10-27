@@ -248,6 +248,15 @@ public sealed class RuntimePerformanceProfileStore
 /// </summary>
 public sealed class RuntimePerformanceTuner
 {
+    internal const string MediaBusyMessage = "Media generation is active; stop it before tuning text inference.";
+    internal const string GamingBusyMessage = "Gaming Mode is active; performance tuning is blocked.";
+
+    /// <summary>True when a run was refused only because the machine is busy right now. That is a deferral to retry when idle, not a failure.</summary>
+    internal static string? BusyWaitingText(string? error) =>
+        string.Equals(error, MediaBusyMessage, StringComparison.Ordinal) ? "Waiting: media generation is active; it will retry when the PC is idle"
+        : string.Equals(error, GamingBusyMessage, StringComparison.Ordinal) ? "Paused: Gaming Mode is on"
+        : null;
+
     private readonly LocalAiProcessManager _process;
     private readonly GpuInventoryService _gpus;
     private readonly ILlamaPerformanceProbe _probe;
@@ -328,11 +337,11 @@ public sealed class RuntimePerformanceTuner
             Set(entry, "running", "Preparing isolated performance benchmark…");
 
             if (_process.GamingActive)
-                throw new InvalidOperationException("Gaming Mode is active; performance tuning is blocked.");
+                throw new InvalidOperationException(GamingBusyMessage);
             // A game launched mid-run must stop GPU benchmarking promptly, not after the matrix.
             gaming = new GamingHardOffWatch(() => _process.GamingActive, entry.Cancellation.Token);
             if (await _process.IsMediaHealthyAsync(gaming.Token).ConfigureAwait(false))
-                throw new InvalidOperationException("Media generation is active; stop it before tuning text inference.");
+                throw new InvalidOperationException(MediaBusyMessage);
 
             restoreText = await _process.IsTextHealthyAsync(gaming.Token).ConfigureAwait(false);
             if (!_process.StopText())

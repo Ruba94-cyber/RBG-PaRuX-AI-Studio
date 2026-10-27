@@ -254,7 +254,13 @@ internal sealed class IdleCalibrationService
         RuntimeOptimizationRun? run = _deps.Get(id);
         if (run is not null && run.Status is not ("completed" or "failed" or "cancelled")) return false;
         DateTime now = _deps.UtcNow();
-        if (run is null || run.Status == "failed")
+        if (run is { Status: "failed" } && RuntimePerformanceTuner.BusyWaitingText(run.Error) is { } busyText)
+        {
+            // Refused only because media generation / Gaming Mode is active right now: not a failure. Back to the queue.
+            _registry.MarkCancelled(key, label, workload, "deferred: " + run.Error, now);
+            if (tuningId != null) _deps.Tuning?.Requeue(tuningId, busyText);
+        }
+        else if (run is null || run.Status == "failed")
         {
             _registry.MarkFailed(key, label, workload, run?.Error ?? "run disappeared", now);
             if (tuningId != null) _deps.Tuning?.Failed(tuningId, "Tuning failed: " + (run?.Error ?? "the run disappeared"));

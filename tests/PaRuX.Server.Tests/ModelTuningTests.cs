@@ -361,6 +361,27 @@ public sealed class ModelTuningTests : IDisposable
         Assert.Contains("server did not start", item.Reason);
     }
 
+    [Theory]
+    [InlineData("Media generation is active; stop it before tuning text inference.")]
+    [InlineData("Gaming Mode is active; performance tuning is blocked.")]
+    public async Task A_run_refused_because_the_machine_is_busy_is_queued_again_never_failed(string error)
+    {
+        Rig rig = NewRig("Qwen3-8B-Q4_K_M.gguf");
+        rig.Fresh.Add(rig.Targets[0].ModelPath);
+        rig.Now = rig.Now.AddSeconds(30);
+        await rig.Service.TickAsync(default);
+        rig.Run!.Status = "failed";
+        rig.Run.Error = error;
+
+        await rig.Service.TickAsync(default);
+
+        ModelTuningItemDto item = OnlyItem(rig);
+        Assert.Equal(ModelTuningStates.Queued, item.State);
+        Assert.DoesNotContain("failed", item.Reason ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.False(string.IsNullOrWhiteSpace(item.Reason));
+        Assert.True(rig.Tuning.Snapshot().Active);
+    }
+
     [Fact]
     public async Task A_fresh_model_that_is_already_tuned_is_skipped_and_leaves_the_fresh_queue()
     {
