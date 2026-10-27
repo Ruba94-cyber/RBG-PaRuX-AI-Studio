@@ -2057,10 +2057,27 @@ namespace PaRuX.Views
                 if (analysis.IsSilent) { ShowTransientStatus(VoiceMessages.Silent()); return; }
 
                 ShowTransientStatus("Transcribing locally…");
-                TranscribeResponse result = await SpeechClient.Current.TranscribeAsync(
-                    Convert.ToBase64String(wav), "voice-message.wav", CancellationToken.None);
-                string text = (result.Text ?? string.Empty).Trim();
-                if (text.Length == 0) { ShowTransientStatus(VoiceMessages.NoSpeechRecognized()); return; }
+                string header = BitConverter.ToString(wav, 0, Math.Min(48, wav.Length));
+                Log.Write("Voice: " + wav.Length + " bytes, " + analysis.DurationSeconds.ToString("0.00")
+                    + " s, peak " + analysis.Peak.ToString("0.0000") + ", header " + header);
+                try { File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "parux-voice-debug.wav"), wav); } catch { } // TEMP-DEBUG
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                string text;
+                try
+                {
+                    using var timeout = new CancellationTokenSource(VoiceMessages.TranscribeTimeout);
+                    TranscribeResponse result = await SpeechClient.Current.TranscribeAsync(
+                        Convert.ToBase64String(wav), "voice-message.wav", timeout.Token);
+                    text = (result.Text ?? string.Empty).Trim();
+                    Log.Write("Voice transcription ok in " + sw.ElapsedMilliseconds + " ms: " + text.Length + " chars");
+                }
+                catch (OperationCanceledException)
+                {
+                    Log.Write("Voice transcription timed out after " + sw.ElapsedMilliseconds + " ms");
+                    ShowPersistentVoiceStatus(VoiceMessages.TranscribeTimedOut());
+                    return;
+                }
+                if (text.Length == 0) { ShowPersistentVoiceStatus(VoiceMessages.NoSpeechRecognized()); return; }
 
                 string existing = InputBox.Text ?? string.Empty;
                 InputBox.Text = existing.Length == 0 || char.IsWhiteSpace(existing[existing.Length - 1])
@@ -2079,10 +2096,22 @@ namespace PaRuX.Views
                 Log.Write("Voice transcription failed: " + ex.GetType().Name + ": " + ex.Message);
                 if (GamingManager.Current.IsActive) ShowTransientStatus(VoiceMessages.GamingMode("voice input"));
                 else if (ex.Message.IndexOf("not installed", StringComparison.OrdinalIgnoreCase) >= 0)
-                    ShowTransientStatus(VoiceMessages.SttNotInstalled());
-                else ShowTransientStatus("Transcription failed: " + ex.Message);
+                    ShowPersistentVoiceStatus(VoiceMessages.SttNotInstalled());
+                else ShowPersistentVoiceStatus("Transcription failed: " + ex.Message);
             }
             finally { _voice.Finish(); }
+        }
+
+        /// <summary>Voice outcomes stay visible longer than the usual transient status so a failure is never missed.</summary>
+        private void ShowPersistentVoiceStatus(string text)
+        {
+            ShowTransientStatus(text);
+            _dispatcher.TryEnqueue(() =>
+            {
+                _statusTimer.Stop();
+                _statusTimer.Interval = TimeSpan.FromSeconds(20);
+                _statusTimer.Start();
+            });
         }
 
         private async void CancelVoiceRecording()
@@ -2555,6 +2584,7 @@ namespace PaRuX.Views
             {
                 ShowStatus(text, false);
                 _statusTimer.Stop();
+                _statusTimer.Interval = TimeSpan.FromSeconds(7);
                 _statusTimer.Start();
             });
         }
