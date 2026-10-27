@@ -37,6 +37,7 @@
   <ItemGroup>
     <Compile Include="..\..\src\PaRuX.App\Models\RouteKind.cs" Link="Routing\RouteKind.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ModelArenaPresenter.cs" Link="Linked\ModelArenaPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\InstalledModelMerge.cs" Link="Linked\InstalledModelMerge.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CreateWorkflowLoraPresenter.cs" Link="Linked\CreateWorkflowLoraPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Models\Conversation.cs" Link="Models\Conversation.cs" />
     <Compile Include="..\..\src\PaRuX.App\Models\ChatMessage.cs" Link="Models\ChatMessage.cs" />

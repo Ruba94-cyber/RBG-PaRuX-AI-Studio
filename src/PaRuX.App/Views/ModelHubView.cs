@@ -4802,6 +4802,19 @@ namespace PaRuX.Views
                         HorizontalAlignment = HorizontalAlignment.Left
                     });
                 }
+                var deleteButton = new Button { Content = "Delete", HorizontalAlignment = HorizontalAlignment.Left };
+                AutomationProperties.SetName(deleteButton, "Delete model " + model.FileName);
+                string capturedFile = model.FileName;
+                long capturedSize = model.SizeBytes;
+                deleteButton.Click += async (_, _) =>
+                {
+                    deleteButton.IsEnabled = false;
+                    (bool deleted, string message) = await ManagedModelDeleteFlow.RunAsync(XamlRoot, capturedFile, capturedSize);
+                    _status.Text = message;
+                    if (deleted) await RefreshAllAsync();
+                    else deleteButton.IsEnabled = true;
+                };
+                row.Children.Add(deleteButton);
                 _installed.Children.Add(row);
             }
             if (models.Count == 0) _installed.Children.Add(new TextBlock { Text = "No PaRuX-managed GGUF model is installed yet." });

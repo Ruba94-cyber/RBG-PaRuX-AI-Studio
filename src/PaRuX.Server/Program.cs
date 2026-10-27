@@ -131,6 +131,14 @@ builder.Services.AddSingleton<ModelDownloadService>(services => new ModelDownloa
     destinationSpaceProvider: services.GetRequiredService<IModelDestinationSpaceProvider>(),
     stateDirectory: ServerState.StateDirectory,
     scanOrphanPartials: true));
+builder.Services.AddSingleton<ManagedModelDeletionService>(services =>
+{
+    RuntimeManagerService runtime = services.GetRequiredService<RuntimeManagerService>();
+    return new ManagedModelDeletionService(
+        services.GetRequiredService<ModelDownloadService>(),
+        async ct => (await runtime.GetStatusAsync(ct)).ActiveModelPath,
+        log: services.GetRequiredService<ILoggerFactory>().CreateLogger("ManagedModelDeletion"));
+});
 builder.Services.AddSingleton<IModelDiscoveryProvider>(_ => ModelDiscoveryProviderSelector.Create(
     Environment.GetEnvironmentVariable(ModelDiscoveryProviderSelector.EndpointVariable),
     () => new HuggingFaceModelDiscoveryProvider()));
@@ -2698,10 +2706,16 @@ app.MapGet("/api/v1/models/library", (ModelDownloadService models, ModelBenchmar
     return Results.Ok(library);
 });
 
-app.MapDelete("/api/v1/models/library/{fileName}", (string fileName, ModelDownloadService models) =>
+app.MapDelete("/api/v1/models/library/{fileName}", async (string fileName, ManagedModelDeletionService deletion, CancellationToken ct) =>
 {
-    try { return models.DeleteManagedModel(fileName) ? Results.NoContent() : Results.NotFound(new { error = "Managed model not found" }); }
-    catch (InvalidDataException ex) { return Results.BadRequest(new { error = ex.Message }); }
+    ManagedModelDeleteResult result = await deletion.DeleteAsync(fileName, ct);
+    return result.Status switch
+    {
+        ManagedModelDeleteStatus.Deleted => Results.NoContent(),
+        ManagedModelDeleteStatus.NotFound => Results.NotFound(new { error = result.Message }),
+        ManagedModelDeleteStatus.Refused => Results.Conflict(new { error = result.Message, blockers = result.Blockers }),
+        _ => Results.BadRequest(new { error = result.Message })
+    };
 }).RequireDesktopOwner();
 
 app.MapPost("/api/v1/models/library/import", (ImportManagedModelRequest request, ModelDownloadService models) =>

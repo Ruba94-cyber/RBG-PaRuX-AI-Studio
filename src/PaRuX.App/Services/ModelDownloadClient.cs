@@ -11,6 +11,9 @@ using PaRuX.Contracts;
 
 namespace PaRuX.Services
 {
+    public sealed record ManagedModelDeleteOutcome(
+        bool Deleted, string Message, IReadOnlyList<string> TextRolesToReset, bool OtherBlockers);
+
     /// <summary>
     /// The first-class Model Hub client. Text GGUF downloads and compatible media checkpoints use
     /// the same PaRuX Core download queue/budget/integrity boundary; activation remains explicit
@@ -350,6 +353,38 @@ namespace PaRuX.Services
         /// carries the parts it lacks and cannot be loaded.</summary>
         public Task<List<ManagedModelInfo>> ListIncompleteSplitSetsAsync(CancellationToken ct) =>
             SendAsync<List<ManagedModelInfo>>(HttpMethod.Get, "/api/v1/models/library/split-sets", null, ct);
+
+        /// <summary>Guarded delete: a 409 means PaRuX refused (assigned / loaded / linked / user-managed) and the outcome says why.
+        /// TextRolesToReset lists the text roles to switch to Automatic first (empty when the refusal is not about a role).</summary>
+        public async Task<ManagedModelDeleteOutcome> DeleteManagedModelCheckedAsync(string fileName, CancellationToken ct)
+        {
+            ServerBootstrap server = await PaRuXServerController.Current.EnsureRunningAsync(null, ct).ConfigureAwait(false);
+            using var request = new HttpRequestMessage(HttpMethod.Delete,
+                server.Endpoint.TrimEnd('/') + "/api/v1/models/library/" + Uri.EscapeDataString(fileName));
+            request.Headers.Add("X-PaRuX-Token", server.Token);
+            using HttpResponseMessage response = await Http.SendAsync(request, ct).ConfigureAwait(false);
+            if (response.IsSuccessStatusCode) return new ManagedModelDeleteOutcome(true, string.Empty, Array.Empty<string>(), false);
+            string body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            string message = body;
+            var roles = new List<string>();
+            bool otherBlockers = false;
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("error", out var err)) message = err.GetString() ?? body;
+                if (doc.RootElement.TryGetProperty("blockers", out var blockers))
+                    foreach (var b in blockers.EnumerateArray())
+                    {
+                        string kind = b.TryGetProperty("kind", out var k) ? k.GetString() ?? string.Empty : string.Empty;
+                        if (kind == "assigned-role" && b.TryGetProperty("role", out var r) && r.GetString() is { } role) roles.Add(role);
+                        else otherBlockers = true;
+                    }
+            }
+            catch (System.Text.Json.JsonException) { }
+            if (response.StatusCode != System.Net.HttpStatusCode.Conflict)
+                throw new LocalAiException("Model Hub request failed (" + (int)response.StatusCode + "): " + body);
+            return new ManagedModelDeleteOutcome(false, message, roles, otherBlockers);
+        }
 
         public Task DeleteManagedModelAsync(string fileName, CancellationToken ct) =>
             SendNoContentAsync(HttpMethod.Delete, "/api/v1/models/library/" + Uri.EscapeDataString(fileName), null, ct);
