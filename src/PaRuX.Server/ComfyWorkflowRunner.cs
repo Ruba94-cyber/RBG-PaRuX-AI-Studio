@@ -478,6 +478,12 @@ public sealed class ComfyWorkflowRunner
         if (effective.IsOverridden) SetIn(request, MediaCheckpointResolution.UnetNode, "unet_name", effective.File);
     }
 
+    internal static string? ModelSelectionReasonForProvenance(MediaJobRequest request)
+    {
+        string type = (request.Type ?? string.Empty).Trim().ToLowerInvariant();
+        return MediaCheckpointResolution.SelectionReasonFor(type == "img2img" ? "image" : type);
+    }
+
     internal string? ModelFileNameForProvenance(MediaJobRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);

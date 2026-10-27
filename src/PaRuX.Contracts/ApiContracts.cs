@@ -633,6 +633,8 @@ public sealed class MediaJobProvenance
     public string? ModelFileName { get; set; }
     public string Locality { get; set; } = "local";
     public string? FallbackReason { get; set; }
+    /// <summary>Why the router chose this model for this request (short, no paths, no prompt text). Null when not routed.</summary>
+    public string? ModelSelectionReason { get; set; }
     public string? FailureClass { get; set; }
 }
 

@@ -94,6 +94,25 @@ internal static class MediaCheckpointResolution
         return ReadTemplateUnet(TemplatePathFor(type));
     }
 
+    /// <summary>Installed diffusion files this type's workflow can run (family allowed), for the per-tab Model picker. Never throws.</summary>
+    public static List<string> CompatibleFiles(string type)
+    {
+        try
+        {
+            MediaRoutingFacts facts = (MediaCapabilityRouting.FactsOverride ?? MediaCapabilityRouting.LiveFacts)(type);
+            return facts.InstalledFiles.Where(f => facts.Inspect(f).FamilyAllowed).ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { return new List<string>(); }
+    }
+
+    /// <summary>Why the model for the next job of this type was chosen, for the job provenance. Read-only (does not record a trace).</summary>
+    public static string? SelectionReasonFor(string type)
+    {
+        if (MediaCapabilityRouting.CapabilityFor(type) is not { } cap) return null;
+        try { return MediaCapabilityRouting.Preview(cap).Explanation; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { return null; }
+    }
+
     /// <summary>Refuses a checkpoint whose family the given media type cannot run, and names the families it can.
     /// Runs before an override is saved and before an activation moves a file, so a refused file is never left behind.</summary>
     public static void EnsureFamilyAllowed(string type, string filePath)

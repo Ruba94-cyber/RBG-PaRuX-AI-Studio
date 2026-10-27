@@ -675,6 +675,20 @@ public sealed class MediaCheckpointStatus
     public string? Family { get; set; }
     /// <summary>An override whose file was removed. It is cleared and the template default is used again.</summary>
     public string? ClearedOverrideFile { get; set; }
+    /// <summary>The subset of <see cref="AvailableFiles"/> this type's workflow can run (family allowed), for the per-tab Model picker.</summary>
+    public List<string> CompatibleFiles { get; set; } = new();
+}
+
+/// <summary>The media content lane (GET/POST /api/v1/media/lane): Standard, Uncensored or Automatic.</summary>
+public sealed class MediaLaneStatus
+{
+    public string Lane { get; set; } = "Standard";
+    public List<string> Options { get; set; } = new() { "Standard", "Uncensored", "Automatic" };
+}
+
+public sealed class SetMediaLaneRequest
+{
+    public string Lane { get; set; } = "Standard";
 }
 
 public sealed class SetMediaCheckpointRequest

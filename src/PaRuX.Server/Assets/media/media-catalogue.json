@@ -13,6 +13,7 @@
     {
       "id": "z-image", "displayName": "Z-Image Turbo", "capability": "image.generate", "support": "supported",
       "registryFamily": "z-image", "parametersBillion": 6.0, "textEncoderGb": 8.0, "vaeGb": 0.33,
+      "strengths": ["photoreal", "fast", "text-rendering"],
       "variants": [
         { "id": "z-image-turbo-bf16", "title": "Z-Image Turbo (bf16, full precision)", "lane": "standard", "precision": "bf16",
           "repository": "Comfy-Org/z_image_turbo", "path": "split_files/diffusion_models/z_image_turbo_bf16.safetensors", "revision": "6fc90a3b1b653e935a0d175e260736de25b84df5", "fileName": "z_image_turbo_bf16.safetensors", "sha256": "2407613050b809ffdff18a4ac99af83ea6b95443ecebdf80e064a79c825574a6",
@@ -31,6 +32,7 @@
     {
       "id": "flux2-klein", "displayName": "FLUX.2 klein 4B", "capability": "image.edit", "support": "supported",
       "registryFamily": "flux2-klein", "parametersBillion": 4.0, "textEncoderGb": 8.0, "vaeGb": 0.34,
+      "strengths": ["editing", "photoreal"],
       "variants": [
         { "id": "flux2-klein-4b", "title": "FLUX.2 klein 4B (distilled, PaRuX default)", "lane": "standard", "precision": "bf16",
           "repository": "Comfy-Org/Flux-2-Klein-4B", "path": "split_files/diffusion_models/flux-2-klein-4b.safetensors", "revision": "533c4cbc3d3b89af1743d9466c434e89810391c0", "fileName": "flux-2-klein-4b.safetensors", "sha256": "ec3d4e733a771f61c052fb4856c48b336c55eaf2c65487c2a1faeb9bbda7a343",
@@ -45,6 +47,7 @@
     {
       "id": "wan2.2-ti2v-5b", "displayName": "Wan 2.2 TI2V 5B", "capability": "video.generate", "support": "supported",
       "registryFamily": "wan2.2-ti2v-5b", "parametersBillion": 5.0, "textEncoderGb": 6.7, "vaeGb": 1.4,
+      "strengths": ["cinematic"],
       "variants": [
         { "id": "wan2.2-ti2v-5b-fp16", "title": "Wan 2.2 TI2V 5B (fp16, PaRuX default)", "lane": "standard", "precision": "fp16",
           "repository": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "path": "split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors", "revision": "ee6f4a40737a995bf5818954cfce6d59443b0f04", "fileName": "wan2.2_ti2v_5B_fp16.safetensors", "sha256": "456f901338bd9eadbded3828b819109a9b68e8a525ca5cf8d0049a69fcfeca1e",
@@ -56,6 +59,7 @@
       "id": "qwen-image", "displayName": "Qwen-Image", "capability": "image.generate", "support": "resolver_only",
       "reason": "No Qwen-Image workflow template could be validated against a real ComfyUI in this build, so PaRuX does not run it yet. The requested label 'Qwen-Image 2.1' could not be confirmed offline; the family is catalogued as Qwen-Image.",
       "registryFamily": "qwen-image", "parametersBillion": 20.0, "textEncoderGb": 9.0, "vaeGb": 0.25,
+      "strengths": ["text-rendering", "illustration", "photoreal"],
       "variants": [
         { "id": "qwen-image-fp8", "title": "Qwen-Image (fp8)", "lane": "standard", "precision": "fp8",
           "repository": "Comfy-Org/Qwen-Image_ComfyUI", "path": "split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors", "fileName": "qwen_image_fp8_e4m3fn.safetensors",
@@ -71,6 +75,7 @@
       "id": "qwen-image-edit", "displayName": "Qwen-Image-Edit", "capability": "image.edit", "support": "resolver_only",
       "reason": "No Qwen-Image-Edit workflow template could be validated against a real ComfyUI in this build, so PaRuX does not run it yet.",
       "registryFamily": "qwen-image", "parametersBillion": 20.0, "textEncoderGb": 9.0, "vaeGb": 0.25,
+      "strengths": ["editing", "text-rendering"],
       "variants": [
         { "id": "qwen-image-edit-fp8", "title": "Qwen-Image-Edit (fp8)", "lane": "standard", "precision": "fp8",
           "repository": "Comfy-Org/Qwen-Image-Edit_ComfyUI", "path": "split_files/diffusion_models/qwen_image_edit_fp8_e4m3fn.safetensors", "fileName": "qwen_image_edit_fp8_e4m3fn.safetensors",
@@ -82,6 +87,7 @@
       "id": "wan2.2-14b", "displayName": "Wan 2.2 14B (T2V / I2V / S2V)", "capability": "video.generate", "support": "resolver_only",
       "reason": "No Wan 2.2 14B workflow template (two-expert sampling, GGUF loader, audio-driven S2V) could be validated against a real ComfyUI in this build, so PaRuX does not run it yet.",
       "registryFamily": null, "parametersBillion": 14.0, "textEncoderGb": 6.7, "vaeGb": 0.25,
+      "strengths": ["cinematic"],
       "variants": [
         { "id": "wan2.2-i2v-14b-fp8", "title": "Wan 2.2 I2V 14B (fp8, high-noise expert)", "lane": "standard", "precision": "fp8",
           "repository": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", "path": "split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors", "revision": "ee6f4a40737a995bf5818954cfce6d59443b0f04", "fileName": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
@@ -107,6 +113,7 @@
       "id": "ltx-video", "displayName": "LTX-Video 2B", "capability": "video.generate", "support": "resolver_only",
       "reason": "No LTX-Video workflow template could be validated against a real ComfyUI in this build, so PaRuX does not run it yet.",
       "registryFamily": null, "parametersBillion": 2.0, "textEncoderGb": 4.9, "vaeGb": 0.0,
+      "strengths": ["fast", "cinematic"],
       "variants": [
         { "id": "ltx-video-2b-v095", "title": "LTX-Video 2B v0.9.5", "lane": "standard", "precision": "bf16",
           "repository": "Lightricks/LTX-Video", "path": "ltx-video-2b-v0.9.5.safetensors", "fileName": "ltx-video-2b-v0.9.5.safetensors",

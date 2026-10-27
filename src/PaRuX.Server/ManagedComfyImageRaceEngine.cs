@@ -209,7 +209,8 @@ public sealed class ManagedComfyImageRaceEngine
         SetIn(request, "6", "width", width);
         SetIn(request, "6", "height", height);
         SetIn(request, "10", "filename_prefix", "LocalAI_images/PaRuX_EngineRace");
-        MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob("image");
+        MediaCheckpointEffective effective;
+        using (MediaRoutingContext.Begin(prompt)) effective = MediaCheckpointResolution.ResolveForJob("image");
         if (effective.IsOverridden) SetIn(request, MediaCheckpointResolution.UnetNode, "unet_name", effective.File);
         // Registry-resolved companion names apply here too, so the race graph matches the sequential media path.
         ComfyWorkflowRunner.ApplyResolvedCompanionChoices(request, "image");
