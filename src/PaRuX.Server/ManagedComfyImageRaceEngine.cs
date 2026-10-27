@@ -198,7 +198,8 @@ public sealed class ManagedComfyImageRaceEngine
         CancellationToken ct)
     {
         ConfigAssets.EnsureAll();
-        MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob("image");
+        MediaCheckpointEffective effective;
+        using (MediaRoutingContext.Begin(prompt)) effective = MediaCheckpointResolution.ResolveForJob("image");
         string templatePath = MediaCheckpointResolution.TemplatePathFor(effective);
         if (!File.Exists(templatePath)) throw new InvalidOperationException("Missing workflow template: " + templatePath);
         JsonObject request = (JsonObject)JsonNode.Parse(await File.ReadAllTextAsync(templatePath, ct).ConfigureAwait(false))!;

@@ -80,6 +80,7 @@ namespace PaRuX.Views
         {
             _status.Text = CreateSetupStatusLine.Checking;
             SetProvenance(null);
+            foreach (MediaModelRow row in new[] { _imageModelRow, _videoModelRow, _editModelRow }) _ = row.RefreshAsync();
             foreach (MediaSetupCard card in _setupCards) card.StartPolling();
         }
 
@@ -222,6 +223,7 @@ namespace PaRuX.Views
                 "Watercolor portrait of an old sailor with a pipe",
                 "Isometric pixel-art city at night, neon signs"));
             panel.Children.Add(_enhanceImage);
+            panel.Children.Add(_imageModelRow);
             var dimensions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             dimensions.Children.Add(Labeled("Width", _imageWidth));
             dimensions.Children.Add(Labeled("Height", _imageHeight));
@@ -235,6 +237,10 @@ namespace PaRuX.Views
             return panel;
         }
 
+        // Model + content lane per generating tab. Edit follows its mode: instruction edits use the edit checkpoint, variations the image one.
+        private readonly MediaModelRow _imageModelRow = new MediaModelRow("image", "Create_Image");
+        private readonly MediaModelRow _videoModelRow = new MediaModelRow("video", "Create_Video");
+        private readonly MediaModelRow _editModelRow = new MediaModelRow("edit", "Create_Edit");
         private readonly CheckBox _enhanceImage = MediaPromptEnhancerUi.CreateToggle();
         private readonly CheckBox _enhanceVideo = MediaPromptEnhancerUi.CreateToggle("_Video");
         private IReadOnlyDictionary<string, string>? _pendingEnhancementDetails;
@@ -266,6 +272,7 @@ namespace PaRuX.Views
                 "A paper boat drifting down a rain-soaked street",
                 "Clouds racing over a mountain ridge, time-lapse"));
             panel.Children.Add(_enhanceVideo);
+            panel.Children.Add(_videoModelRow);
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             row.Children.Add(Labeled("Width", _videoWidth));
             row.Children.Add(Labeled("Height", _videoHeight));
@@ -357,6 +364,7 @@ namespace PaRuX.Views
             panel.Children.Add(choose);
             panel.Children.Add(_editSourceLabel);
             panel.Children.Add(_editPrompt);
+            panel.Children.Add(_editModelRow);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_variationStrengthPanel, "Create_EditVariationStrength_Panel");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_editStrength, "Create_EditVariationStrength_NumberBox");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_editStrength, "Variation strength");
@@ -379,6 +387,7 @@ namespace PaRuX.Views
         private void UpdateEditModeDescription()
         {
             bool variation = SelectedEditType() == "img2img";
+            _ = _editModelRow.SetTypeAsync(variation ? "image" : "edit");
             _variationStrengthPanel.Visibility = variation ? Visibility.Visible : Visibility.Collapsed;
             _editRunButton.Content = variation ? "Create variation" : "Edit image";
             _editModeDescription.Text = variation
@@ -486,8 +495,10 @@ namespace PaRuX.Views
 
                 ticket = BeginOperation(type == "video" ? "Generating video…" : type == "image" ? "Generating image…" : "Editing image…");
                 if (ticket == null) return;
+                MediaJobProvenance? jobProvenance = null;
                 var progress = new Progress<MediaJobStatus>(job =>
                 {
+                    if (job.Provenance != null) jobProvenance = job.Provenance;
                     _progress.Value = Math.Clamp(job.ProgressPercent, 0, 100);
                     string eta = job.EtaSeconds.HasValue ? " · ETA ~" + job.EtaSeconds.Value + "s" : string.Empty;
                     _status.Text = job.Stage + " · " + job.ProgressPercent + "%" + eta;
@@ -497,12 +508,15 @@ namespace PaRuX.Views
                 _lastOutput.Text = "Output: " + path;
                 ShowResult(path);
                 _status.Text = "Generation completed locally and registered in Artifact Workspace.";
-                string modelName = !string.IsNullOrWhiteSpace(asset.FileName) ? asset.FileName : Path.GetFileName(path);
+                // The model the router/override actually chose comes from the server's job provenance; the output file name is only a fallback.
+                string modelName = !string.IsNullOrWhiteSpace(jobProvenance?.ModelFileName) ? jobProvenance!.ModelFileName!
+                    : !string.IsNullOrWhiteSpace(asset.FileName) ? asset.FileName : Path.GetFileName(path);
                 SetProvenance(new MediaProvenanceRecord
                 {
                     EngineFamily = "Local Media Engine",
                     Model = modelName,
                     IsLocal = true,
+                    SelectionReason = jobProvenance?.ModelSelectionReason,
                     AdditionalDetails = _pendingEnhancementDetails
                 });
                 _pendingEnhancementDetails = null;

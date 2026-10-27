@@ -37,6 +37,12 @@ namespace PaRuX.Services
             SendAsync<MediaCheckpointStatus>(HttpMethod.Post, "/api/v1/media/checkpoints/activate",
                 new ActivateCheckpointRequest { Type = type, FileName = fileName }, ct);
 
+        public Task<MediaLaneStatus> GetLaneAsync(CancellationToken ct) =>
+            SendAsync<MediaLaneStatus>(HttpMethod.Get, "/api/v1/media/lane", null, ct);
+
+        public Task<MediaLaneStatus> SetLaneAsync(string lane, CancellationToken ct) =>
+            SendAsync<MediaLaneStatus>(HttpMethod.Post, "/api/v1/media/lane", new SetMediaLaneRequest { Lane = lane }, ct);
+
         public Task<MediaCatalogueResponse> GetCatalogueAsync(string lane, CancellationToken ct) =>
             SendAsync<MediaCatalogueResponse>(HttpMethod.Get, "/api/v1/media/catalogue?lane=" + Uri.EscapeDataString(lane), null, ct);
 

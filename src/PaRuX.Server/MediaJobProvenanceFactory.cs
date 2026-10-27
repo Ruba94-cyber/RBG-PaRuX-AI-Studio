@@ -14,7 +14,8 @@ internal static class MediaJobProvenanceFactory
         string runtimeIdentity,
         string? modelFilePath,
         string? fallbackReason = null,
-        Exception? failure = null)
+        Exception? failure = null,
+        string? modelSelectionReason = null)
     {
         string identity = string.IsNullOrWhiteSpace(runtimeIdentity) ? "unknown" : runtimeIdentity.Trim();
         return new MediaJobProvenance
@@ -24,6 +25,7 @@ internal static class MediaJobProvenanceFactory
             ModelFileName = FileNameOnly(modelFilePath),
             Locality = "local",
             FallbackReason = SafeReason(fallbackReason),
+            ModelSelectionReason = SafeReason(modelSelectionReason),
             FailureClass = failure == null ? null : ClassifyFailure(failure)
         };
     }
@@ -63,6 +65,7 @@ internal static class MediaJobProvenanceFactory
             ModelFileName = FileNameOnly(provenance.ModelFileName),
             Locality = "local",
             FallbackReason = SafeReason(provenance.FallbackReason),
+            ModelSelectionReason = SafeReason(provenance.ModelSelectionReason),
             FailureClass = ClassifyFailure(failure)
         };
     }
@@ -80,6 +83,7 @@ internal static class MediaJobProvenanceFactory
             ModelFileName = FileNameOnly(provenance.ModelFileName),
             Locality = "local",
             FallbackReason = SafeReason(provenance.FallbackReason),
+            ModelSelectionReason = SafeReason(provenance.ModelSelectionReason),
             FailureClass = SafeFailureClass(provenance.FailureClass)
         };
     }

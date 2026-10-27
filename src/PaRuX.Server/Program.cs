@@ -2666,6 +2666,7 @@ app.MapPost("/api/v1/models/roles/auto-assign", async (
 
 AutoMaintenanceEndpoints.Map(app);
 MediaCatalogueEndpoints.Map(app);
+MediaLaneEndpoints.Map(app);
 RuntimeSuggestionEndpoints.Map(app);
 
 app.MapGet("/api/v1/models/budget", async (ModelDownloadService models) => Results.Ok(await models.GetBudgetAsync()));
@@ -3488,7 +3489,8 @@ static MediaCheckpointStatus DescribeCheckpoint(string type)
         Template = effective.TemplateFile,
         ReplacesInputs = effective.ReplacesInputs.ToList(),
         Family = effective.IsOverridden ? MediaCheckpointResolution.FamilyOfInstalledFile(effective.File) : null,
-        ClearedOverrideFile = effective.ClearedOverrideFile
+        ClearedOverrideFile = effective.ClearedOverrideFile,
+        CompatibleFiles = MediaCheckpointResolution.CompatibleFiles(type)
     };
 }
 

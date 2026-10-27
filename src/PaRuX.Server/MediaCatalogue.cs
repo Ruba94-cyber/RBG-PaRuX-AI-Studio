@@ -20,8 +20,11 @@ internal sealed record MediaCatalogueVariant(
 
 internal sealed record MediaCatalogueFamily(
     string Id, string DisplayName, string Capability, string Support, string? Reason, string? RegistryFamily,
-    double ParametersBillion, double TextEncoderGb, double VaeGb, IReadOnlyList<MediaCatalogueVariant> Variants)
+    double ParametersBillion, double TextEncoderGb, double VaeGb, IReadOnlyList<MediaCatalogueVariant> Variants,
+    IReadOnlyList<string>? DeclaredStrengths = null)
 {
+    /// <summary>What this family is declared to be good at (see <see cref="MediaCatalogue.Strengths"/>); empty when undeclared.</summary>
+    internal IReadOnlyList<string> Strengths => DeclaredStrengths ?? Array.Empty<string>();
     internal bool IsSupported => Support == "supported";
 }
 
@@ -35,6 +38,8 @@ internal sealed class MediaCatalogue
     public const string ResourceName = "PaRuX.Server.Assets.media.media-catalogue.json";
     internal const int SupportedSchemaVersion = 1;
     internal static readonly string[] Lanes = { "standard", "uncensored" };
+    /// <summary>Closed vocabulary for the optional per-family "strengths" array; the prompt hints in MediaPromptStyleHints use the same ids.</summary>
+    internal static readonly string[] Strengths = { "photoreal", "anime", "illustration", "text-rendering", "fast", "editing", "cinematic" };
     internal static readonly string[] CapabilityIds = { "image.generate", "image.edit", "video.generate", "audio.music", "audio.speak" };
     private static readonly Regex IdPattern = new(@"^[a-z0-9][a-z0-9.\-]{0,59}$", RegexOptions.CultureInvariant);
     private static readonly Regex RepoPattern = new(@"^[A-Za-z0-9][A-Za-z0-9._\-]*/[A-Za-z0-9][A-Za-z0-9._\-]*$", RegexOptions.CultureInvariant);
@@ -170,8 +175,20 @@ internal sealed class MediaCatalogue
                     verified, bundled, Str(v, "baseCompat", vw), extra, revision, sha256));
             }
             if (variants.Count == 0) throw new InvalidDataException($"{where}: has no variants.");
+            var strengths = new List<string>();
+            if (f.TryGetProperty("strengths", out JsonElement st))
+            {
+                if (st.ValueKind != JsonValueKind.Array) throw new InvalidDataException($"{where}: strengths must be an array.");
+                foreach (JsonElement e in st.EnumerateArray())
+                {
+                    string? sv = e.ValueKind == JsonValueKind.String ? e.GetString() : null;
+                    if (sv is null || !Strengths.Contains(sv)) throw new InvalidDataException($"{where}: unknown strength \"{sv}\".");
+                    if (strengths.Contains(sv)) throw new InvalidDataException($"{where}: duplicate strength \"{sv}\".");
+                    strengths.Add(sv);
+                }
+            }
             families.Add(new(fid, Str(f, "displayName", where), cap, support, reason, regFamily, paramsB,
-                Dbl(f, "textEncoderGb", where), Dbl(f, "vaeGb", where), variants));
+                Dbl(f, "textEncoderGb", where), Dbl(f, "vaeGb", where), variants, strengths));
         }
         return new MediaCatalogue(version, caps, families);
     }
