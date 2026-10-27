@@ -11,10 +11,11 @@ internal sealed record MediaCatalogueCapability(string Id, string Label, MediaJo
 internal sealed record MediaCatalogueVariant(
     string Id, string Title, string Lane, string? LaneEvidence, string Precision, string? Repository, string? Path,
     string FileName, long? SizeBytes, string SizeBasis, string License, int Tier, bool ListingVerified, bool Bundled,
-    string BaseCompat, IReadOnlyList<string> AdditionalFiles)
+    string BaseCompat, IReadOnlyList<string> AdditionalFiles, string? Revision = null, string? Sha256 = null)
 {
+    /// <summary>Pinned to the listed commit when the catalogue records one, so the bytes cannot change under the recorded size.</summary>
     internal string? DownloadUrl => Repository is not null && Path is not null
-        ? $"https://huggingface.co/{Repository}/resolve/main/{Path}" : null;
+        ? $"https://huggingface.co/{Repository}/resolve/{Revision ?? "main"}/{Path}" : null;
 }
 
 internal sealed record MediaCatalogueFamily(
@@ -139,11 +140,19 @@ internal sealed class MediaCatalogue
                 string license = Str(v, "license", vw);
                 int tier = Int(v, "tier", vw);
                 if (tier is < 1 or > 5) throw new InvalidDataException($"{vw}: tier must be 1-5.");
+                string? revision = OptStr(v, "revision");
+                if (revision is not null && !System.Text.RegularExpressions.Regex.IsMatch(revision, "^[0-9a-f]{40}$"))
+                    throw new InvalidDataException($"{vw}: revision must be a 40-character lowercase commit SHA.");
+                string? sha256 = OptStr(v, "sha256");
+                if (sha256 is not null && !System.Text.RegularExpressions.Regex.IsMatch(sha256, "^[0-9a-f]{64}$"))
+                    throw new InvalidDataException($"{vw}: sha256 must be 64 lowercase hex characters.");
+                if (sha256 is not null && revision is null)
+                    throw new InvalidDataException($"{vw}: a pinned sha256 needs the commit revision it belongs to.");
                 var extra = new List<string>();
                 if (v.TryGetProperty("additionalFiles", out JsonElement af))
                     foreach (JsonElement e in af.EnumerateArray()) extra.Add(e.GetString() ?? string.Empty);
                 variants.Add(new(vid, Str(v, "title", vw), lane, laneEvidence, precision, repo, path, fileName, size, sizeBasis, license, tier,
-                    verified, bundled, Str(v, "baseCompat", vw), extra));
+                    verified, bundled, Str(v, "baseCompat", vw), extra, revision, sha256));
             }
             if (variants.Count == 0) throw new InvalidDataException($"{where}: has no variants.");
             families.Add(new(fid, Str(f, "displayName", where), cap, support, reason, regFamily, paramsB,

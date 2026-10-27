@@ -103,16 +103,18 @@ namespace PaRuX.Views
                 Opacity = 0.78
             });
 
+            var statusBlock = new StackPanel { Spacing = 8 };
             var top = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             var cancel = new Button { Content = "Cancel active job" };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(cancel, "Create_Cancel_Active_Job_Button");
             cancel.Click += (_, _) => CancelActive();
             top.Children.Add(cancel);
-            body.Children.Add(top);
-            body.Children.Add(_progress);
-            body.Children.Add(_status);
+            statusBlock.Children.Add(top);
+            statusBlock.Children.Add(_progress);
+            statusBlock.Children.Add(_status);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_status, "Create_Operation_Status_Text");
-            body.Children.Add(_lastOutput);
+            statusBlock.Children.Add(_lastOutput);
+            statusBlock.Children.Add(BuildResultStrip());
 
             var provenanceRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_provenanceText, MediaProvenanceFormatter.ProvenanceTextAutomationId);
@@ -124,19 +126,71 @@ namespace PaRuX.Views
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_provenanceDetailsButton, "Details");
             _provenanceDetailsButton.Click += (_, _) => ToggleProvenanceDetails();
             provenanceRow.Children.Add(_provenanceDetailsButton);
-            body.Children.Add(provenanceRow);
+            statusBlock.Children.Add(provenanceRow);
 
             _provenanceDetailsPanel.Children.Add(_provenanceDetailsContent);
-            body.Children.Add(_provenanceDetailsPanel);
+            statusBlock.Children.Add(_provenanceDetailsPanel);
 
-            body.Children.Add(Section("IMAGE", BuildImagePanel()));
-            body.Children.Add(Section("VIDEO", BuildVideoPanel()));
-            body.Children.Add(Section("IMAGE EDIT", BuildEditPanel()));
-            body.Children.Add(Section("IMAGE → 3D", BuildThreedPanel()));
-            body.Children.Add(Section("TEXT TO SPEECH", BuildTtsPanel()));
-            body.Children.Add(Section("SPEECH TO TEXT", BuildSttPanel()));
-            body.Children.Add(Section("COMFYUI WORKFLOWS AND LORAS", BuildWorkflowLoraPanel()));
+            // One mode at a time: the long single page made every mode compete for attention. Results, status and setup stay above.
+            var speech = new StackPanel { Spacing = 14 };
+            speech.Children.Add(Section("TEXT TO SPEECH", BuildTtsPanel()));
+            speech.Children.Add(Section("SPEECH TO TEXT", BuildSttPanel()));
+            var gallery = new MediaGalleryView();
+            gallery.ItemReusedAsEditSource += (_, item) =>
+            {
+                if (item.FilePath is not { Length: > 0 } filePath) return;
+                _editSourcePath = filePath;
+                _editSourceLabel.Text = filePath;
+                SelectMode("Edit");
+            };
+            body.Children.Add(BuildModeTabs(new (string, UIElement)[]
+            {
+                ("Image", Section("IMAGE", BuildImagePanel())),
+                ("Video", Section("VIDEO", BuildVideoPanel())),
+                ("Edit", Section("IMAGE EDIT", BuildEditPanel())),
+                ("3D", Section("IMAGE → 3D", BuildThreedPanel())),
+                ("Speech", speech),
+                ("Workflows", Section("COMFYUI WORKFLOWS AND LORAS", BuildWorkflowLoraPanel())),
+                ("Gallery", gallery)
+            }));
+            body.Children.Add(statusBlock);
             return scroll;
+        }
+
+        /// <summary>One-click example prompts, so a first-time user sees what to type. Clicking only fills the box.</summary>
+        private static UIElement ExampleChips(TextBox target, string idPrefix, params string[] examples)
+        {
+            var row = new StackPanel { Spacing = 6 };
+            row.Children.Add(new TextBlock { Text = "Try an example, or just ask in Chat (\"create an image of…\", \"crea un'immagine di…\")", FontSize = 12, Opacity = 0.7, TextWrapping = TextWrapping.Wrap });
+            var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            int i = 0;
+            foreach (string example in examples)
+            {
+                var chip = new Button { Content = example.Length > 44 ? example.Substring(0, 41) + "…" : example, Padding = new Thickness(10, 4, 10, 4), FontSize = 12 };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(chip, idPrefix + "_" + (++i));
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(chip, example);
+                string text = example;
+                chip.Click += (_, _) => { target.Text = text; target.Focus(FocusState.Programmatic); };
+                chips.Children.Add(chip);
+            }
+            row.Children.Add(new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalScrollMode = ScrollMode.Auto, Content = chips });
+            return row;
+        }
+
+        /// <summary>One-click aspect-ratio presets that fill the width and height boxes.</summary>
+        private static UIElement SizePresets(string idPrefix, NumberBox width, NumberBox height, params (string Label, int W, int H)[] presets)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            row.Children.Add(new TextBlock { Text = "Size", FontSize = 12, Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center });
+            foreach ((string label, int w, int h) in presets)
+            {
+                var button = new Button { Content = label + " " + w + "×" + h, Padding = new Thickness(10, 3, 10, 3), FontSize = 12 };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(button, idPrefix + "_" + label);
+                int pw = w, ph = h;
+                button.Click += (_, _) => { width.Value = pw; height.Value = ph; };
+                row.Children.Add(button);
+            }
+            return row;
         }
 
         private MediaSetupCard NewSetupCard(string type, string label)
@@ -159,11 +213,18 @@ namespace PaRuX.Views
             var panel = new StackPanel { Spacing = 8 };
             panel.Children.Add(NewSetupCard("image", "image generation"));
             panel.Children.Add(_imagePrompt);
+            panel.Children.Add(ExampleChips(_imagePrompt, "Create_Image_Example",
+                "A cozy cabin in a snowy forest at dusk, warm light in the windows",
+                "Macro photo of a dew-covered spider web at sunrise",
+                "Watercolor portrait of an old sailor with a pipe",
+                "Isometric pixel-art city at night, neon signs"));
             panel.Children.Add(_enhanceImage);
             var dimensions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             dimensions.Children.Add(Labeled("Width", _imageWidth));
             dimensions.Children.Add(Labeled("Height", _imageHeight));
             panel.Children.Add(dimensions);
+            panel.Children.Add(SizePresets("Create_Image_Size", _imageWidth, _imageHeight,
+                ("Square", 1024, 1024), ("Portrait", 896, 1152), ("Landscape", 1344, 768), ("Phone", 768, 1344)));
             var run = new Button { Content = "Generate image" };
             run.Click += async (_, _) => await GenerateMediaAsync("image");
             _runButtons.Add(run);
@@ -194,10 +255,16 @@ namespace PaRuX.Views
             var panel = new StackPanel { Spacing = 8 };
             panel.Children.Add(NewSetupCard("video", "video generation"));
             panel.Children.Add(_videoPrompt);
+            panel.Children.Add(ExampleChips(_videoPrompt, "Create_Video_Example",
+                "Waves rolling onto a beach at sunset, cinematic, slow motion",
+                "A paper boat drifting down a rain-soaked street",
+                "Clouds racing over a mountain ridge, time-lapse"));
             panel.Children.Add(_enhanceVideo);
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             row.Children.Add(Labeled("Width", _videoWidth));
             row.Children.Add(Labeled("Height", _videoHeight));
+            panel.Children.Add(SizePresets("Create_Video_Size", _videoWidth, _videoHeight,
+                ("Fast 480p", 832, 480), ("HD 720p", 1280, 720), ("Vertical", 480, 832)));
             row.Children.Add(Labeled("Seconds", _videoDuration));
             row.Children.Add(Labeled("FPS", _videoFps));
             row.Children.Add(Labeled("Steps", _videoSteps));
@@ -420,6 +487,7 @@ namespace PaRuX.Views
                 MediaAsset asset = await RunWithCompanionConsentAsync(request, type, progress, ticket.Token);
                 string path = await SaveMediaAssetAsync(asset, type, ticket.Token);
                 _lastOutput.Text = "Output: " + path;
+                ShowResult(path);
                 _status.Text = "Generation completed locally and registered in Artifact Workspace.";
                 string modelName = !string.IsNullOrWhiteSpace(asset.FileName) ? asset.FileName : Path.GetFileName(path);
                 SetProvenance(new MediaProvenanceRecord

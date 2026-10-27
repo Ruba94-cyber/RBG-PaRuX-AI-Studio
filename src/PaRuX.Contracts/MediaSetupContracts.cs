@@ -20,4 +20,6 @@ public sealed class MediaSetupStepDto
     public string State { get; set; } = string.Empty;   // done | pending | blocked
     public long SizeBytes { get; set; }
     public string Detail { get; set; } = string.Empty;
+    /// <summary>Publisher's licence for what this step downloads (SPDX-style), shown before anything downloads.</summary>
+    public string License { get; set; } = string.Empty;
 }

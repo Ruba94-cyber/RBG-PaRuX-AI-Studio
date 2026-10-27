@@ -120,7 +120,8 @@ builder.Services.AddModelArenaServices();
 builder.Services.AddSingleton<IModelDestinationSpaceProvider, ModelDestinationSpaceProvider>();
 builder.Services.AddSingleton<PaRuX.Server.Orchestration.Gaming.IGamingResumable>(services => services.GetRequiredService<ModelDownloadService>());
 builder.Services.AddSingleton<ModelDownloadService>(services => new ModelDownloadService(
-    completionHandler: services.GetRequiredService<ModelBenchmarkService>(),
+    completionHandler: new PostDownloadOptimizationHandler(
+        services.GetRequiredService<ModelBenchmarkService>(), new PostDownloadOptimizationQueue()),
     destinationSpaceProvider: services.GetRequiredService<IModelDestinationSpaceProvider>(),
     stateDirectory: ServerState.StateDirectory,
     scanOrphanPartials: true));
@@ -3528,7 +3529,7 @@ app.MapPost("/api/v1/media/companions/fetch", async (MediaCompanionFetchRequest 
 // Guided first-run media setup: ComfyUI, the prompt-assistant model, a downloadable image checkpoint and its companions.
 app.MapGet("/api/v1/media/setup", (string? type, MediaSetupService setup) => Results.Ok(setup.GetStatus(type)));
 app.MapPost("/api/v1/media/setup/start", (string? type, MediaSetupService setup) => Results.Accepted("/api/v1/media/setup", setup.Start(type))).RequireDesktopOwner();
-app.MapPost("/api/v1/media/setup/cancel", (string? type, MediaSetupService setup) => { setup.Cancel(); return Results.Ok(setup.GetStatus(type)); }).RequireDesktopOwner();
+app.MapPost("/api/v1/media/setup/cancel", (string? type, MediaSetupService setup) => { setup.Cancel(type); return Results.Ok(setup.GetStatus(type)); }).RequireDesktopOwner();
 
 app.MapPost("/api/v1/media/checkpoints/activate", (ActivateCheckpointRequest request) =>
 {

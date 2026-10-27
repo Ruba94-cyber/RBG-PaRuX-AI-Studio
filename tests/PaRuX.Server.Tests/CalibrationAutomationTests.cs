@@ -216,6 +216,7 @@ public sealed class CalibrationAutomationTests : IDisposable
         public IdleCalibrationService Service = null!;
         public IdleCalibrationRegistry Registry = null!;
         public List<CalibrationTarget> Targets = new();
+        public bool FreshModel;
     }
 
     private Rig NewRig(params string[] workloads)
@@ -234,6 +235,7 @@ public sealed class CalibrationAutomationTests : IDisposable
             IsOnBattery = () => rig.OnBattery,
             GpuUtilizationPercent = _ => Task.FromResult(rig.Gpu),
             Targets = () => rig.Targets,
+            HasFreshModel = () => rig.FreshModel,
             Environment = _ => Task.FromResult<CalibrationEnvironment?>(new CalibrationEnvironment("text-cuda", rig.RuntimeTag, "rtx5080")),
             Start = request =>
             {
@@ -249,6 +251,25 @@ public sealed class CalibrationAutomationTests : IDisposable
     }
 
     private static void MakeIdle(Rig rig) => rig.Now = rig.Now.AddMinutes(11);
+
+    [Fact]
+    public async Task A_freshly_downloaded_model_is_tuned_after_a_short_pause_not_the_full_idle_threshold()
+    {
+        Rig rig = NewRig("chat");
+        rig.FreshModel = true;
+        rig.Now = rig.Now.AddMinutes(3); // past the 2-minute fresh-model pause, well short of the 10-minute default
+
+        Assert.StartsWith("started:", await rig.Service.TickAsync(default));
+    }
+
+    [Fact]
+    public async Task Without_a_fresh_model_three_idle_minutes_are_not_enough()
+    {
+        Rig rig = NewRig("chat");
+        rig.Now = rig.Now.AddMinutes(3);
+
+        Assert.Equal("not_idle", await rig.Service.TickAsync(default));
+    }
 
     [Fact]
     public async Task Nothing_runs_while_the_user_was_active_recently_or_the_setting_is_off()

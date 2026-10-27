@@ -193,6 +193,7 @@ namespace PaRuX.Views
                 MediaAsset asset = await MediaJobClient.Current.RunAsync(request, progress, ticket.Token);
                 string path = await SaveMediaAssetAsync(asset, info.Type == "video" ? "video" : "image", ticket.Token);
                 _lastOutput.Text = "Output: " + path;
+                ShowResult(path);
                 FinishOperation(ticket, "Imported workflow completed locally and registered in Artifact Workspace.");
             }
             catch (OperationCanceledException) { FinishOperation(ticket, "Generation cancelled."); }

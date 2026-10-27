@@ -70,6 +70,7 @@ public sealed class MediaHubPresenterTests
         Assert.Equal("z_image_turbo_bf16.safetensors", dl.FileName);
         Assert.Equal("image", dl.Type);
         Assert.Equal(12_309_866_400, dl.EstimatedSizeBytes);
-        Assert.StartsWith("https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/", dl.DownloadUrl);
+        // The catalogue pins the commit the size was listed at, so the Hub downloads exactly those bytes.
+        Assert.Matches("^https://huggingface.co/Comfy-Org/z_image_turbo/resolve/[0-9a-f]{40}/", dl.DownloadUrl);
     }
 }

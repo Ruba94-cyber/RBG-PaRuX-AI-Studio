@@ -194,11 +194,7 @@ namespace PaRuX.Services
 
         private ChatAttachment? LastGeneratedImage()
         {
-            ChatMessage? last = Conversation.Messages.LastOrDefault(m => m.Role == "assistant");
-            if (last == null || last.IsError || last.Attachments == null) return null;
-            return last.Attachments.FirstOrDefault(a => a.MediaType != null
-                && a.MediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(a.LocalPath) && File.Exists(a.LocalPath));
+            return RouterService.FindLastGeneratedImage(Conversation.Messages);
         }
 
         private static readonly Regex StrengthRx = new(
@@ -248,7 +244,7 @@ namespace PaRuX.Services
 
             RouteKind route = hasAttachments ? RouterService.ClassifyWithAttachment(text) : RouterService.Classify(text);
             if (RouterService.UsesPriorGeneratedImage(route) && !hasAttachments
-                && (route != RouteKind.Video || RouterService.ReferencesExistingImage(text)))
+                && RouterService.ShouldAttachPriorGeneratedImage(route, text))
             {
                 ChatAttachment? lastImage = LastGeneratedImage();
                 if (lastImage != null)

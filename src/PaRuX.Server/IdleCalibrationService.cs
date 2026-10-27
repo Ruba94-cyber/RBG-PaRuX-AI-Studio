@@ -18,6 +18,8 @@ internal sealed class IdleCalibrationDependencies
     /// <summary>Highest GPU utilisation right now in percent; null when no telemetry exists.</summary>
     public required Func<CancellationToken, Task<int?>> GpuUtilizationPercent { get; init; }
     public required Func<IReadOnlyList<CalibrationTarget>> Targets { get; init; }
+    /// <summary>True while a freshly downloaded model still awaits its first calibration; the machine then needs only a short pause.</summary>
+    public Func<bool> HasFreshModel { get; init; } = () => false;
     public required Func<CancellationToken, Task<CalibrationEnvironment?>> Environment { get; init; }
     public Func<string, string?> ModelId { get; init; } = LocalBenchmarkIdentity.ModelId;
     public required Func<RuntimeOptimizationRequest, RuntimeOptimizationRun> Start { get; init; }
@@ -35,6 +37,8 @@ internal sealed class IdleCalibrationDependencies
 internal sealed class IdleCalibrationService
 {
     internal static readonly TimeSpan DefaultIdleThreshold = TimeSpan.FromMinutes(10);
+    /// <summary>A new model's first calibration waits only this long for a quiet machine, so its first real use is already tuned.</summary>
+    internal static readonly TimeSpan FreshModelIdleThreshold = TimeSpan.FromMinutes(2);
     internal const int GpuBusyPercent = 15;
 
     private readonly IdleCalibrationDependencies _deps;
@@ -115,7 +119,8 @@ internal sealed class IdleCalibrationService
         }
         if (!enabled) return "disabled";
         if (_deps.IsGamingActive()) return "gaming";
-        if (!_activity.IsIdle(IdleThreshold)) return "not_idle";
+        TimeSpan needed = _deps.HasFreshModel() && FreshModelIdleThreshold < IdleThreshold ? FreshModelIdleThreshold : IdleThreshold;
+        if (!_activity.IsIdle(needed)) return "not_idle";
         if (_deps.IsOnBattery() == true) return "on_battery";
 
         int? gpu = await _deps.GpuUtilizationPercent(ct).ConfigureAwait(false);
@@ -209,6 +214,7 @@ internal sealed class IdleCalibrationService
             IdleCalibrationRegistry.KeyOf(modelId, completion.HardwareKey, completion.RuntimeTag, completion.Workload),
             label, completion.Workload, run.Trigger, _deps.UtcNow());
         CalibrationHistory.Record(run, completion, modelId, hardwareDigest, history);
+        new PostDownloadOptimizationQueue().MarkDone(completion.ModelPath);
     }
 }
 

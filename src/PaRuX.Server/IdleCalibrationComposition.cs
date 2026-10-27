@@ -37,6 +37,7 @@ internal static class IdleCalibrationComposition
                 }
                 return peak;
             },
+            HasFreshModel = () => new PostDownloadOptimizationQueue().Pending().Count > 0,
             Targets = Targets,
             Environment = async ct =>
             {
@@ -80,6 +81,12 @@ internal static class IdleCalibrationComposition
             string workload = role == "coding" ? "coding" : "chat";
             if (seen.Add(path + "|" + workload)) result.Add(new CalibrationTarget(path, workload));
         }
+        // Freshly downloaded chat models are tuned too, so their first real use already runs on measured settings.
+        foreach (CalibrationTarget queued in QueuedTargets(new PostDownloadOptimizationQueue()))
+            if (seen.Add(queued.ModelPath + "|" + queued.Workload)) result.Add(queued);
         return result;
     }
+
+    internal static IReadOnlyList<CalibrationTarget> QueuedTargets(PostDownloadOptimizationQueue queue) =>
+        queue.Pending().Select(path => new CalibrationTarget(path, "chat")).ToList();
 }

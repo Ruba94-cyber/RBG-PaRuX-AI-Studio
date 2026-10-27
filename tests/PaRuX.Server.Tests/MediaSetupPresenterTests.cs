@@ -8,10 +8,10 @@ namespace PaRuX.Server.Tests;
 public sealed class MediaSetupPresenterTests
 {
     private static MediaSetupStatus Status(string state, bool ready = false, string message = "", string? error = null,
-        long done = 0, long total = 0, params (string Id, string Title, string State, long Size)[] steps) => new()
+        long done = 0, long total = 0, params (string Id, string Title, string State, long Size, string License)[] steps) => new()
     {
         State = state, Ready = ready, Message = message, Error = error, BytesDownloaded = done, TotalBytes = total,
-        Steps = steps.Select(s => new MediaSetupStepDto { Id = s.Id, Title = s.Title, State = s.State, SizeBytes = s.Size }).ToList()
+        Steps = steps.Select(s => new MediaSetupStepDto { Id = s.Id, Title = s.Title, State = s.State, SizeBytes = s.Size, License = s.License }).ToList()
     };
 
     [Fact]
@@ -25,9 +25,9 @@ public sealed class MediaSetupPresenterTests
     {
         MediaSetupCardModel card = MediaSetupPresenter.Present(Status("idle", steps: new[]
         {
-            ("comfyui", "Image engine (ComfyUI)", "pending", 2_018_444_114L),
-            ("assistant-model", "Prompt assistant model", "done", 0L),
-            ("image-checkpoint", "Image model", "pending", 12_309_866_400L)
+            ("comfyui", "Image engine (ComfyUI)", "pending", 2_018_444_114L, "GPL-3.0"),
+            ("assistant-model", "Prompt assistant model", "done", 0L, "Apache-2.0"),
+            ("image-checkpoint", "Image model", "pending", 12_309_866_400L, "Apache-2.0")
         }));
 
         Assert.True(card.Visible);
@@ -37,6 +37,7 @@ public sealed class MediaSetupPresenterTests
         Assert.Contains("Image model", card.Detail);
         Assert.DoesNotContain("Prompt assistant model", card.Detail);
         Assert.Contains("13.3 GB", card.Detail); // total of pending downloads, 1024-based
+        Assert.Contains("Licences: GPL-3.0 (Image engine (ComfyUI)), Apache-2.0 (Image model)", card.Detail);
     }
 
     [Fact]

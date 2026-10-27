@@ -112,7 +112,8 @@ public sealed class MediaCatalogueTests : IDisposable
             MediaCatalogueVariant v = c.Families.SelectMany(f => f.Variants).Single(x => x.FileName == r.FileName);
             Assert.Equal(r.EstimatedSizeBytes, v.SizeBytes);
             Assert.Equal(r.HuggingFaceRepoId, v.Repository);
-            Assert.Equal(r.DownloadUrl, v.DownloadUrl);
+            // The catalogue pins the commit; the recommended list still names the moving "main" branch for the same file.
+            Assert.Equal(r.DownloadUrl, v.DownloadUrl!.Replace("/resolve/" + v.Revision + "/", "/resolve/main/"));
         }
     }
 

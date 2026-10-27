@@ -32,7 +32,7 @@ public sealed class MediaSetupService
         long? missingCompanions = null;
         if (comfy && checkpoints.Count > 0)
         {
-            try { missingCompanions = MediaCompanionPlanReader.Build(type).Missing.Sum(m => m.PinnedSizeBytes ?? m.ApproxSizeBytes ?? 0); }
+            try { missingCompanions = MediaSetupFacts.CompanionBytes(MediaCompanionPlanReader.Build(type)); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException) { }
         }
         return new MediaSetupFacts(comfy, assistant, checkpoints, missingCompanions);
@@ -57,7 +57,7 @@ public sealed class MediaSetupService
             MediaSetupStatus status = _lastType == type || _last.State == "idle" ? Clone(_last) : new MediaSetupStatus();
             if (_lastType != type && _run is { IsCompleted: false })
             {
-                status.State = "idle";
+                status.State = "waiting";
                 status.Message = "Another media setup (" + _lastType + ") is running; wait for it to finish.";
             }
             status.Steps = plan.Steps.Select(ToDto).ToList();
@@ -86,7 +86,10 @@ public sealed class MediaSetupService
         type = NormalizeType(type);
         lock (_gate)
         {
-            if (_run is { IsCompleted: false }) return GetStatusUnlocked();
+            if (_run is { IsCompleted: false })
+                return _lastType == type
+                    ? GetStatusUnlocked()
+                    : new MediaSetupStatus { State = "waiting", Message = "Another media setup (" + _lastType + ") is running; wait for it to finish." };
             _lastType = type;
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
@@ -98,9 +101,13 @@ public sealed class MediaSetupService
         return GetStatus(type);
     }
 
-    public void Cancel()
+    /// <summary>Cancels the running setup, but only when it belongs to <paramref name="type"/>: another mode's card must not stop it.</summary>
+    public void Cancel(string? type = null)
     {
-        lock (_gate) _cts?.Cancel();
+        lock (_gate)
+        {
+            if (_lastType == NormalizeType(type) && _run is { IsCompleted: false }) _cts?.Cancel();
+        }
     }
 
     private MediaSetupStatus GetStatusUnlocked() => Clone(_last);
@@ -119,10 +126,20 @@ public sealed class MediaSetupService
                 using var stepTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 stepTimeout.CancelAfter(StepTimeout);
                 Update(step.Id, "Setting up: " + step.Title, 0, step.SizeBytes);
-                if (step.Id == MediaSetupPlanner.ComfyStepId) await InstallComfyAsync(step, stepTimeout.Token);
-                else if (step.Id == MediaSetupPlanner.AssistantStepId) await DownloadAssistantAsync(step, stepTimeout.Token);
-                else if (step.Id == MediaSetupPlanner.CheckpointStepIdFor(type)) await DownloadCheckpointAsync(step, type, stepTimeout.Token);
-                else if (step.Id == MediaSetupPlanner.CompanionsStepIdFor(type)) await FetchCompanionsAsync(step, type, stepTimeout.Token);
+                try
+                {
+                    if (step.Id == MediaSetupPlanner.ComfyStepId) await InstallComfyAsync(step, stepTimeout.Token);
+                    else if (step.Id == MediaSetupPlanner.AssistantStepId) await DownloadAssistantAsync(step, stepTimeout.Token);
+                    else if (step.Id == MediaSetupPlanner.CheckpointStepIdFor(type)) await DownloadCheckpointAsync(step, type, stepTimeout.Token);
+                    else if (step.Id == MediaSetupPlanner.CompanionsStepIdFor(type)) await FetchCompanionsAsync(step, type, stepTimeout.Token);
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    // Not the user: either the step budget ran out or a network request timed out. Say which.
+                    throw new MediaSetupException(step.Id, stepTimeout.IsCancellationRequested
+                        ? step.Title + " did not finish within " + StepTimeout.TotalHours + " hours."
+                        : "A network request timed out while setting up " + step.Title + ". Check the connection and try again; downloads resume.");
+                }
             }
 
             MediaSetupPlan after = CurrentPlan(type);
@@ -133,10 +150,6 @@ public sealed class MediaSetupService
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             Finish("cancelled", "Media setup was cancelled. Downloads resume where they stopped.", null, null);
-        }
-        catch (OperationCanceledException)
-        {
-            Finish("failed", "A setup step did not finish within " + StepTimeout.TotalHours + " hours.", "Timed out.", null);
         }
         catch (MediaSetupException ex)
         {
@@ -156,7 +169,7 @@ public sealed class MediaSetupService
         RuntimeInstallStatus job = _runtime.CreateInstall(new RuntimeInstallRequest { Backend = "media-comfyui", Tag = pick.Tag, Variant = pick.Variant });
         while (true)
         {
-            ct.ThrowIfCancellationRequested();
+            if (ct.IsCancellationRequested) { _runtime.CancelJob(job.Id); ct.ThrowIfCancellationRequested(); }
             RuntimeInstallStatus? now = _runtime.GetJob(job.Id);
             if (now is null) throw new MediaSetupException(step.Id, "The ComfyUI install job disappeared.");
             Update(step.Id, "Installing ComfyUI (" + now.Stage + ").", now.BytesDownloaded, now.TotalBytes);
@@ -176,22 +189,21 @@ public sealed class MediaSetupService
 
     private async Task DownloadCheckpointAsync(MediaSetupStep step, string type, CancellationToken ct)
     {
-        ModelDownloadStatus job = await _downloads.CreateDownloadAsync(new ModelDownloadRequest
-        {
-            RepoId = step.RepoId!, FileName = step.FileName!, DownloadUrl = step.DownloadUrl!,
-            SizeBytes = step.SizeBytes, MediaCheckpointType = type
-        }, ct);
-        await WaitForDownloadsAsync(step, new List<string> { job.Id }, ct);
-
+        if (step.Sha256 is null) throw new MediaSetupException(step.Id, step.Title + " has no pinned checksum, so it is not downloaded.");
         string source = Path.Combine(ModelDownloadService.ModelsDirectory, step.FileName!);
         string destination = Path.Combine(LocalAiPaths.DiffusionModelsPath, step.FileName!);
-        if (!File.Exists(destination))
+        // A previous run may have finished the download but not the move; do not download the same file twice.
+        if (!File.Exists(source) || new FileInfo(source).Length != step.SizeBytes)
         {
-            if (!File.Exists(source)) throw new MediaSetupException(step.Id, step.FileName + " was not found after the download.");
-            Directory.CreateDirectory(LocalAiPaths.DiffusionModelsPath);
-            try { File.Move(source, destination); }
-            catch (IOException) { File.Copy(source, destination, overwrite: false); File.Delete(source); }
+            ModelDownloadStatus job = await _downloads.CreateMediaCheckpointDownloadAsync(new ModelDownloadRequest
+            {
+                RepoId = step.RepoId!, Revision = step.Revision, FileName = step.FileName!, DownloadUrl = step.DownloadUrl!,
+                SizeBytes = step.SizeBytes, MediaCheckpointType = type
+            }, step.Sha256, ct);
+            await WaitForDownloadsAsync(step, new List<string> { job.Id }, ct);
         }
+        try { MediaCheckpointPlacement.MoveIntoPlace(source, destination, step.SizeBytes); }
+        catch (IOException ex) { throw new MediaSetupException(step.Id, step.Title + " could not be installed: " + ex.Message); }
         LocalAiPaths.SetMediaCheckpointOverride(type, step.FileName!);
     }
 
@@ -199,6 +211,8 @@ public sealed class MediaSetupService
     {
         var fetcher = new MediaCompanionFetcher(_downloads, Path.Combine(LocalAiPaths.ComfyApp, "models"));
         MediaCompanionPlan plan = MediaCompanionPlanReader.Build(type);
+        if (plan.Support != "supported")
+            throw new MediaSetupException(step.Id, "The installed " + type + " model is not a family PaRuX can run: " + (plan.Reason ?? plan.Support) + ".");
         if (plan.Missing.Count == 0) return;
         DateTime startedUtc = DateTime.UtcNow;
         using var progressStop = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -229,7 +243,11 @@ public sealed class MediaSetupService
     {
         while (true)
         {
-            ct.ThrowIfCancellationRequested();
+            if (ct.IsCancellationRequested)
+            {
+                foreach (string id in ids) _downloads.Cancel(id);
+                ct.ThrowIfCancellationRequested();
+            }
             long done = 0, total = 0;
             bool allDone = true;
             foreach (string id in ids)
@@ -271,7 +289,7 @@ public sealed class MediaSetupService
 
     private static MediaSetupStepDto ToDto(MediaSetupStep s) => new()
     {
-        Id = s.Id, Title = s.Title, State = s.State.ToString().ToLowerInvariant(), SizeBytes = s.SizeBytes, Detail = s.Detail
+        Id = s.Id, Title = s.Title, State = s.State.ToString().ToLowerInvariant(), SizeBytes = s.SizeBytes, Detail = s.Detail, License = s.License
     };
 
     private static MediaSetupStatus Clone(MediaSetupStatus s) => new()

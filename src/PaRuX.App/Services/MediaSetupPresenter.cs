@@ -24,6 +24,9 @@ namespace PaRuX.Services
                     double fraction = known ? Math.Min(1.0, (double)status.BytesDownloaded / status.TotalBytes) : 0;
                     return new MediaSetupCardModel(true, "Setting up " + label, status.Message, "Cancel setup", true,
                         true, fraction, !known);
+                case "waiting":
+                    return new MediaSetupCardModel(true, "Waiting for another setup to finish", status.Message,
+                        "Set up " + label, false, false, 0, false);
                 case "failed":
                     return new MediaSetupCardModel(true, Cap(label) + " setup stopped",
                         string.IsNullOrWhiteSpace(status.Error) ? status.Message : status.Message + " " + status.Error,
@@ -40,7 +43,8 @@ namespace PaRuX.Services
                     string what = pending.Count == 0
                         ? status.Message
                         : "PaRuX will download and install, one verified step at a time: "
-                          + string.Join(", ", pending.Select(s => s.Title)) + " (about " + FormatSize(bytes) + ").";
+                          + string.Join(", ", pending.Select(s => s.Title)) + " (about " + FormatSize(bytes) + "). Licences: "
+                          + string.Join(", ", pending.Where(s => !string.IsNullOrWhiteSpace(s.License)).Select(s => s.License + " (" + s.Title + ")")) + ".";
                     return new MediaSetupCardModel(true, "Set up " + label, what, "Set up " + label, true, false, 0, false);
             }
         }

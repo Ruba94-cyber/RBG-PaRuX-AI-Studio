@@ -999,6 +999,17 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
             allowUnclassifiedSafetensors: true, requiredSha256: sha256.ToLowerInvariant());
     }
 
+    /// <summary>Guided media-setup checkpoint download: pinned size and SHA-256 are verified before the file is published.</summary>
+    internal Task<ModelDownloadStatus> CreateMediaCheckpointDownloadAsync(ModelDownloadRequest request, string requiredSha256, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (requiredSha256 is not { Length: 64 } || !requiredSha256.All(Uri.IsHexDigit))
+            throw new InvalidDataException("The checkpoint needs a pinned SHA-256 before download.");
+        return CreateDownloadCoreAsync(request, ct, triggerCompletionHandler: false, candidateKey: null,
+            exactSizeBytes: request.SizeBytes > 0 ? request.SizeBytes : null, requireAuthoritativeSize: false,
+            allowUnclassifiedSafetensors: false, requiredSha256: requiredSha256.ToLowerInvariant());
+    }
+
     internal async Task<ModelDownloadStatus> CreateCandidateDownloadAsync(
         ModelDiscoveryCandidate candidate,
         ModelDownloadLicenseEvidence? licenseEvidence,

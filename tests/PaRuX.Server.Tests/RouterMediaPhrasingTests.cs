@@ -58,6 +58,13 @@ public sealed class RouterMediaPhrasingTests
     [InlineData("Spiegami come funziona la generazione di immagini")]
     [InlineData("Summarize this video transcript in three bullets")]
     [InlineData("Give me a recipe for a good photo editing workflow")]
+    [InlineData("Make a video call to John at 5pm")]
+    [InlineData("I need a photo editor recommendation for Windows")]
+    [InlineData("I want a picture frame for my desk, any ideas?")]
+    [InlineData("Create a video game idea for a weekend jam")]
+    [InlineData("Voglio una videochiamata con Marco domani")]
+    [InlineData("Ho bisogno di un editor di foto gratuito")]
+    [InlineData("Show me the image file size limits in HTTP uploads")]
     public void Ordinary_prompts_about_drawing_images_or_videos_do_not_start_media(string text)
     {
         RouteKind route = RouterService.Classify(text);

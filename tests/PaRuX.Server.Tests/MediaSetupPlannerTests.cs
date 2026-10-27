@@ -32,7 +32,13 @@ public sealed class MediaSetupPlannerTests
         Assert.NotEqual("z_image_turbo_nvfp4.safetensors", checkpoint.FileName);
         Assert.False(string.IsNullOrEmpty(checkpoint.DownloadUrl));
         Assert.StartsWith("https://huggingface.co/", checkpoint.DownloadUrl);
+        // The bytes are pinned to a commit, not the moving "main" branch, so they match the recorded size.
+        Assert.Matches("^[0-9a-f]{40}$", checkpoint.Revision ?? string.Empty);
+        Assert.Contains("/resolve/" + checkpoint.Revision + "/", checkpoint.DownloadUrl);
         Assert.True(checkpoint.SizeBytes > 0);
+        // Every download step states its licence before anything is downloaded.
+        Assert.All(plan.Steps, s => Assert.False(string.IsNullOrWhiteSpace(s.License), s.Id));
+        Assert.Equal("GPL-3.0", plan.Steps.Single(s => s.Id == "comfyui").License);
     }
 
     [Fact]

@@ -31,7 +31,16 @@ namespace PaRuX.Services
         private static readonly Regex NotARequest = new Regex(
             @"^\s*(?:how|what|why|when|which|explain|describe|summari[sz]e|spiega|come|cos['’]?\s*[eè]|cosa|perch[eé]|quando|qual[ei]|riassumi|descrivi)\b"
           + @"|\b(?:matplotlib|canvas|python|javascript|typescript|html|css|svg|function|script|library|api|pandas|opencv|pillow|codice|funzione|libreria|tutorial|"
-          + @"workflow|transcript|trascrizione|recipe|ricetta)\b", Opts);
+          + @"workflow|transcript|trascrizione|recipe|ricetta)\b"
+          // Compound nouns that are not pictures or clips: "video call", "photo editor", "picture frame", "image file", "videochiamata".
+          + @"|\b(?:video|photo|image|picture|immagine|foto)\s+(?:calls?|chats?|conferences?|editors?|editing|players?|games?|frames?|files?|formats?|sizes?|uploads?|tutorials?|courses?|booths?|albums?)\b"
+          + @"|\b(?:videochiamat\w*|videogiochi\w*|videogam\w*|fotocamer\w*)|\beditor\s+di\s+(?:foto|video|immagini)", Opts);
+
+        // Weaker request verbs ("I want", "show me", "voglio") name a thing, not a task: they count only as "I want a picture OF ...".
+        private static readonly Regex WeakVerb = new Regex(
+            @"^(?:show\s+me|i\s+want|i\s*'?d\s+like|i\s+would\s+like|i\s+need|mostrami|voglio|vorrei|ho\s+bisogno\s+di)$", Opts);
+        private static readonly Regex OfSubject = new Regex(
+            @"^\s+(?:of|di|d['’]|del|della|dello|dei|degli|delle|with|con|showing|that|che)\b", Opts);
 
         // "Paint a sunset over the sea": painting verbs name the picture by their object, so no media noun is needed.
         private static readonly Regex PaintVerb = new Regex(
@@ -54,6 +63,11 @@ namespace PaRuX.Services
                 Match video = VideoNoun.Match(window);
                 Match image = ImageNoun.Match(window);
                 if (!video.Success && !image.Success) continue;
+                if (WeakVerb.IsMatch(verb.Value.Trim()))
+                {
+                    Match noun = video.Success && (!image.Success || video.Index <= image.Index) ? video : image;
+                    if (!OfSubject.IsMatch(window.Substring(noun.Index + noun.Length))) continue;
+                }
                 if (video.Success && (!image.Success || video.Index <= image.Index)) return Kind.Video;
                 return Kind.Image;
             }
