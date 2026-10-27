@@ -3596,8 +3596,10 @@ app.MapPost("/api/v1/media/checkpoints/activate", (ActivateCheckpointRequest req
         || request.FileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         return Results.BadRequest(new { error = "Invalid file name." });
 
-    string source = Path.Combine(ModelDownloadService.ModelsDirectory, request.FileName);
-    if (!File.Exists(source))
+    // The file is either still in the text-model folder (ComfyUI was missing when it finished) or was already placed in ComfyUI by the
+    // download itself. Both activate; the second case moves nothing.
+    string? source = MediaCheckpointPlacement.FindActivationSource(request.FileName);
+    if (source is null)
         return Results.BadRequest(new { error = "No downloaded file named \"" + request.FileName + "\" was found - download it first." });
 
     MediaDependencyError? familyRefusal = null;
@@ -3605,13 +3607,16 @@ app.MapPost("/api/v1/media/checkpoints/activate", (ActivateCheckpointRequest req
     {
         // Family gate BEFORE the file is moved: a refused file stays where the download put it.
         MediaCheckpointResolution.EnsureFamilyAllowed(request.Type, source, out familyRefusal);
-        string destinationFolder = MediaCheckpointResolution.DestinationFolderFor(source);
-        Directory.CreateDirectory(destinationFolder);
-        string destination = Path.Combine(destinationFolder, request.FileName);
-        if (!File.Exists(destination))
+        if (string.Equals(Path.GetFullPath(Path.GetDirectoryName(source)!), Path.GetFullPath(ModelDownloadService.ModelsDirectory), StringComparison.OrdinalIgnoreCase))
         {
-            try { File.Move(source, destination); }
-            catch (IOException) { File.Copy(source, destination, overwrite: false); File.Delete(source); }
+            string destinationFolder = MediaCheckpointResolution.DestinationFolderFor(source);
+            Directory.CreateDirectory(destinationFolder);
+            string destination = Path.Combine(destinationFolder, request.FileName);
+            if (!File.Exists(destination))
+            {
+                try { File.Move(source, destination); }
+                catch (IOException) { File.Copy(source, destination, overwrite: false); File.Delete(source); }
+            }
         }
         if (request.AssignOverride) LocalAiPaths.SetMediaCheckpointOverride(request.Type, request.FileName);
         return Results.Ok(DescribeCheckpoint(request.Type));
@@ -3627,6 +3632,12 @@ app.MapPost("/api/v1/media/checkpoints/activate", (ActivateCheckpointRequest req
     catch (InvalidDataException ex) { return Results.BadRequest(new { error = ex.Message }); }
     catch (Exception ex) { return Results.Json(new { error = "Couldn't activate: " + ex.Message }, statusCode: StatusCodes.Status500InternalServerError); }
 }).RequireDesktopOwner();
+
+// Media checkpoints an older build left in the text-model folder. GET lists them; POST installs them in ComfyUI. A file PaRuX
+// downloaded is moved; anything else is copied only with includeUserManaged=true and the original always stays. Nothing is deleted.
+app.MapGet("/api/v1/media/checkpoints/misplaced", () => Results.Ok(MediaCheckpointMigration.Find()));
+app.MapPost("/api/v1/media/checkpoints/misplaced/migrate", (MigrateMisplacedCheckpointsRequest? request) =>
+    Results.Ok(MediaCheckpointMigration.Migrate(request?.IncludeUserManaged ?? false))).RequireDesktopOwner();
 
 app.MapGet("/api/v1/media/workflows", ([FromServices] CustomWorkflowService workflows) => Results.Ok(workflows.List()));
 
@@ -3773,6 +3784,15 @@ if (!app.Environment.IsEnvironment("Testing"))
     app.Lifetime.ApplicationStarted.Register(state.Publish);
     app.Lifetime.ApplicationStarted.Register(() => StartupTrace.Mark("application-started"));
     app.Lifetime.ApplicationStopped.Register(state.RemoveIfOwned);
+}
+// PaRuX-downloaded media checkpoints that an older build left in the text-model folder are moved into ComfyUI (user files are only offered).
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    _ = Task.Run(() =>
+    {
+        try { MediaCheckpointMigration.Migrate(includeUserManaged: false); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { System.Diagnostics.Trace.TraceWarning("Media checkpoint migration failed: " + ex.Message); }
+    });
 }
 // Media jobs that were in flight when Core last stopped are decided against ComfyUI in the background.
 _ = Task.Run(async () =>

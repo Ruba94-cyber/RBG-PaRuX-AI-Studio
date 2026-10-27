@@ -581,6 +581,8 @@ public sealed class ModelDownloadServiceTests : IDisposable
     [Fact]
     public async Task Non_gguf_checkpoint_download_never_triggers_a_text_model_benchmark()
     {
+        // A finished media download is placed in ComfyUI when it exists; scope the root so a real install is never touched.
+        using IDisposable isolatedRoot = LocalAiPaths.UseRootForTests(Path.Combine(Path.GetTempPath(), "parux-dl-root-" + Guid.NewGuid().ToString("N")));
         byte[] content = ZImageSafetensors();
         Directory.CreateDirectory(ModelsDir);
         string fileName = "parux-test-" + Guid.NewGuid().ToString("N") + ".safetensors";

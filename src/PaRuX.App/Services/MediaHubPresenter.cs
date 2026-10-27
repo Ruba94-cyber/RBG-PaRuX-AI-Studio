@@ -37,6 +37,28 @@ public static class MediaHubPresenter
 
     public static string LaneLabel(string lane) => lane == Uncensored ? "Uncensored" : "Standard";
 
+    /// <summary>The Model Hub tab to open first for the global content lane (Standard / Uncensored / Automatic): Uncensored opens the
+    /// Uncensored group so its models are not hidden behind the Standard tab; Standard and Automatic open Standard.</summary>
+    public static string InitialTabFor(string? globalLane) =>
+        string.Equals(globalLane?.Trim(), "Uncensored", StringComparison.OrdinalIgnoreCase) ? Uncensored : Standard;
+
+    /// <summary>One line for the Standard tab that says which uncensored models exist (catalogue and discovered) and where they are, so an
+    /// uncensored-capable family such as Chroma is never invisible. Empty when the catalogue lists none.</summary>
+    public static string UncensoredPointer(MediaCatalogueResponse catalogue, string globalLane)
+    {
+        List<MediaCatalogueEntryDto> entries = catalogue.Capabilities.SelectMany(c => c.Entries).Where(e => e.Lane == Uncensored).ToList();
+        if (entries.Count == 0) return string.Empty;
+        List<string> names = entries.Where(e => !e.Discovered).Select(e => e.Title).Distinct(StringComparer.Ordinal).Take(4).ToList();
+        int discovered = entries.Count(e => e.Discovered);
+        string listed = string.Join(", ", names) + (discovered > 0 ? (names.Count > 0 ? " and " : string.Empty) + discovered + " found on Hugging Face" : string.Empty);
+        string when = string.Equals(globalLane?.Trim(), "Uncensored", StringComparison.OrdinalIgnoreCase)
+            ? "Your content lane is Uncensored, so only these are used."
+            : string.Equals(globalLane?.Trim(), "Automatic", StringComparison.OrdinalIgnoreCase)
+                ? "Your content lane is Automatic: they are used only when the prompt explicitly asks for adult content."
+                : "They are used only when the content lane is Uncensored, or Automatic with an explicit adult prompt.";
+        return "Uncensored models are listed in the Uncensored tab: " + listed + ". " + when;
+    }
+
     public static IReadOnlyList<MediaHubCapabilityModel> Build(MediaCatalogueResponse catalogue, string lane)
     {
         string l = lane == Uncensored ? Uncensored : Standard;

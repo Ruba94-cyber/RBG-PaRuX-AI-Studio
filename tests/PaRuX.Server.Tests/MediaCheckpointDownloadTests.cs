@@ -23,11 +23,13 @@ public sealed class MediaCheckpointDownloadTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "parux-media-download-test-" + Guid.NewGuid().ToString("N"));
     private readonly string _previousDataRoot;
     private readonly IDisposable _modelsScope;
+    private readonly IDisposable _rootScope;
 
     public MediaCheckpointDownloadTests()
     {
         _previousDataRoot = PaRuXDataRoot.Path;
         PaRuXDataRoot.UseForTests(Path.Combine(_directory, "data"));
+        _rootScope = LocalAiPaths.UseRootForTests(Path.Combine(_directory, "root"));
         _modelsScope = ModelDownloadService.UseModelsDirectoryForTests(Path.Combine(_directory, "data", "models"));
         Directory.CreateDirectory(ModelDownloadService.ModelsDirectory);
     }
@@ -35,6 +37,7 @@ public sealed class MediaCheckpointDownloadTests : IDisposable
     public void Dispose()
     {
         _modelsScope.Dispose();
+        _rootScope.Dispose();
         PaRuXDataRoot.UseForTests(_previousDataRoot);
         try { if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true); }
         catch (IOException) { }

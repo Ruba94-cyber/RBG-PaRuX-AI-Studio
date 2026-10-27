@@ -18,8 +18,19 @@ namespace PaRuX.Views
         private MediaCatalogueResponse? _mediaCatalogue;
         private string _mediaLane = MediaHubPresenter.Standard;
 
+        private bool _mediaLaneInitialised;
+        private string _globalMediaLane = "Standard";
+
         private async Task<MediaCatalogueResponse?> TryGetMediaCatalogueAsync(CancellationToken ct)
         {
+            try
+            {
+                // The global content lane decides which group opens first (once; the user's own tab clicks win afterwards).
+                MediaLaneStatus lane = await MediaCheckpointsClient.Current.GetLaneAsync(ct);
+                _globalMediaLane = lane.Lane;
+                if (!_mediaLaneInitialised) { _mediaLane = MediaHubPresenter.InitialTabFor(lane.Lane); _mediaLaneInitialised = true; }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException) { }
             try { return await MediaCheckpointsClient.Current.GetCatalogueAsync(_mediaLane, ct); }
             catch (Exception ex) when (ex is not OperationCanceledException) { return null; }
         }
@@ -81,6 +92,16 @@ namespace PaRuX.Views
                 laneRow.Children.Add(tab);
             }
             _media.Children.Add(laneRow);
+            if (_mediaLane == MediaHubPresenter.Standard)
+            {
+                string pointer = MediaHubPresenter.UncensoredPointer(_mediaCatalogue, _globalMediaLane);
+                if (pointer.Length > 0)
+                {
+                    var pointerLine = new TextBlock { Text = pointer, TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.72 };
+                    AutomationProperties.SetAutomationId(pointerLine, "ModelHub_UncensoredPointer");
+                    _media.Children.Add(pointerLine);
+                }
+            }
 
             foreach (MediaHubCapabilityModel cap in MediaHubPresenter.Build(_mediaCatalogue, _mediaLane))
             {
