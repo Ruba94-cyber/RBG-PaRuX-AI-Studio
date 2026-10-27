@@ -772,14 +772,14 @@ namespace PaRuX.Views
                     _body.Children.Add(debugFixture);
                 }
                 _body.Children.Add(_recommendedSection);
-                _body.Children.Add(_searchSection);
                 _body.Children.Add(_installedSection);
+                _body.Children.Add(_searchSection);
             }
             else
             {
                 _body.Children.Add(_recommendedSection);
-                _body.Children.Add(_searchSection);
                 _body.Children.Add(_installedSection);
+                _body.Children.Add(_searchSection);
                 if (_cohortFilterRow != null) _body.Children.Add(_cohortFilterRow);
                 _body.Children.Add(_candidateActions);
                 _body.Children.Add(_explicitDiscoveryStatus);

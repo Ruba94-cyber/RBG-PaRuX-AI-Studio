@@ -109,9 +109,47 @@ namespace PaRuX.Views
                 });
                 if (cap.DiscoveredCards.Count == 0)
                     _media.Children.Add(new TextBlock { Text = cap.DiscoveredMessage, TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.72 });
-                foreach (MediaHubCard found in cap.DiscoveredCards) _media.Children.Add(BuildMediaCatalogueCard(found, capCurrent));
+                if (cap.DiscoveredCards.Count > 0) _media.Children.Add(BuildDiscoveredWindow(cap, capCurrent));
             }
             return true;
+        }
+
+        private readonly Dictionary<string, int> _discoveredLimits = new(StringComparer.Ordinal);
+
+        /// <summary>Discovered candidates are windowed (default 6, best first, installed always shown) and cards are built
+        /// lazily: only the visible ones exist, so ~700 candidates no longer make the page slow to scroll.</summary>
+        private UIElement BuildDiscoveredWindow(MediaHubCapabilityModel cap, MediaCheckpointStatus? capCurrent)
+        {
+            string key = cap.CapabilityId + "_" + _mediaLane;
+            var host = new StackPanel { Spacing = 0 };
+            void Rebuild()
+            {
+                host.Children.Clear();
+                int limit = _discoveredLimits.TryGetValue(key, out int l) ? l : DiscoveredListWindow.DefaultLimit;
+                DiscoveredWindowResult<MediaHubCard> w = DiscoveredListWindow.Compute(cap.DiscoveredCards, c => c.Action == MediaHubAction.Installed, limit);
+                foreach (MediaHubCard found in w.Visible) host.Children.Add(BuildMediaCatalogueCard(found, capCurrent));
+                if (!w.CanShowMore && !w.CanShowFewer) return;
+                var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 6, 0, 0) };
+                if (w.CanShowMore)
+                {
+                    var more = new Button { Content = w.ShowMoreLabel };
+                    AutomationProperties.SetName(more, "Show more discovered " + cap.Label + " models");
+                    AutomationProperties.SetAutomationId(more, "ModelHub_Discovered_ShowMore_" + cap.CapabilityId + "_" + _mediaLane);
+                    more.Click += (_, _) => { _discoveredLimits[key] = DiscoveredListWindow.Expand(limit); Rebuild(); };
+                    row.Children.Add(more);
+                }
+                if (w.CanShowFewer)
+                {
+                    var fewer = new Button { Content = w.ShowFewerLabel };
+                    AutomationProperties.SetName(fewer, "Show fewer discovered " + cap.Label + " models");
+                    AutomationProperties.SetAutomationId(fewer, "ModelHub_Discovered_ShowFewer_" + cap.CapabilityId + "_" + _mediaLane);
+                    fewer.Click += (_, _) => { _discoveredLimits[key] = DiscoveredListWindow.Collapse(limit); Rebuild(); };
+                    row.Children.Add(fewer);
+                }
+                host.Children.Add(row);
+            }
+            Rebuild();
+            return host;
         }
 
         private UIElement BuildMediaCatalogueCard(MediaHubCard card, MediaCheckpointStatus? current)
