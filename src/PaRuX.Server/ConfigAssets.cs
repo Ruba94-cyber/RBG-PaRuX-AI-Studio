@@ -36,6 +36,7 @@ internal static class ConfigAssets
         UiConfigFileName,
         "z-image-smoke-api.json",
         "z-image-img2img-api.json",
+        "z-image-inpaint-api.json",
         "flux2-klein-edit-api.json",
         "wan-video-smoke-api.json",
         "upscale-api.json"

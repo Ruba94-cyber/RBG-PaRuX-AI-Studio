@@ -78,6 +78,23 @@ internal static class ComfyWorkflowImportEndpoints
 
         app.MapGet("/api/v1/media/loras", () => Results.Ok(LoraLibrary.List()));
 
+        // Installed LoRAs with their family and how each relates to the checkpoint the next image job loads. Read-only.
+        app.MapGet("/api/v1/media/loras/installed", () =>
+        {
+            (string? key, string? file) = MediaLoraStack.ActiveCheckpointFamily("image");
+            return Results.Ok(MediaLoraStack.Describe(LoraLibrary.List(), key, file));
+        });
+
+        // Dry run of the rule a job enforces: up to three installed LoRAs whose family matches the checkpoint's.
+        app.MapPost("/api/v1/media/loras/validate", (MediaLoraStackRequest body) =>
+        {
+            (string? key, string? file) = MediaLoraStack.ActiveCheckpointFamily("image");
+            MediaLoraStackCheck check = MediaLoraStack.Validate(body.Loras, LoraLibrary.List(), key, file);
+            return check.Ok
+                ? Results.Ok(new { ok = true, code = (string?)null, reason = (string?)null, warnings = check.Warnings })
+                : Results.Json(new { ok = false, code = check.Code, reason = check.Reason, warnings = check.Warnings }, statusCode: StatusCodes.Status409Conflict);
+        });
+
         app.MapGet("/api/v1/media/loras/search", async (string q, string? baseModel, int? page, bool? includeNsfw, CancellationToken ct) =>
         {
             try

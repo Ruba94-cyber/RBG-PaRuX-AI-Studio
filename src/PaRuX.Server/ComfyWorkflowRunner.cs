@@ -99,8 +99,10 @@ public sealed class ComfyWorkflowRunner
         bool alreadyReviewed, string prompt, Func<string, CancellationToken, Task<string>> refine, CancellationToken ct) =>
         alreadyReviewed ? Task.FromResult(prompt) : refine(prompt, ct);
 
-    public async Task<MediaResult> RunImageAsync(string prompt, long seed, int width, int height, CancellationToken ct, IProgress<int>? progressPercent = null, bool skipPromptRefinement = false)
+    public async Task<MediaResult> RunImageAsync(string prompt, long seed, int width, int height, CancellationToken ct, IProgress<int>? progressPercent = null, bool skipPromptRefinement = false, IReadOnlyList<MediaLoraSelection>? loras = null)
     {
+        // Refused before the runtime starts: a LoRA of the wrong family or a missing file never reaches the GPU queue.
+        MediaLoraStackCheck loraStack = MediaLoraStack.ResolveOrRefuse("image", loras);
         await EnsureMediaReadyAsync(ct);
         try
         {
@@ -113,6 +115,7 @@ public sealed class ComfyWorkflowRunner
                 SetIn(request, "6", "height", height);
                 SetIn(request, "10", "filename_prefix", "LocalAI_images/AI_Studio");
                 ApplyCheckpointOverrideIfSet(request, "image");
+                MediaLoraStack.Inject(request, loraStack.Loras);
             }, saveNode: "10", timeout: TimeSpan.FromMinutes(10), ct, progressPercent, mediaType: "image");
             return new MediaResult(path, seed, width, height, 0, 0, 0);
         }
@@ -132,6 +135,31 @@ public sealed class ComfyWorkflowRunner
                 SetIn(request, "13", "noise_seed", seed);
                 ApplyCheckpointOverrideIfSet(request, "edit");
             }, saveNode: "19", timeout: TimeSpan.FromMinutes(10), ct, mediaType: "edit");
+            return new MediaResult(path, seed, 0, 0, 0, 0, 0);
+        }
+        finally { TriggerBackgroundTextRestore(); }
+    }
+
+    /// <summary>Mask inpainting on the Z-Image graph (z-image-inpaint-api.json): the source and the painted mask are uploaded,
+    /// only the masked area is regenerated from <paramref name="prompt"/>, and the rest of the picture is composited back
+    /// unchanged. The source is scaled to about one megapixel, so the result can be smaller than a very large input.</summary>
+    public async Task<MediaResult> RunInpaintAsync(string prompt, long seed, byte[] sourceImage, string sourceFileName,
+        string maskBase64, int? growPixels, IReadOnlyList<MediaLoraSelection>? loras, CancellationToken ct, IProgress<int>? progressPercent = null)
+    {
+        byte[] mask = MediaInpaintMask.Validate(sourceImage, maskBase64);
+        MediaLoraStackCheck loraStack = MediaLoraStack.ResolveOrRefuse("image", loras);
+        await EnsureMediaReadyAsync(ct);
+        try
+        {
+            string refinedPrompt = await RefinePromptAsync(prompt, ct);
+            string uploadedSource = await UploadImageAsync(sourceImage, sourceFileName, ct);
+            string uploadedMask = await UploadImageAsync(mask, "inpaint_mask.png", ct);
+            string path = await SubmitAndWaitAsync(LocalAiPaths.InpaintWorkflowTemplate, request =>
+            {
+                MediaInpaintMask.Patch(request, refinedPrompt, seed, uploadedSource, uploadedMask, MediaInpaintMask.NormalizeGrow(growPixels));
+                ApplyCheckpointOverrideIfSet(request, "image");
+                MediaLoraStack.Inject(request, loraStack.Loras);
+            }, saveNode: MediaInpaintMask.SaveNode, timeout: TimeSpan.FromMinutes(10), ct, progressPercent, mediaType: "inpaint");
             return new MediaResult(path, seed, 0, 0, 0, 0, 0);
         }
         finally { TriggerBackgroundTextRestore(); }
@@ -482,7 +510,7 @@ public sealed class ComfyWorkflowRunner
     {
         ArgumentNullException.ThrowIfNull(request);
         string type = (request.Type ?? string.Empty).Trim().ToLowerInvariant();
-        string checkpointType = type == "img2img" ? "image" : type;
+        string checkpointType = type is "img2img" or "inpaint" ? "image" : type;
         if (checkpointType is "image" or "video" or "edit")
             return MediaCheckpointResolution.FileNameForProvenance(checkpointType);
 

@@ -23,7 +23,7 @@ public static class MediaVramReservationEstimator
         {
             "video" => 7.5,
             "upscale" => 4.0,
-            "edit" or "img2img" => 5.0,
+            "edit" or "img2img" or "inpaint" => 5.0,
             "custom" or "imported" => 6.0,
             _ => 4.5
         };

@@ -49,7 +49,7 @@ internal static class MediaCapabilityRouting
 
     internal static string? CapabilityFor(string type) => type switch
     {
-        "image" or "img2img" => ModelCapabilityIds.ImageGenerate,
+        "image" or "img2img" or "inpaint" => ModelCapabilityIds.ImageGenerate,
         "edit" => ModelCapabilityIds.ImageEdit,
         "video" => ModelCapabilityIds.VideoGenerate,
         _ => null

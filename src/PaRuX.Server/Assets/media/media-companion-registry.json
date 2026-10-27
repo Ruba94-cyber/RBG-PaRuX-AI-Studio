@@ -10,7 +10,7 @@
       "id": "z-image",
       "displayName": "Z-Image Turbo",
       "support": "supported",
-      "pipelines": [ "image", "img2img" ],
+      "pipelines": [ "image", "img2img", "inpaint" ],
       "templateFile": "z-image-smoke-api.json",
       "mainLoader": { "node": "1", "classType": "UNETLoader", "input": "unet_name", "folder": "diffusion_models" },
       "requiredNodes": [ "UNETLoader", "CLIPLoader", "VAELoader", "ModelSamplingAuraFlow", "KSampler", "VAEDecode", "SaveImage" ],

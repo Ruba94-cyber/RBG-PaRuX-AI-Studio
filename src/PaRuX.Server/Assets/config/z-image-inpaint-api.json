@@ -1,0 +1,29 @@
+{
+  "prompt": {
+    "1": { "class_type": "UNETLoader", "inputs": { "unet_name": "z_image_turbo_nvfp4.safetensors", "weight_dtype": "default" } },
+    "2": { "class_type": "CLIPLoader", "inputs": { "clip_name": "qwen_3_4b.safetensors", "type": "lumina2", "device": "default" } },
+    "3": { "class_type": "VAELoader", "inputs": { "vae_name": "ae.safetensors" } },
+    "4": { "class_type": "CLIPTextEncode", "inputs": { "text": "a photograph", "clip": [ "2", 0 ] } },
+    "5": { "class_type": "ConditioningZeroOut", "inputs": { "conditioning": [ "4", 0 ] } },
+    "6": { "class_type": "LoadImage", "inputs": { "image": "example.png" } },
+    "7": { "class_type": "ImageScaleToTotalPixels", "inputs": { "image": [ "6", 0 ], "upscale_method": "lanczos", "megapixels": 1.0, "resolution_steps": 8 } },
+    "8": { "class_type": "LoadImage", "inputs": { "image": "example_mask.png" } },
+    "9": { "class_type": "GetImageSize", "inputs": { "image": [ "7", 0 ] } },
+    "10": { "class_type": "ImageScale", "inputs": { "image": [ "8", 0 ], "upscale_method": "bilinear", "width": [ "9", 0 ], "height": [ "9", 1 ], "crop": "disabled" } },
+    "11": { "class_type": "ImageToMask", "inputs": { "image": [ "10", 0 ], "channel": "red" } },
+    "12": { "class_type": "GrowMask", "inputs": { "mask": [ "11", 0 ], "expand": 6, "tapered_corners": true } },
+    "13": { "class_type": "VAEEncode", "inputs": { "pixels": [ "7", 0 ], "vae": [ "3", 0 ] } },
+    "14": { "class_type": "SetLatentNoiseMask", "inputs": { "samples": [ "13", 0 ], "mask": [ "12", 0 ] } },
+    "15": { "class_type": "ModelSamplingAuraFlow", "inputs": { "model": [ "1", 0 ], "shift": 3.0 } },
+    "16": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [ "15", 0 ], "seed": 0, "steps": 8, "cfg": 1.0, "sampler_name": "res_multistep", "scheduler": "simple",
+        "positive": [ "4", 0 ], "negative": [ "5", 0 ], "latent_image": [ "14", 0 ], "denoise": 0.95
+      }
+    },
+    "17": { "class_type": "VAEDecode", "inputs": { "samples": [ "16", 0 ], "vae": [ "3", 0 ] } },
+    "18": { "class_type": "ImageCompositeMasked", "inputs": { "destination": [ "7", 0 ], "source": [ "17", 0 ], "x": 0, "y": 0, "resize_source": false, "mask": [ "12", 0 ] } },
+    "19": { "class_type": "SaveImage", "inputs": { "images": [ "18", 0 ], "filename_prefix": "LocalAI_images/AI_Studio_inpaint" } }
+  }
+}
