@@ -986,6 +986,7 @@ public static class LocalAiPaths
     public static string VideoWorkflowTemplate => Path.Combine(ConfigDir, "wan-video-smoke-api.json");
     public static string EditWorkflowTemplate => Path.Combine(ConfigDir, "flux2-klein-edit-api.json");
     public static string Img2ImgWorkflowTemplate => Path.Combine(ConfigDir, "z-image-img2img-api.json");
+    public static string InpaintWorkflowTemplate => Path.Combine(ConfigDir, "z-image-inpaint-api.json");
     public static string UpscaleWorkflowTemplate => Path.Combine(ConfigDir, "upscale-api.json");
 
     public static string DiffusionModelsPath => Path.Combine(ComfyApp, "models", "diffusion_models");

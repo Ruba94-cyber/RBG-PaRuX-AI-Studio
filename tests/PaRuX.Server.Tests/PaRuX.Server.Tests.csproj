@@ -39,6 +39,9 @@
     <Compile Include="..\..\src\PaRuX.App\Services\ModelArenaPresenter.cs" Link="Linked\ModelArenaPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\InstalledModelMerge.cs" Link="Linked\InstalledModelMerge.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CreateWorkflowLoraPresenter.cs" Link="Linked\CreateWorkflowLoraPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\InpaintMaskModel.cs" Link="Linked\InpaintMaskModel.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CreateInpaintPresenter.cs" Link="Linked\CreateInpaintPresenter.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\CreateLoraStackPresenter.cs" Link="Linked\CreateLoraStackPresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Models\Conversation.cs" Link="Models\Conversation.cs" />
     <Compile Include="..\..\src\PaRuX.App\Models\ChatMessage.cs" Link="Models\ChatMessage.cs" />
     <Compile Include="..\..\src\PaRuX.App\Models\ChatAttachment.cs" Link="Models\ChatAttachment.cs" />

@@ -38,6 +38,7 @@ internal static class ConfigAssets
         "qwen-image-api.json",
         "qwen-image-edit-api.json",
         "z-image-img2img-api.json",
+        "z-image-inpaint-api.json",
         "sdxl-checkpoint-api.json",
         "flux1-schnell-api.json",
         "chroma-api.json",

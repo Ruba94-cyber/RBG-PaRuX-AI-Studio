@@ -89,7 +89,7 @@ internal sealed class MediaCompanionRegistry
     private static readonly Regex ComfyVersionPattern = new(@"^\d{1,4}(\.\d{1,4}){1,2}$", RegexOptions.CultureInvariant);
     private static readonly string[] Roles = { "text_encoder", "vae", "clip_vision", "lora", "upscaler" };
     private static readonly string[] Folders = { "diffusion_models", "text_encoders", "clip", "vae", "clip_vision", "loras", "upscale_models" };
-    private static readonly string[] Pipelines = { "image", "img2img", "edit", "video" };
+    private static readonly string[] Pipelines = { "image", "img2img", "inpaint", "edit", "video" };
     private static readonly string[] Supports = { "supported", "resolver_only", "unsupported" };
 
     /// <summary>ComfyUI loader inputs that name a model file, mapped to the models folder they read from.

@@ -86,10 +86,10 @@ public sealed class MediaGenerationService
         ArgumentNullException.ThrowIfNull(request);
         string type = (request.Type ?? string.Empty).Trim().ToLowerInvariant();
         if (_runtime.GamingMode) throw new InvalidOperationException("Gaming Mode is active, so media generation is unavailable.");
-        if (type is not ("image" or "video" or "edit" or "img2img" or "upscale" or "custom" or "imported"))
-            throw new InvalidDataException("Media type must be image, video, edit, img2img, upscale, custom, or imported.");
+        if (type is not ("image" or "video" or "edit" or "img2img" or "inpaint" or "upscale" or "custom" or "imported"))
+            throw new InvalidDataException("Media type must be image, video, edit, img2img, inpaint, upscale, custom, or imported.");
         if (type is not ("upscale" or "custom" or "imported") && string.IsNullOrWhiteSpace(request.Prompt)) throw new InvalidDataException("A media prompt is required.");
-        if ((type == "edit" || type == "img2img" || type == "upscale") && string.IsNullOrWhiteSpace(request.SourceImageBase64))
+        if ((type == "edit" || type == "img2img" || type == "inpaint" || type == "upscale") && string.IsNullOrWhiteSpace(request.SourceImageBase64))
             throw new InvalidDataException(type + " requires sourceImageBase64.");
         if (type is "custom" or "imported" && string.IsNullOrWhiteSpace(request.CustomWorkflowId))
             throw new InvalidDataException(type + " requires customWorkflowId.");
@@ -139,7 +139,7 @@ public sealed class MediaGenerationService
             string stage = type switch
             {
                 "video" => "Generating video clips", "edit" => "Editing image",
-                "img2img" => "Generating variation", "upscale" => "Upscaling image",
+                "img2img" => "Generating variation", "inpaint" => "Repainting masked area", "upscale" => "Upscaling image",
                 "custom" => "Running custom workflow", "imported" => "Running imported workflow", _ => "Generating image"
             };
             progress?.Report((stage, 15, estimated));
@@ -153,7 +153,7 @@ public sealed class MediaGenerationService
 
             ComfyWorkflowRunner.MediaResult result = type switch
             {
-                "image" => await _comfy.RunImageAsync(request.Prompt.Trim(), seed, width, height, runCt, liveProgress, skipPromptRefinement: request.PromptAlreadyReviewed),
+                "image" => await _comfy.RunImageAsync(request.Prompt.Trim(), seed, width, height, runCt, liveProgress, skipPromptRefinement: request.PromptAlreadyReviewed, loras: request.Loras),
                 "video" => await _comfy.RunVideoAsync(request.Prompt.Trim(), seed, width, height, duration, fps, steps, runCt, liveProgress,
                     skipPromptRefinement: request.PromptAlreadyReviewed,
                     startImage: string.IsNullOrWhiteSpace(request.SourceImageBase64)
@@ -164,6 +164,9 @@ public sealed class MediaGenerationService
                 "img2img" => await _comfy.RunImg2ImgAsync(request.Prompt.Trim(), seed,
                     Convert.FromBase64String(request.SourceImageBase64), "source.png",
                     request.Strength ?? 0.6, runCt),
+                "inpaint" => await _comfy.RunInpaintAsync(request.Prompt.Trim(), seed,
+                    Convert.FromBase64String(request.SourceImageBase64), "source.png",
+                    request.MaskImageBase64, request.MaskGrowPixels, request.Loras, runCt, liveProgress),
                 "upscale" => await _comfy.RunUpscaleAsync(Convert.FromBase64String(request.SourceImageBase64), "source.png", runCt),
                 "custom" => await _comfy.RunCustomAsync(request.CustomWorkflowId!, request.Prompt?.Trim() ?? string.Empty, seed,
                     string.IsNullOrWhiteSpace(request.SourceImageBase64) ? null : Convert.FromBase64String(request.SourceImageBase64),
@@ -171,7 +174,7 @@ public sealed class MediaGenerationService
                 "imported" => await _comfy.RunImportedAsync(request.CustomWorkflowId!, request.Prompt?.Trim() ?? string.Empty, request.Seed > 0 ? request.Seed : (long?)null,
                     request.WorkflowOverrides, string.IsNullOrWhiteSpace(request.SourceImageBase64) ? null : Convert.FromBase64String(request.SourceImageBase64),
                     "source.png", runCt, liveProgress),
-                _ => throw new InvalidDataException("Media type must be image, video, edit, img2img, upscale, custom, or imported.")
+                _ => throw new InvalidDataException("Media type must be image, video, edit, img2img, inpaint, upscale, custom, or imported.")
             };
 
             progress?.Report(("Finalizing media", 92, 10));

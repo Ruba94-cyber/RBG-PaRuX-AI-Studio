@@ -57,24 +57,27 @@ internal static class MediaCheckpointResolution
     /// the active image checkpoint is another family the job uses the img2img template's own Z-Image default. It is refused by name, never
     /// substituted silently, when that default is not installed.
     /// </summary>
-    public static MediaCheckpointEffective ResolveForImg2Img()
+    public static MediaCheckpointEffective ResolveForImg2Img() => ResolveForPipeline("img2img", LocalAiPaths.Img2ImgWorkflowTemplate);
+
+    /// <summary>The same resolution for any Z-Image-only pipeline registered under pipelineTemplates (img2img, inpaint).</summary>
+    public static MediaCheckpointEffective ResolveForPipeline(string pipeline, string templatePath)
     {
         MediaCheckpointEffective effective = ResolveForJob("image");
         if (effective.FamilyId is null) return effective;
         RegistryFamily? family = MediaCompanionRegistry.Shipped.FindFamily(effective.FamilyId);
-        if (family is null || family.Pipelines.Contains("img2img", StringComparer.Ordinal)) return effective;
+        if (family is null || family.Pipelines.Contains(pipeline, StringComparer.Ordinal)) return effective;
 
         ConfigAssets.EnsureAll();
-        string defaultFile = ReadTemplateUnet(LocalAiPaths.Img2ImgWorkflowTemplate);
+        string defaultFile = ReadTemplateUnet(templatePath);
         if (string.IsNullOrEmpty(defaultFile) || !File.Exists(LocalAiPaths.MainModelPath(defaultFile)))
             throw new InvalidOperationException("The active image model (" + family.DisplayName
-                + ") cannot do image-to-image yet, and the Z-Image model that can (" + (string.IsNullOrEmpty(defaultFile) ? "the default" : defaultFile)
-                + ") is not installed. Install or activate a Z-Image model to use image-to-image.");
+                + ") cannot do " + (pipeline == "inpaint" ? "mask inpainting" : "image-to-image") + " yet, and the Z-Image model that can (" + (string.IsNullOrEmpty(defaultFile) ? "the default" : defaultFile)
+                + ") is not installed. Install or activate a Z-Image model to use " + (pipeline == "inpaint" ? "mask inpainting" : "image-to-image") + ".");
         return effective with
         {
             IsOverridden = false,
             File = defaultFile,
-            TemplateFile = Path.GetFileName(LocalAiPaths.Img2ImgWorkflowTemplate),
+            TemplateFile = Path.GetFileName(templatePath),
             FamilyId = null,
             LoaderNode = UnetNode,
             LoaderClass = "UNETLoader",

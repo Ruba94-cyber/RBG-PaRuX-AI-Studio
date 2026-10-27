@@ -4230,6 +4230,7 @@ namespace PaRuX.Views
 
             if (recommendations.Count == 0)
                 _media.Children.Add(new TextBlock { Text = "No additional verified same-family media checkpoint is currently recommended. The active workflow defaults remain available above." });
+            RenderInstalledLoras();
         }
 
         private async Task DownloadMediaCheckpointAsync(RecommendedCheckpoint checkpoint, Button trigger)

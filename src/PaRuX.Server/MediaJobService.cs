@@ -78,14 +78,25 @@ public sealed class MediaJobService
     public MediaJobStatus Create(MediaJobRequest request, string owner = "desktop")
     {
         string type = request.Type.Trim().ToLowerInvariant();
-        if (type is not ("image" or "video" or "edit" or "img2img" or "upscale" or "custom" or "imported"))
-            throw new InvalidDataException("Media type must be image, video, edit, img2img, upscale, custom, or imported.");
+        if (type is not ("image" or "video" or "edit" or "img2img" or "inpaint" or "upscale" or "custom" or "imported"))
+            throw new InvalidDataException("Media type must be image, video, edit, img2img, inpaint, upscale, custom, or imported.");
         if (type is not ("upscale" or "custom" or "imported") && string.IsNullOrWhiteSpace(request.Prompt))
             throw new InvalidDataException("A media prompt is required.");
         if (type == "video" && (request.Prompt?.Trim().Length ?? 0) > MaximumVideoPromptCharacters)
             throw new InvalidDataException("A video prompt cannot exceed 32000 characters.");
-        if ((type == "edit" || type == "img2img" || type == "upscale") && string.IsNullOrWhiteSpace(request.SourceImageBase64))
+        if ((type == "edit" || type == "img2img" || type == "inpaint" || type == "upscale") && string.IsNullOrWhiteSpace(request.SourceImageBase64))
             throw new InvalidDataException(type + " requires sourceImageBase64.");
+        // The mask pair and the LoRA stack are checked now, so a bad request fails here and not on the GPU queue.
+        if (type == "inpaint")
+            MediaInpaintMask.Validate(MediaStartImageValidator.DecodePayload(request.SourceImageBase64), request.MaskImageBase64);
+        if (request.Loras is { Count: > 0 })
+        {
+            if (type is not ("image" or "inpaint"))
+                throw new InvalidDataException("LoRAs can only be used with image and inpaint jobs.");
+            if (type == "image") MediaLoraStack.ResolveOrRefuse(MediaCheckpointResolution.Resolve("image"), request.Loras);
+            else if (MediaLoraStack.Validate(request.Loras, LoraLibrary.List(), null, null) is { Ok: false } bad)
+                throw new InvalidDataException(bad.Reason); // structure only: the family is checked against the Z-Image model when the job runs
+        }
         if (type is "custom" or "imported" && string.IsNullOrWhiteSpace(request.CustomWorkflowId))
             throw new InvalidDataException(type + " requires customWorkflowId.");
         // An optional video start image is checked now, against the size the job will render at, so a bad
@@ -835,7 +846,7 @@ public sealed class MediaJobService
     }
 
     // Single-prompt jobs with a saved output node are collectible directly; video also requires its persisted clip plan.
-    private static bool CanCollect(Entry entry) => entry.Status.Type is "image" or "edit" or "img2img" or "upscale"
+    private static bool CanCollect(Entry entry) => entry.Status.Type is "image" or "edit" or "img2img" or "inpaint" or "upscale"
         || (entry.Status.Type is "custom" or "imported" && !string.IsNullOrWhiteSpace(entry.Intent.CustomWorkflowId)
             && !string.IsNullOrWhiteSpace(entry.Intent.SaveNodeId))
         || (entry.Status.Type == "video" && HasVideoPlan(entry.Intent));

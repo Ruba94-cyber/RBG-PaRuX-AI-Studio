@@ -99,13 +99,15 @@ public sealed class ComfyWorkflowRunner
         bool alreadyReviewed, string prompt, Func<string, CancellationToken, Task<string>> refine, CancellationToken ct) =>
         alreadyReviewed ? Task.FromResult(prompt) : refine(prompt, ct);
 
-    public async Task<MediaResult> RunImageAsync(string prompt, long seed, int width, int height, CancellationToken ct, IProgress<int>? progressPercent = null, bool skipPromptRefinement = false)
+    public async Task<MediaResult> RunImageAsync(string prompt, long seed, int width, int height, CancellationToken ct, IProgress<int>? progressPercent = null, bool skipPromptRefinement = false, IReadOnlyList<MediaLoraSelection>? loras = null)
     {
         await EnsureMediaReadyAsync(ct);
         try
         {
             // The active checkpoint decides the template: Z-Image by default, or the SDXL / FLUX.1 schnell / Chroma graph when one of those is active.
             MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForJob("image");
+            // Refused before anything is queued: a LoRA of the wrong family or a missing file never reaches the GPU.
+            MediaLoraStackCheck loraStack = MediaLoraStack.ResolveOrRefuse(effective, loras);
             string refinedPrompt = await RefineUnlessReviewedAsync(skipPromptRefinement, prompt, RefinePromptAsync, ct);
             refinedPrompt = MediaImageGraph.WithPromptPrefix(refinedPrompt, effective);
             string path = await SubmitAndWaitAsync(MediaCheckpointResolution.TemplatePathFor(effective), request =>
@@ -116,6 +118,7 @@ public sealed class ComfyWorkflowRunner
                 SetIn(request, "6", "height", height);
                 SetIn(request, "10", "filename_prefix", "LocalAI_images/AI_Studio");
                 ApplyResolvedCheckpoint(request, effective);
+                MediaLoraStack.Inject(request, loraStack.Loras);
             }, saveNode: "10", timeout: TimeSpan.FromMinutes(10), ct, progressPercent, mediaType: "image");
             return new MediaResult(path, seed, width, height, 0, 0, 0);
         }
@@ -138,6 +141,34 @@ public sealed class ComfyWorkflowRunner
                 SetEditSeed(request, seed);
                 ApplyResolvedCheckpoint(request, effective);
             }, saveNode: "19", timeout: TimeSpan.FromMinutes(10), ct, mediaType: "edit");
+            return new MediaResult(path, seed, 0, 0, 0, 0, 0);
+        }
+        finally { TriggerBackgroundTextRestore(); }
+    }
+
+    /// <summary>Mask inpainting on the Z-Image graph (z-image-inpaint-api.json): the source and the painted mask are uploaded,
+    /// only the masked area is regenerated from <paramref name="prompt"/>, and the rest of the picture is composited back
+    /// unchanged. The source is scaled to about one megapixel, so the result can be smaller than a very large input.</summary>
+    public async Task<MediaResult> RunInpaintAsync(string prompt, long seed, byte[] sourceImage, string sourceFileName,
+        string maskBase64, int? growPixels, IReadOnlyList<MediaLoraSelection>? loras, CancellationToken ct, IProgress<int>? progressPercent = null)
+    {
+        byte[] mask = MediaInpaintMask.Validate(sourceImage, maskBase64);
+        await EnsureMediaReadyAsync(ct);
+        try
+        {
+            // Registered as the "inpaint" pipeline of the Z-Image family (pipelineTemplates); like img2img it falls back to the Z-Image default
+            // when another family is active, and is refused by name when that default is not installed.
+            MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForPipeline("inpaint", LocalAiPaths.InpaintWorkflowTemplate);
+            MediaLoraStackCheck loraStack = MediaLoraStack.ResolveOrRefuse(effective, loras);
+            string refinedPrompt = await RefinePromptAsync(prompt, ct);
+            string uploadedSource = await UploadImageAsync(sourceImage, sourceFileName, ct);
+            string uploadedMask = await UploadImageAsync(mask, "inpaint_mask.png", ct);
+            string path = await SubmitAndWaitAsync(LocalAiPaths.InpaintWorkflowTemplate, request =>
+            {
+                MediaInpaintMask.Patch(request, refinedPrompt, seed, uploadedSource, uploadedMask, MediaInpaintMask.NormalizeGrow(growPixels));
+                if (effective.IsOverridden) SetIn(request, MediaCheckpointResolution.UnetNode, "unet_name", effective.File);
+                MediaLoraStack.Inject(request, loraStack.Loras);
+            }, saveNode: MediaInpaintMask.SaveNode, timeout: TimeSpan.FromMinutes(10), ct, progressPercent, mediaType: "inpaint");
             return new MediaResult(path, seed, 0, 0, 0, 0, 0);
         }
         finally { TriggerBackgroundTextRestore(); }
@@ -529,7 +560,7 @@ public sealed class ComfyWorkflowRunner
     {
         ArgumentNullException.ThrowIfNull(request);
         string type = (request.Type ?? string.Empty).Trim().ToLowerInvariant();
-        if (type == "img2img") return MediaCheckpointResolution.FileNameForImg2ImgProvenance();
+        if (type is "img2img" or "inpaint") return MediaCheckpointResolution.FileNameForImg2ImgProvenance();
         if (type is "image" or "video" or "edit")
             return MediaCheckpointResolution.FileNameForProvenance(type);
 

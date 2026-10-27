@@ -65,6 +65,10 @@ internal static class MediaStartImageValidator
         return info;
     }
 
+    /// <summary>Header-only size and format of a PNG, JPEG or WebP file, or null when it is none of them. No range checks.</summary>
+    internal static ImageInfo? TryReadInfo(byte[] image) =>
+        image == null || image.Length == 0 ? null : ReadPng(image) ?? ReadJpeg(image) ?? ReadWebp(image);
+
     /// <summary>Checks the start image against the requested video size. The aspect ratio must match.</summary>
     internal static ImageInfo ValidateForVideo(byte[] image, int videoWidth, int videoHeight)
     {

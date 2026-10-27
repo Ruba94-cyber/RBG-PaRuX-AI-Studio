@@ -48,6 +48,13 @@ namespace PaRuX.Services
         public Task<MediaCatalogueResponse> GetCatalogueAsync(string lane, CancellationToken ct) =>
             SendAsync<MediaCatalogueResponse>(HttpMethod.Get, "/api/v1/media/catalogue?lane=" + Uri.EscapeDataString(lane), null, ct);
 
+        /// <summary>Installed LoRAs with their family and how each relates to the active image checkpoint (read-only).</summary>
+        public async Task<(string CheckpointFamilyName, List<InstalledLoraChoice> Choices)> GetInstalledLorasAsync(CancellationToken ct)
+        {
+            System.Text.Json.JsonElement body = await SendAsync<System.Text.Json.JsonElement>(HttpMethod.Get, "/api/v1/media/loras/installed", null, ct).ConfigureAwait(false);
+            return CreateLoraStackPresenter.ParseInstalled(body);
+        }
+
         /// <summary>Discovered (not curated) Hugging Face media candidates per capability and lane.</summary>
         public Task<MediaDiscoveryResponse> GetDiscoveryAsync(CancellationToken ct) =>
             SendAsync<MediaDiscoveryResponse>(HttpMethod.Get, "/api/v1/media/discovery", null, ct);

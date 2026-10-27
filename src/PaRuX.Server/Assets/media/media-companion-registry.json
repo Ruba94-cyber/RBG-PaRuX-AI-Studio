@@ -19,11 +19,13 @@
       "support": "supported",
       "pipelines": [
         "image",
-        "img2img"
+        "img2img",
+        "inpaint"
       ],
       "templateFile": "z-image-smoke-api.json",
       "pipelineTemplates": {
-        "img2img": "z-image-img2img-api.json"
+        "img2img": "z-image-img2img-api.json",
+        "inpaint": "z-image-inpaint-api.json"
       },
       "mainLoader": {
         "node": "1",

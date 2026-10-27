@@ -22,8 +22,8 @@ public sealed class ComfyWorkflowImportService
     // Names of the shipped templates and workflow types; a user template may not take them.
     private static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        "z-image-smoke", "z-image-img2img", "wan-video-smoke", "flux2-klein-edit", "upscale", "llama-ui",
-        "image", "video", "edit", "img2img", "custom"
+        "z-image-smoke", "z-image-img2img", "z-image-inpaint", "wan-video-smoke", "flux2-klein-edit", "upscale", "llama-ui",
+        "image", "video", "edit", "img2img", "inpaint", "custom"
     };
 
     private readonly object _gate = new();

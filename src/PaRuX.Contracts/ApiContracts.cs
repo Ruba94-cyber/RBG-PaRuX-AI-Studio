@@ -536,7 +536,7 @@ public sealed class CloudFallbackTestResult
 
 public sealed class MediaJobRequest
 {
-    /// <summary>"image" | "video" | "edit" | "img2img" | "upscale" | "custom" | "imported" (a stored user template; its id travels in CustomWorkflowId)</summary>
+    /// <summary>"image" | "video" | "edit" | "img2img" | "inpaint" | "upscale" | "custom" | "imported" (a stored user template; its id travels in CustomWorkflowId)</summary>
     public string Type { get; set; } = "image";
     /// <summary>For "edit"/"img2img", this describes the desired result. For "custom", used only
     /// if the imported workflow has a detected, overridable prompt node - otherwise ignored and
@@ -563,6 +563,21 @@ public sealed class MediaJobRequest
     /// <summary>"imported" only: parameter key (for example "6.text") to value overrides for a stored user template.
     /// The server validates every key, type and range against the template's schema before anything is queued.</summary>
     public Dictionary<string, System.Text.Json.JsonElement>? WorkflowOverrides { get; set; }
+    /// <summary>"inpaint" only: base64 PNG mask, white = repaint, black = keep. It may be lower resolution than the source
+    /// image (the graph scales it to the source), but it must have the same aspect ratio.</summary>
+    public string MaskImageBase64 { get; set; } = string.Empty;
+    /// <summary>"inpaint" only: pixels the repaint area is grown by so the edit blends into its surroundings (0-64, default 6).</summary>
+    public int? MaskGrowPixels { get; set; }
+    /// <summary>"image" and "inpaint": up to three LoRAs applied in order as chained LoraLoader nodes. Each name must be an
+    /// installed ComfyUI LoRA and its family must match the checkpoint family, otherwise the job is refused with the reason.</summary>
+    public List<MediaLoraSelection>? Loras { get; set; }
+}
+
+/// <summary>One LoRA of a stack: the installed file name (relative to ComfyUI models/loras) and its strength.</summary>
+public sealed class MediaLoraSelection
+{
+    public string Name { get; set; } = string.Empty;
+    public double Strength { get; set; } = 1.0;
 }
 
 /// <summary>A user-imported ComfyUI "API format" workflow. The booleans reflect what
