@@ -46,6 +46,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\ManagedRuntimeEndpoint.cs" Link="Runtime\ManagedRuntimeEndpoint.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\RouterService.cs" Link="Routing\RouterService.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\MediaPhrasing.cs" Link="Routing\MediaPhrasing.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\MicrophoneChooser.cs" Link="Voice\MicrophoneChooser.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CutoutPhrasing.cs" Link="Routing\CutoutPhrasing.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatMediaJobReconciler.cs" Link="Chat\ChatMediaJobReconciler.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ChatRenderWindowPolicy.cs" Link="Chat\ChatRenderWindowPolicy.cs" />

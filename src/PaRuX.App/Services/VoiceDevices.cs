@@ -32,10 +32,10 @@ namespace PaRuX.Services
             try
             {
                 _capture = new MediaCapture();
-                await _capture.InitializeAsync(new MediaCaptureInitializationSettings
-                {
-                    StreamingCaptureMode = StreamingCaptureMode.Audio
-                });
+                var settings = new MediaCaptureInitializationSettings { StreamingCaptureMode = StreamingCaptureMode.Audio };
+                string? deviceId = await ChooseMicrophoneAsync();
+                if (deviceId != null) settings.AudioDeviceId = deviceId;
+                await _capture.InitializeAsync(settings);
                 _stream = new InMemoryRandomAccessStream();
                 await _capture.StartRecordToStreamAsync(MediaEncodingProfile.CreateWav(AudioEncodingQuality.Medium), _stream);
             }
@@ -83,6 +83,20 @@ namespace PaRuX.Services
             _capture = null;
             _stream = null;
         }
+        /// <summary>Prefers a real microphone over a virtual/streaming default device (see <see cref="MicrophoneChooser"/>).</summary>
+        private static async System.Threading.Tasks.Task<string?> ChooseMicrophoneAsync()
+        {
+            try
+            {
+                var found = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(Windows.Devices.Enumeration.DeviceClass.AudioCapture);
+                string defaultId = Windows.Media.Devices.MediaDevice.GetDefaultAudioCaptureId(Windows.Media.Devices.AudioDeviceRole.Default);
+                var devices = new System.Collections.Generic.List<MicrophoneChooser.Device>();
+                foreach (var d in found) devices.Add(new MicrophoneChooser.Device(d.Id, d.Name, d.Id == defaultId));
+                return MicrophoneChooser.Choose(devices);
+            }
+            catch (System.Exception) { return null; }
+        }
+
     }
 
     /// <summary>Thin wrapper around MediaPlayer that plays one WAV byte array at a time.</summary>
