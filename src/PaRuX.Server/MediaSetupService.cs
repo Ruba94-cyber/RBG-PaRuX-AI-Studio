@@ -12,16 +12,39 @@ public sealed class MediaSetupService
     private static readonly TimeSpan StepTimeout = TimeSpan.FromHours(3);
     private readonly RuntimeInstallService _runtime;
     private readonly ModelDownloadService _downloads;
+    private readonly SpeechService? _speech;
+    private (DateTime AtUtc, SpeechEngineStatus Status)? _speechStatus;
     private readonly object _gate = new();
     private CancellationTokenSource? _cts;
     private Task? _run;
     private MediaSetupStatus _last = new();
     private string _lastType = "image";
 
-    public MediaSetupService(RuntimeInstallService runtime, ModelDownloadService downloads)
+    public MediaSetupService(RuntimeInstallService runtime, ModelDownloadService downloads, SpeechService? speech = null)
     {
         _runtime = runtime;
         _downloads = downloads;
+        _speech = speech;
+    }
+
+    /// <summary>The Python probe costs about a second, so polling reads a short-lived cache.</summary>
+    private SpeechEngineStatus ReadSpeechStatus(bool fresh = false)
+    {
+        if (_speech is null) return new SpeechEngineStatus();
+        lock (_gate)
+        {
+            if (!fresh && _speechStatus is { } cached && DateTime.UtcNow - cached.AtUtc < TimeSpan.FromSeconds(20)) return cached.Status;
+        }
+        SpeechEngineStatus status = _speech.GetStatusAsync(CancellationToken.None).GetAwaiter().GetResult();
+        lock (_gate) _speechStatus = (DateTime.UtcNow, status);
+        return status;
+    }
+
+    private MediaSetupPlan PlanFor(string type, bool freshSpeech = false)
+    {
+        if (type != "speech") return CurrentPlan(type);
+        SpeechEngineStatus engine = ReadSpeechStatus(freshSpeech);
+        return MediaSetupPlanner.PlanSpeech(engine.SttInstalled, engine.TtsInstalled);
     }
 
     internal static MediaSetupFacts ReadFacts(string type = "image")
@@ -45,12 +68,12 @@ public sealed class MediaSetupService
             MediaCatalogueLive.SpeedLookup(MediaSetupPlanner.CapabilityFor(type), digest), type);
     }
 
-    internal static string NormalizeType(string? type) => type is "video" or "edit" ? type : "image";
+    internal static string NormalizeType(string? type) => type is "video" or "edit" or "speech" ? type : "image";
 
     public MediaSetupStatus GetStatus(string? type = null)
     {
         type = NormalizeType(type);
-        MediaSetupPlan plan = CurrentPlan(type);
+        MediaSetupPlan plan = PlanFor(type);
         lock (_gate)
         {
             // A run belongs to one media type; other types report only what is installed.
@@ -78,6 +101,7 @@ public sealed class MediaSetupService
     {
         "video" => "Video generation",
         "edit" => "Image editing",
+        "speech" => "Speech",
         _ => "Image generation"
     };
 
@@ -116,7 +140,7 @@ public sealed class MediaSetupService
     {
         try
         {
-            MediaSetupPlan plan = CurrentPlan(type);
+            MediaSetupPlan plan = PlanFor(type, freshSpeech: true);
             foreach (MediaSetupStep step in plan.Steps)
             {
                 if (step.State == MediaSetupStepState.Blocked) { Finish("blocked", step.Detail, step.Detail, step.Id); return; }
@@ -128,7 +152,8 @@ public sealed class MediaSetupService
                 Update(step.Id, "Setting up: " + step.Title, 0, step.SizeBytes);
                 try
                 {
-                    if (step.Id == MediaSetupPlanner.ComfyStepId) await InstallComfyAsync(step, stepTimeout.Token);
+                    if (step.Id == MediaSetupPlanner.SpeechStepId) await InstallSpeechAsync(step, stepTimeout.Token);
+                    else if (step.Id == MediaSetupPlanner.ComfyStepId) await InstallComfyAsync(step, stepTimeout.Token);
                     else if (step.Id == MediaSetupPlanner.AssistantStepId) await DownloadAssistantAsync(step, stepTimeout.Token);
                     else if (step.Id == MediaSetupPlanner.CheckpointStepIdFor(type)) await DownloadCheckpointAsync(step, type, stepTimeout.Token);
                     else if (step.Id == MediaSetupPlanner.CompanionsStepIdFor(type)) await FetchCompanionsAsync(step, type, stepTimeout.Token);
@@ -142,7 +167,7 @@ public sealed class MediaSetupService
                 }
             }
 
-            MediaSetupPlan after = CurrentPlan(type);
+            MediaSetupPlan after = PlanFor(type, freshSpeech: true);
             if (after.Ready) Finish("completed", Label(type) + " is set up.", null, null);
             else Finish("failed", "Setup finished but something is still missing.",
                 string.Join(" ", after.Steps.Where(s => s.State != MediaSetupStepState.Done).Select(s => s.Title + ": " + s.Detail)), null);
@@ -158,6 +183,18 @@ public sealed class MediaSetupService
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             Finish("failed", "Media setup failed: " + ex.Message, ex.Message, null);
+        }
+    }
+
+    private async Task InstallSpeechAsync(MediaSetupStep step, CancellationToken ct)
+    {
+        if (_speech is null) throw new MediaSetupException(step.Id, "The speech engine is not available in this build.");
+        Update(step.Id, "Installing the speech engine (PyTorch and speech packages); this takes several minutes.", 0, 0);
+        try { await _speech.InstallEngineAsync(ct); }
+        catch (InvalidOperationException ex) { throw new MediaSetupException(step.Id, "The speech engine could not be installed: " + ex.Message); }
+        catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception or TimeoutException)
+        {
+            throw new MediaSetupException(step.Id, "The speech engine could not be installed: " + ex.Message);
         }
     }
 

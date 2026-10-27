@@ -60,6 +60,22 @@ internal static class MediaSetupPlanner
     internal const long ComfyApproxBytes = 2_018_444_114;
     internal const long AssistantApproxBytes = 2_740_937_888;
 
+    internal const string SpeechStepId = "speech-engine";
+    /// <summary>PyTorch (CUDA) plus the speech packages; the Kokoro and Parakeet weights download on first use.</summary>
+    internal const long SpeechApproxBytes = 4_000_000_000;
+
+    /// <summary>Speech (text-to-speech and transcription) is one managed Python engine: installed or not.</summary>
+    internal static MediaSetupPlan PlanSpeech(bool sttInstalled, bool ttsInstalled) => new(new[]
+    {
+        sttInstalled && ttsInstalled
+            ? new MediaSetupStep(SpeechStepId, "Speech engine (Kokoro + Parakeet)", MediaSetupStepState.Done, 0, "Installed.", License: SpeechLicense)
+            : new MediaSetupStep(SpeechStepId, "Speech engine (Kokoro + Parakeet)", MediaSetupStepState.Pending, SpeechApproxBytes,
+                "PaRuX installs a private Python environment with PyTorch, Kokoro text-to-speech and Parakeet speech recognition. Nothing is sent anywhere.",
+                License: SpeechLicense)
+    });
+
+    internal const string SpeechLicense = "Apache-2.0 (Kokoro), CC-BY-4.0 (Parakeet), BSD-3 (PyTorch)";
+
     internal static MediaSetupPlan Plan(
         MediaCatalogue catalogue, MediaHardware hw, MediaSetupFacts facts, Func<string, double?> lastJobSeconds, string type = "image")
     {

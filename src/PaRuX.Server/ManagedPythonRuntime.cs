@@ -85,8 +85,31 @@ public static class ManagedPythonRuntime
     {
         ValidateVersion(version);
         await EnsureUvAsync(ct).ConfigureAwait(false);
+        // Already installed: do not ask uv again. `uv python install` for an installed version fails on some folders (see the fallback below).
+        string? installed = TryGetInstalledPython(version);
+        if (installed != null && File.Exists(installed)) return Path.GetFullPath(installed);
+
         (int installExit, _, string installErr) = await RunUvAsync(
             new[] { "python", "install", version }, ct, TimeSpan.FromMinutes(10)).ConfigureAwait(false);
+        if (installExit != 0 && IsMinorVersionLinkFailure(installErr))
+        {
+            // uv 0.12 cannot create its minor-version link under some data folders (seen under %LOCALAPPDATA%\PaRuX on a clean install).
+            // Install into a staging folder where it works and adopt the interpreter directory; venvs only need that directory.
+            string staging = Path.Combine(Path.GetTempPath(), "parux-uv-python-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                Directory.CreateDirectory(staging);
+                (installExit, _, installErr) = await RunUvAsync(
+                    new[] { "python", "install", version, "--no-bin" }, ct, TimeSpan.FromMinutes(10), pythonInstallDirOverride: staging)
+                    .ConfigureAwait(false);
+                if (installExit == 0 && AdoptStagedPython(staging, PythonInstallRoot, version) == null)
+                    throw new InvalidOperationException("PaRuX installed managed Python " + version + " in a staging folder but could not adopt it.");
+            }
+            finally
+            {
+                try { if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true); } catch { }
+            }
+        }
         if (installExit != 0)
             throw new InvalidOperationException("PaRuX could not install managed Python " + version + ":\n" + Trim(installErr));
 
@@ -97,6 +120,47 @@ public static class ManagedPythonRuntime
         if (findExit != 0 || !File.Exists(path) || !IsInside(path, PythonInstallRoot))
             throw new InvalidOperationException("PaRuX managed Python " + version + " could not be resolved: " + Trim(findErr));
         return Path.GetFullPath(path);
+    }
+
+    internal static bool IsMinorVersionLinkFailure(string? stderr) =>
+        !string.IsNullOrEmpty(stderr)
+        && stderr.Contains("Missing expected target directory for Python minor version link", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Moves the staged <c>cpython-&lt;version&gt;-*</c> interpreter directory (never a link) into <paramref name="installRoot"/> and returns its python.exe;
+    /// an interpreter already in place is kept. Null when nothing matching was staged.
+    /// </summary>
+    internal static string? AdoptStagedPython(string stagingRoot, string installRoot, string version)
+    {
+        if (!Directory.Exists(stagingRoot)) return null;
+        foreach (string dir in Directory.EnumerateDirectories(stagingRoot, "cpython-" + version + "-*"))
+        {
+            if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0) continue;
+            if (!File.Exists(Path.Combine(dir, "python.exe"))) continue;
+            string destination = Path.Combine(installRoot, Path.GetFileName(dir));
+            if (!File.Exists(Path.Combine(destination, "python.exe")))
+            {
+                Directory.CreateDirectory(installRoot);
+                if (Directory.Exists(destination)) Directory.Delete(destination, recursive: true);
+                try { Directory.Move(dir, destination); }
+                catch (IOException)
+                {
+                    // Different volume (temp folder vs data folder): copy then remove.
+                    CopyDirectory(dir, destination);
+                }
+            }
+            return Path.Combine(destination, "python.exe");
+        }
+        return null;
+    }
+
+    private static void CopyDirectory(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (string file in Directory.EnumerateFiles(source))
+            File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), overwrite: true);
+        foreach (string directory in Directory.EnumerateDirectories(source))
+            CopyDirectory(directory, Path.Combine(destination, Path.GetFileName(directory)));
     }
 
     public static string? TryGetInstalledPython(string? version = null)
@@ -170,7 +234,7 @@ public static class ManagedPythonRuntime
 
     public static async Task<(int ExitCode, string Stdout, string Stderr)> RunUvAsync(
         IEnumerable<string> arguments, CancellationToken ct, TimeSpan timeout,
-        string? workingDirectory = null)
+        string? workingDirectory = null, string? pythonInstallDirOverride = null)
     {
         string uv = await EnsureUvAsync(ct).ConfigureAwait(false);
         var info = new ProcessStartInfo
@@ -184,6 +248,7 @@ public static class ManagedPythonRuntime
         };
         foreach (string argument in arguments) info.ArgumentList.Add(argument);
         ApplyEnvironment(info);
+        if (pythonInstallDirOverride != null) info.Environment["UV_PYTHON_INSTALL_DIR"] = pythonInstallDirOverride;
 
         using var process = new Process { StartInfo = info };
         process.Start();

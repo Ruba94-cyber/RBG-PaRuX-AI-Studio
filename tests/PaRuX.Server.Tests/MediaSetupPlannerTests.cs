@@ -95,6 +95,23 @@ public sealed class MediaSetupPlannerTests
     }
 
     [Fact]
+    public void Speech_plan_is_one_engine_step_that_is_pending_until_both_directions_are_installed()
+    {
+        MediaSetupPlan missing = MediaSetupPlanner.PlanSpeech(sttInstalled: false, ttsInstalled: false);
+        MediaSetupPlan half = MediaSetupPlanner.PlanSpeech(sttInstalled: true, ttsInstalled: false);
+        MediaSetupPlan ready = MediaSetupPlanner.PlanSpeech(sttInstalled: true, ttsInstalled: true);
+
+        MediaSetupStep step = Assert.Single(missing.Steps);
+        Assert.Equal("speech-engine", step.Id);
+        Assert.Equal(MediaSetupStepState.Pending, step.State);
+        Assert.True(step.SizeBytes > 0);
+        Assert.False(string.IsNullOrWhiteSpace(step.License));
+        Assert.False(half.Ready);
+        Assert.True(ready.Ready);
+        Assert.Equal("speech", MediaSetupService.NormalizeType("speech"));
+    }
+
+    [Fact]
     public void A_pc_too_small_for_every_checkpoint_is_blocked_with_a_reason_instead_of_downloading_something_unusable()
     {
         MediaSetupPlan plan = Plan(Facts(true, true), Hw(1, 4));

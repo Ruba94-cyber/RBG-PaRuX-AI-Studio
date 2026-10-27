@@ -133,6 +133,7 @@ namespace PaRuX.Views
 
             // One mode at a time: the long single page made every mode compete for attention. Results, status and setup stay above.
             var speech = new StackPanel { Spacing = 14 };
+            speech.Children.Add(NewSetupCard("speech", "speech"));
             speech.Children.Add(Section("TEXT TO SPEECH", BuildTtsPanel()));
             speech.Children.Add(Section("SPEECH TO TEXT", BuildSttPanel()));
             var gallery = new MediaGalleryView();
