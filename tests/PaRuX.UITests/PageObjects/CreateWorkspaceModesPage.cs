@@ -20,13 +20,20 @@ internal sealed class CreateWorkspaceModesPage
 
     internal void OpenCreateWorkspace()
     {
-        new MainWindowPage(_window).Click("Navigation_Create_Item", ControlType.ListItem);
+        var navigation = new WorkspaceNavigationPage(_window, _app);
+        navigation.NavigateTo(WorkspaceNavigationPage.CreateDescriptor.Id);
+        UiWait.For(() => navigation.IsItemSelected(WorkspaceNavigationPage.CreateDescriptor.Id),
+            "Create workspace navigation item selected");
+
+        AutomationElement status = UiWait.ById(_window, "Create_Operation_Status_Text", ControlType.Text);
+        try { status.Patterns.ScrollItem.PatternOrDefault?.ScrollIntoView(); }
+        catch { /* The status may already be in view or WinUI may not expose ScrollItem. */ }
         UiWait.For(() =>
         {
             var status = _window.FindFirstDescendant(cf =>
                 cf.ByAutomationId("Create_Operation_Status_Text").And(cf.ByControlType(ControlType.Text)));
             return status != null && !status.Properties.IsOffscreen.ValueOrDefault;
-        }, "Create workspace ready status visible");
+        }, "Create workspace ready status visible after navigation and scroll");
     }
 
     /// <summary>The Create status line before the media-setup check has answered.</summary>

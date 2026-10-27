@@ -104,7 +104,29 @@ public sealed class MediaHubPresenterTests
         Assert.Equal("z_image_turbo_bf16.safetensors", dl.FileName);
         Assert.Equal("image", dl.Type);
         Assert.Equal(12_309_866_400, dl.EstimatedSizeBytes);
+        Assert.Matches("^[0-9a-f]{40}$", dl.Revision);
+        Assert.Matches("^[0-9a-f]{64}$", dl.Sha256);
+        Assert.Equal("Apache-2.0", dl.License);
         // The catalogue pins the commit the size was listed at, so the Hub downloads exactly those bytes.
         Assert.Matches("^https://huggingface.co/Comfy-Org/z_image_turbo/resolve/[0-9a-f]{40}/", dl.DownloadUrl);
+        Assert.StartsWith("https://huggingface.co/Comfy-Org/z_image_turbo/resolve/" + dl.Revision + "/", dl.DownloadUrl);
+    }
+
+    [Fact]
+    public void Shipped_flux_klein_card_without_catalogue_pin_keeps_optional_download_metadata_null()
+    {
+        IReadOnlyList<MediaHubCapabilityModel> model = MediaHubPresenter.Build(Catalogue(64), "standard");
+        MediaHubCard flux = model
+            .SelectMany(capability => capability.Best is { } best
+                ? capability.Alternatives.Prepend(best)
+                : capability.Alternatives)
+            .Single(card => card.VariantId == "flux2-klein-base-4b");
+
+        Assert.Equal(MediaHubAction.Download, flux.Action);
+        RecommendedCheckpoint download = MediaHubPresenter.ToDownload(flux.Entry)!;
+
+        Assert.Null(download.Revision);
+        Assert.Null(download.Sha256);
+        Assert.Equal("Apache-2.0", download.License);
     }
 }

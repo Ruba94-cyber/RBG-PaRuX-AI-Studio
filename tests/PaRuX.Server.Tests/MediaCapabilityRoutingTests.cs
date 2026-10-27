@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.Text;
 using PaRuX.Contracts;
 using PaRuX.Server;
 using Xunit;
@@ -41,13 +43,38 @@ public sealed class MediaCapabilityRoutingTests : IDisposable
     private void SetMode(string capability, string mode, string? model) =>
         CapabilityRoutingPreferenceStore.SetCapabilityMode(capability, mode, model, MediaCapabilityRouting.CapabilityModeRoot);
 
+    private static void WriteZImageHeader(string path)
+    {
+        string[] names = { "noise_refiner.0.w", "context_refiner.0.w", "cap_embedder.0.w", "x_embedder.w" };
+        string json = "{" + string.Join(",", names.Select((name, i) => "\"" + name + "\":{\"dtype\":\"U8\",\"shape\":[1],\"data_offsets\":[" + i + "," + (i + 1) + "]}")) + "}";
+        byte[] header = Encoding.UTF8.GetBytes(json);
+        byte[] bytes = new byte[8 + header.Length + names.Length];
+        BinaryPrimitives.WriteUInt64LittleEndian(bytes.AsSpan(0, 8), (ulong)header.Length);
+        header.CopyTo(bytes, 8);
+        File.WriteAllBytes(path, bytes);
+    }
+
     [Fact]
     public void Automatic_keeps_the_template_default_and_has_no_routing_refusal()
     {
         MediaCheckpointEffective e = MediaCheckpointResolution.ResolveForJob("image");
         Assert.Equal("default.safetensors", e.File);
         Assert.False(e.IsOverridden);
+        Assert.False(e.IsCheckpointPinned);
         Assert.False(e.Routing!.IsRefusal);
+    }
+
+    [Fact]
+    public void Automatic_router_pick_is_effective_but_not_an_explicit_checkpoint_pin()
+    {
+        Facts(new() { ["z_image_turbo_nvfp4.safetensors"] = Good() });
+
+        MediaCheckpointEffective effective = MediaCheckpointResolution.Resolve("image");
+
+        Assert.Equal("z_image_turbo_nvfp4.safetensors", effective.File);
+        Assert.True(effective.IsOverridden); // The graph must load the routed file.
+        Assert.True(effective.Routing!.UsesOverride);
+        Assert.False(effective.IsCheckpointPinned); // The user did not pin it in the Model picker.
     }
 
     [Fact]
@@ -62,6 +89,22 @@ public sealed class MediaCapabilityRoutingTests : IDisposable
         Assert.True(e.IsOverridden);
         Assert.Equal("forced.safetensors", MediaCheckpointResolution.Resolve("image").File);
         Assert.Equal("forced.safetensors", MediaCheckpointResolution.FileNameForProvenance("image"));
+    }
+
+    [Fact]
+    public void Force_route_preserves_the_different_saved_pin_for_the_picker_to_clear_or_reselect()
+    {
+        WriteZImageHeader(Path.Combine(LocalAiPaths.DiffusionModelsPath, "pinned-a.safetensors"));
+        LocalAiPaths.SetMediaCheckpointOverride("image", "pinned-a.safetensors");
+        Facts(new() { ["forced-b.safetensors"] = Good() });
+        SetMode("image.generate", "force", "forced-b.safetensors");
+
+        MediaCheckpointEffective e = MediaCheckpointResolution.Resolve("image");
+
+        Assert.Equal("forced-b.safetensors", e.File);
+        Assert.True(e.IsCheckpointPinned);
+        Assert.Equal("pinned-a.safetensors", e.PinnedFile);
+        Assert.True(e.Routing!.UsesOverride);
     }
 
     [Theory]

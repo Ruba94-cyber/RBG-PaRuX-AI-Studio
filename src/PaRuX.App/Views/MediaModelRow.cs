@@ -130,7 +130,8 @@ namespace PaRuX.Views
                 List<MediaCheckpointStatus> all = await MediaCheckpointsClient.Current.GetCheckpointsAsync(CancellationToken.None);
                 MediaCheckpointStatus? status = all.Find(s => string.Equals(s.Type, _type, StringComparison.Ordinal));
                 if (status == null) { _hint.Text = "This model type is not reported by PaRuX Core."; return; }
-                MediaModelPickerState state = MediaModelPickerPresenter.Build(status.CurrentFile, status.IsOverridden, status.CompatibleFiles);
+                MediaModelPickerState state = MediaModelPickerPresenter.Build(status.CurrentFile, status.IsCheckpointPinned, status.CompatibleFiles,
+                    status.RoutingUsesOverride, status.RoutingMode, status.IsCheckpointPinned, status.PinnedFile);
                 _loading = true;
                 try
                 {

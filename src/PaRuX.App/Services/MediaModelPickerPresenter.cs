@@ -21,7 +21,8 @@ namespace PaRuX.Services
         public const string AutomaticLabel = "Automatic (recommended)";
         public static readonly IReadOnlyList<string> Lanes = new[] { "Standard", "Uncensored", "Automatic" };
 
-        public static MediaModelPickerState Build(string? currentFile, bool isOverridden, IEnumerable<string>? compatibleFiles)
+        public static MediaModelPickerState Build(string? currentFile, bool isOverridden, IEnumerable<string>? compatibleFiles,
+            bool routingUsesOverride = false, string? routingMode = null, bool hasShadowedPin = false, string? pinnedFile = null)
         {
             var items = new List<MediaModelPickerItem> { new(AutomaticLabel, null) };
             var files = (compatibleFiles ?? Array.Empty<string>())
@@ -33,7 +34,29 @@ namespace PaRuX.Services
 
             int selected = 0;
             string hint;
-            if (isOverridden && !string.IsNullOrWhiteSpace(currentFile))
+            if (routingUsesOverride)
+            {
+                hint = "Selected by " + (routingMode ?? "capability") + " routing: " + currentFile + ".";
+                if (hasShadowedPin || isOverridden)
+                {
+                    hint += " Saved pin " + (pinnedFile ?? "(file unavailable)") + " is shadowed by routing. Choose it to pin it again, or choose Automatic to clear it while routing remains active.";
+                    if (!string.IsNullOrWhiteSpace(pinnedFile))
+                    {
+                        int pinIndex = items.FindIndex(item => string.Equals(item.FileName, pinnedFile, StringComparison.OrdinalIgnoreCase));
+                        if (pinIndex < 0)
+                        {
+                            items.Add(new MediaModelPickerItem(pinnedFile + " (saved pin, shadowed)", pinnedFile));
+                            selected = items.Count - 1;
+                        }
+                        else
+                        {
+                            items[pinIndex] = items[pinIndex] with { Label = pinnedFile + " (saved pin, shadowed)" };
+                            selected = pinIndex;
+                        }
+                    }
+                }
+            }
+            else if (isOverridden && !string.IsNullOrWhiteSpace(currentFile))
             {
                 int index = items.FindIndex(i => string.Equals(i.FileName, currentFile, StringComparison.OrdinalIgnoreCase));
                 if (index < 0)

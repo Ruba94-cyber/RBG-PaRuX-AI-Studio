@@ -17,7 +17,8 @@ internal sealed class MediaDiscoveryService
     internal static readonly TimeSpan CandidateRetention = TimeSpan.FromDays(30);
     internal static readonly TimeSpan InspectionReuse = TimeSpan.FromDays(7);
     internal const int MaxRepositoryInspections = 40;
-    internal const int PopularSlots = 28;
+    /// <summary>Baseline repository inspections reserved for each capability before the shared popularity fill.</summary>
+    internal const int CapabilityInspectionSlots = 10;
 
     internal static readonly MediaSearchQuery[] Queries = BuildQueries();
 
@@ -145,11 +146,28 @@ internal sealed class MediaDiscoveryService
             if (MediaDiscoveryPolicy.CapabilitiesForPipelineTag(f.Tag).Count == 0) { counters.Rejected++; continue; }
             eligible.Add(f);
         }
-        foreach (var f in eligible.OrderByDescending(e => e.Repo.Downloads).Take(PopularSlots)) candidatesToInspect.Add((f.Repo, f.Tag));
+        // A global popularity sort let image repositories consume the entire inspection budget, so a live refresh could
+        // return no video/audio proposals even when Hugging Face had eligible checkpoints for those capabilities. Reserve
+        // a small baseline per capability, then use remaining slots for trending/popular repositories.
+        var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string capability in Queries.SelectMany(q => MediaDiscoveryPolicy.CapabilitiesForPipelineTag(q.PipelineTag))
+                     .Distinct(StringComparer.Ordinal))
+        {
+            foreach (var f in eligible.Where(e => MediaDiscoveryPolicy.CapabilitiesForPipelineTag(e.Tag).Contains(capability, StringComparer.Ordinal))
+                         .OrderByDescending(e => e.Repo.Downloads).Take(CapabilityInspectionSlots))
+            {
+                if (selected.Add(f.Repo.Id)) candidatesToInspect.Add((f.Repo, f.Tag));
+            }
+        }
         foreach (var f in eligible.Where(e => e.Trending && candidatesToInspect.All(c => c.Repo.Id != e.Repo.Id)).OrderByDescending(e => e.Repo.Downloads))
         {
             if (candidatesToInspect.Count >= MaxRepositoryInspections) break;
-            candidatesToInspect.Add((f.Repo, f.Tag));
+            if (selected.Add(f.Repo.Id)) candidatesToInspect.Add((f.Repo, f.Tag));
+        }
+        foreach (var f in eligible.OrderByDescending(e => e.Repo.Downloads))
+        {
+            if (candidatesToInspect.Count >= MaxRepositoryInspections) break;
+            if (selected.Add(f.Repo.Id)) candidatesToInspect.Add((f.Repo, f.Tag));
         }
 
         // 3. Inspect each repository once per commit.

@@ -1397,9 +1397,9 @@ namespace PaRuX.Views
                 var title = new TextBlock { Text = typeLabel, Style = (Style)Application.Current.Resources["PaRuXBodyStrongTextStyle"] };
                 Grid.SetColumn(title, 0);
                 titleRow.Children.Add(title);
-                if (status.IsOverridden)
+                if (status.IsCheckpointPinned || status.RoutingMode is "Force" or "Prefer")
                 {
-                    var badge = new TextBlock { Text = "Custom" };
+                    var badge = new TextBlock { Text = MediaSelectionPresenter.SettingsBadge(status) };
                     ApplyCaptionStyle(badge);
                     if (Application.Current.Resources.TryGetValue("PaRuXSuccessColor", out object okColor) && okColor is Windows.UI.Color okC)
                         badge.Foreground = new SolidColorBrush(okC);
@@ -1416,9 +1416,16 @@ namespace PaRuX.Views
                 ApplyCaptionStyle(currentHint);
                 card.Children.Add(currentHint);
 
+                if (MediaSelectionPresenter.SettingsRoutingHint(status) is { } routingHint)
+                {
+                    var route = new TextBlock { Text = routingHint, TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
+                    ApplyCaptionStyle(route);
+                    card.Children.Add(route);
+                }
+
                 List<string> alternatives = status.AvailableFiles
                     .Where(f => !string.Equals(f, status.CurrentFile, StringComparison.OrdinalIgnoreCase)).ToList();
-                if (alternatives.Count > 0)
+                if (alternatives.Count > 0 || status.IsCheckpointPinned)
                 {
                     var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
                     foreach (string file in alternatives)
@@ -1428,23 +1435,26 @@ namespace PaRuX.Views
                         button.Click += async (s, e2) => await SetMediaCheckpointAsync(capturedType, capturedFile);
                         row.Children.Add(button);
                     }
-                    if (status.IsOverridden)
+                    if (status.IsCheckpointPinned)
                     {
                         string capturedType = status.Type;
-                        var resetButton = new Button { Content = "Reset to default", FontSize = 12, Padding = new Thickness(8, 2, 8, 2) };
+                        var resetButton = new Button { Content = "Clear pinned model", FontSize = 12, Padding = new Thickness(8, 2, 8, 2) };
                         resetButton.Click += async (s, e2) => await ResetMediaCheckpointAsync(capturedType);
                         row.Children.Add(resetButton);
                     }
                     card.Children.Add(row);
 
-                    var altHintsPanel = new StackPanel { Spacing = 1, Margin = new Thickness(0, 2, 0, 0) };
-                    foreach (string file in alternatives)
+                    if (alternatives.Count > 0)
                     {
-                        var altHint = new TextBlock { Text = file + " - " + DescribeCheckpointFile(file), TextWrapping = TextWrapping.Wrap, Opacity = 0.6 };
-                        ApplyCaptionStyle(altHint);
-                        altHintsPanel.Children.Add(altHint);
+                        var altHintsPanel = new StackPanel { Spacing = 1, Margin = new Thickness(0, 2, 0, 0) };
+                        foreach (string file in alternatives)
+                        {
+                            var altHint = new TextBlock { Text = file + " - " + DescribeCheckpointFile(file), TextWrapping = TextWrapping.Wrap, Opacity = 0.6 };
+                            ApplyCaptionStyle(altHint);
+                            altHintsPanel.Children.Add(altHint);
+                        }
+                        card.Children.Add(altHintsPanel);
                     }
-                    card.Children.Add(altHintsPanel);
                 }
                 else if (status.AvailableFiles.Count <= 1)
                 {

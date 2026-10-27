@@ -196,6 +196,7 @@ public sealed class MediaDiscoveryTests : IDisposable
         public Dictionary<string, List<MediaRepoSummary>> SearchByTag = new();
         public Dictionary<string, List<MediaRepoFile>> Trees = new();
         public Dictionary<string, string[]> HeaderTensors = new();
+        public Dictionary<string, SafetensorsHeader> Headers = new();
         public Dictionary<string, string?> Cards = new();
         public string? ETag = "W/\"abc\"";
         public Exception? SearchFailure;
@@ -223,6 +224,8 @@ public sealed class MediaDiscoveryTests : IDisposable
         public Task<SafetensorsHeader> ReadSafetensorsHeaderAsync(string repoId, string revision, string path, long fileBytes, CancellationToken ct)
         {
             HeaderCalls++;
+            if (Headers.TryGetValue(repoId + ":" + path, out SafetensorsHeader? header)
+                || Headers.TryGetValue(repoId, out header)) return Task.FromResult(header);
             string[] names = HeaderTensors.GetValueOrDefault(repoId + ":" + path) ?? HeaderTensors.GetValueOrDefault(repoId) ?? UnknownTensors;
             byte[] json = HeaderBytes(names);
             byte[] prefix = new byte[8];
@@ -305,6 +308,36 @@ public sealed class MediaDiscoveryTests : IDisposable
         Assert.Equal("accepted", Outcome("good/z-image-fine"));
         Assert.NotNull(cat.LastSuccessUtc);
         Assert.True(cat.NextRefreshUtc > Now);
+    }
+
+    [Fact]
+    public async Task Popular_image_repositories_do_not_starve_live_video_discovery()
+    {
+        var (svc, fake, store, _, _) = Make();
+        List<MediaRepoSummary> images = Enumerable.Range(0, 40)
+            .Select(i => Repo($"image/model-{i:00}", 1_000_000 - i, sha: (char)('a' + i % 20)))
+            .ToList();
+        fake.SearchByTag["text-to-image"] = images;
+
+        MediaRepoSummary video = Repo("video/ltx-video", 1, sha: '9');
+        video.PipelineTag = "text-to-video";
+        fake.SearchByTag["text-to-video"] = new() { video };
+        fake.Trees[video.Id] = OneFile("ltx-video-2b.safetensors");
+        fake.Headers[video.Id] = new SafetensorsHeader(1, 1, new[]
+        {
+            new SafetensorsTensor("model.diffusion_model.transformer_blocks.0.weight", "BF16", new long[] { 4, 8 }, 0, 64),
+            new SafetensorsTensor("model.diffusion_model.patchify_proj.weight", "BF16", new long[] { 2048, 128 }, 64, 128),
+            new SafetensorsTensor("model.diffusion_model.caption_projection.weight", "BF16", new long[] { 4, 8 }, 128, 192),
+            new SafetensorsTensor("vae.decoder.weight", "BF16", new long[] { 4, 8 }, 192, 256)
+        }, new Dictionary<string, string>());
+
+        MediaDiscoveryRefreshResultDto result = await svc.RefreshAsync(true, default);
+
+        Assert.Equal("ok", result.Outcome);
+        Assert.Contains(video.Id, fake.TreeRepos);
+        MediaDiscoveredCandidate discovered = Assert.Single(store.Load().Candidates, c => c.RepoId == video.Id);
+        Assert.Equal("video.generate", discovered.Capability);
+        Assert.Equal("ltx-video", discovered.RegistryFamilyId);
     }
 
     [Fact]

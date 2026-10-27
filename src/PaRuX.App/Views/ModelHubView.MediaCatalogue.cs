@@ -43,7 +43,7 @@ namespace PaRuX.Views
                 _media.Children.Add(new TextBlock
                 {
                     Text = label + " · active: " + (string.IsNullOrWhiteSpace(status.CurrentFile) ? "not configured" : status.CurrentFile)
-                        + (status.IsOverridden ? " · custom selection" : " · workflow default"),
+                        + " · " + MediaSelectionPresenter.SummarySource(status),
                     TextWrapping = TextWrapping.Wrap,
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
                 });

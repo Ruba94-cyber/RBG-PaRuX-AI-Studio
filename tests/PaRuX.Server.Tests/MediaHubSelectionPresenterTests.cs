@@ -108,8 +108,8 @@ public sealed class MediaHubSelectionPresenterTests
         bool installed = true, string support = "supported", bool auto = false) =>
         new() { CapabilityId = cap, FileName = file, Installed = installed, Support = support, UsedAutomatically = auto };
 
-    private static MediaCheckpointStatus Current(string file, bool overridden) =>
-        new() { Type = "image", CurrentFile = file, IsOverridden = overridden };
+    private static MediaCheckpointStatus Current(string file, bool pinned) =>
+        new() { Type = "image", CurrentFile = file, IsOverridden = pinned, IsCheckpointPinned = pinned };
 
     [Theory]
     [InlineData(ModelCapabilityIds.ImageGenerate, "image")]
@@ -149,11 +149,12 @@ public sealed class MediaHubSelectionPresenterTests
     }
 
     [Fact]
-    public void Same_file_in_automatic_mode_is_not_reported_as_user_choice()
+    public void Same_effective_file_is_active_even_when_catalog_metadata_does_not_mark_it_automatic()
     {
         var m = MediaSelectionPresenter.ForCard(Entry(), Current("a.safetensors", false));
-        Assert.False(m.IsActive);
+        Assert.True(m.IsActive);
         Assert.True(m.UseEnabled);
+        Assert.Equal("Active: picked by Automatic.", m.ActiveLine);
     }
 
     [Fact]

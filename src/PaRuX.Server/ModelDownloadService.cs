@@ -1100,6 +1100,10 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
         request = loraLane
             ? ValidateLoraRequest(request)
             : ValidateDownloadRequest(ResolveDownloadRequest(request, out _), allowUnclassifiedSafetensors);
+        if (requiredSha256 != null && request.ExpectedSha256 != null
+            && !string.Equals(requiredSha256, request.ExpectedSha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Conflicting pinned SHA-256 values were supplied for this download.");
+        requiredSha256 ??= request.ExpectedSha256;
         ModelDownloadProvenanceManifestStore.AssertWritable(ModelsDirectory);
 
         if (!request.ReplaceExisting && GetCompletedFileReplacementFailure(request) is { } replacementFailure)
@@ -1305,6 +1309,10 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
         if (request.Revision != null && revision == null)
             throw new InvalidDataException("revision must be an immutable 40- or 64-character hexadecimal commit SHA.");
         ModelDownloadLicenseEvidence? licenseEvidence = ValidateLicenseEvidence(request.LicenseEvidence);
+        string? expectedSha256 = request.ExpectedSha256?.Trim();
+        if (expectedSha256 != null && (expectedSha256.Length != 64 || !expectedSha256.All(Uri.IsHexDigit)))
+            throw new InvalidDataException("expectedSha256 must be a 64-character hexadecimal digest.");
+        expectedSha256 = expectedSha256?.ToLowerInvariant();
 
         string repoId = request.RepoId.Trim();
         string[] repoParts = repoId.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -1404,6 +1412,7 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
             DiscardPartial = request.DiscardPartial,
             ReplaceExisting = request.ReplaceExisting,
             LicenseEvidence = licenseEvidence,
+            ExpectedSha256 = expectedSha256,
             ResumeFromDownloadId = null
         };
     }
@@ -1776,6 +1785,7 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
             ReviewAcknowledged = request.LicenseEvidence.ReviewAcknowledged,
             ReviewAcknowledgedUtc = request.LicenseEvidence.ReviewAcknowledgedUtc
         },
+        ExpectedSha256 = request.ExpectedSha256,
         ResumeFromDownloadId = null
     };
 

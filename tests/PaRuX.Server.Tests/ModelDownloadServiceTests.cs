@@ -192,7 +192,9 @@ public sealed class ModelDownloadServiceTests : IDisposable
         };
         var service = new ModelDownloadService(new HttpClient(handler), new HttpClient(handler));
 
-        ModelDownloadStatus created = await service.CreateDownloadAsync(RequestFor(fileName), CancellationToken.None);
+        ModelDownloadRequest request = RequestFor(fileName);
+        request.ExpectedSha256 = sha256.ToUpperInvariant();
+        ModelDownloadStatus created = await service.CreateDownloadAsync(request, CancellationToken.None);
         Assert.Equal(sha256, created.Sha256);
         Assert.Null(created.VerificationStatus);
 
@@ -202,6 +204,39 @@ public sealed class ModelDownloadServiceTests : IDisposable
         Assert.Equal("verified", final.VerificationStatus);
         Assert.Equal(content.Length, final.BytesDownloaded);
         Assert.Equal(content, await File.ReadAllBytesAsync(final.LocalPath!));
+    }
+
+    [Fact]
+    public async Task Fresh_download_rejects_a_repository_digest_that_differs_from_catalogue_pin()
+    {
+        byte[] content = new byte[128];
+        string repositorySha = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+        string fileName = NewTrackedFileName();
+        int getCount = 0;
+        var handler = new FakeHandler
+        {
+            OnSend = (req, ct) =>
+            {
+                if (req.Method == HttpMethod.Head)
+                {
+                    var head = new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Array.Empty<byte>()) };
+                    head.Content.Headers.ContentLength = content.Length;
+                    head.Headers.TryAddWithoutValidation("X-Linked-ETag", "\"" + repositorySha + "\"");
+                    return Task.FromResult(head);
+                }
+                getCount++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(content) });
+            }
+        };
+        var service = new ModelDownloadService(new HttpClient(handler), new HttpClient(handler));
+        ModelDownloadRequest request = RequestFor(fileName);
+        request.ExpectedSha256 = new string('f', 64);
+
+        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+            () => service.CreateDownloadAsync(request, CancellationToken.None));
+
+        Assert.Contains("pinned SHA-256", error.Message);
+        Assert.Equal(0, getCount);
     }
 
     [Fact]

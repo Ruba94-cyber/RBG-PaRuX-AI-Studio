@@ -157,7 +157,10 @@ public static class MediaHubPresenter
             HuggingFaceRepoId = e.Repository,
             FileName = e.FileName,
             DownloadUrl = e.DownloadUrl,
-            EstimatedSizeBytes = e.SizeBytes
+            EstimatedSizeBytes = e.SizeBytes,
+            Revision = string.IsNullOrWhiteSpace(e.Revision) ? null : e.Revision.Trim(),
+            Sha256 = string.IsNullOrWhiteSpace(e.Sha256) ? null : e.Sha256.Trim(),
+            License = string.IsNullOrWhiteSpace(e.License) ? null : e.License.Trim()
         };
     }
 }

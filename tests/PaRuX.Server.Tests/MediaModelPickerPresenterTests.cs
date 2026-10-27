@@ -35,6 +35,23 @@ namespace PaRuX.Server.Tests
         }
 
         [Fact]
+        public void Force_route_does_not_show_the_routed_file_as_a_saved_pin()
+        {
+            var state = MediaModelPickerPresenter.Build("forced-b.safetensors", true,
+                new[] { "pinned-a.safetensors", "forced-b.safetensors" }, routingUsesOverride: true, routingMode: "Force", hasShadowedPin: true, pinnedFile: "pinned-a.safetensors");
+            Assert.NotEqual(0, state.SelectedIndex);
+            Assert.Equal("pinned-a.safetensors", state.Items[state.SelectedIndex].FileName);
+            Assert.Contains("saved pin, shadowed", state.Items[state.SelectedIndex].Label);
+            Assert.Contains("Selected by Force routing", state.Hint);
+            Assert.Contains("shadowed", state.Hint);
+            Assert.DoesNotContain("Every request uses it", state.Hint);
+            MediaModelPickerItem pin = Assert.Single(state.Items, item => item.FileName == "pinned-a.safetensors");
+            Assert.Contains("saved pin, shadowed", pin.Label);
+            Assert.Equal("pinned-a.safetensors", MediaModelPickerPresenter.ActionFor(pin).FileName);
+            Assert.True(MediaModelPickerPresenter.ActionFor(state.Items[0]).ClearOverride);
+        }
+
+        [Fact]
         public void With_no_compatible_model_only_Automatic_is_listed_and_the_hint_says_what_to_do()
         {
             var state = MediaModelPickerPresenter.Build("", false, null);

@@ -16,7 +16,9 @@ internal sealed record MediaCheckpointEffective(
     string? FamilyId = null,
     string LoaderNode = "1",
     string LoaderClass = "UNETLoader",
-    string LoaderInput = "unet_name");
+    string LoaderInput = "unet_name",
+    bool IsCheckpointPinned = false,
+    string? PinnedFile = null);
 
 /// <summary>
 /// The single answer to "which checkpoint does the next <type> job load". The graph builder, the ComfyUI race
@@ -189,7 +191,9 @@ internal static class MediaCheckpointResolution
             overrideFile ?? defaultFile,
             overrideFile != null,
             new[] { "UNETLoader.unet_name (node " + UnetNode + " of " + templateFile + ")" },
-            cleared);
+            cleared,
+            IsCheckpointPinned: overrideFile != null,
+            PinnedFile: overrideFile);
     }
 
     /// <summary>Returns the selected checkpoint basename without changing a stale stored override.</summary>

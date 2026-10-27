@@ -4189,7 +4189,7 @@ namespace PaRuX.Views
                 _media.Children.Add(new TextBlock
                 {
                     Text = label + " · active: " + (string.IsNullOrWhiteSpace(status.CurrentFile) ? "not configured" : status.CurrentFile)
-                        + (status.IsOverridden ? " · custom selection" : " · workflow default"),
+                        + " · " + MediaSelectionPresenter.SummarySource(status),
                     TextWrapping = TextWrapping.Wrap,
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
                 });
@@ -4243,24 +4243,38 @@ namespace PaRuX.Views
             SetBusy(true, "Checking repository terms for " + checkpoint.FileName + "…");
             try
             {
-                bool queued = await ModelLicenseConsentPrompt.ConfirmAndStartRepositoryDownloadAsync(
-                    XamlRoot,
-                    checkpoint.HuggingFaceRepoId,
-                    checkpoint.FileName,
-                    async (revision, licenseEvidence) =>
+                async Task StartPinnedDownload(string revision, ModelDownloadLicenseEvidence licenseEvidence)
+                {
+                    var download = new ModelDownloadRequest
                     {
-                        var download = new ModelDownloadRequest
-                        {
-                            RepoId = checkpoint.HuggingFaceRepoId,
-                            FileName = checkpoint.FileName,
-                            DownloadUrl = checkpoint.DownloadUrl,
-                            SizeBytes = checkpoint.EstimatedSizeBytes,
-                            MediaCheckpointType = checkpoint.Type,
-                            LicenseEvidence = licenseEvidence
-                        };
-                        ModelDownloadClient.PinRequestToRevision(download, revision);
-                        await ModelDownloadClient.Current.StartDownloadAsync(download, CancellationToken.None);
-                    });
+                        RepoId = checkpoint.HuggingFaceRepoId,
+                        Revision = revision,
+                        FileName = checkpoint.FileName,
+                        DownloadUrl = checkpoint.DownloadUrl,
+                        SizeBytes = checkpoint.EstimatedSizeBytes,
+                        ExpectedSha256 = string.IsNullOrWhiteSpace(checkpoint.Sha256) ? null : checkpoint.Sha256.Trim(),
+                        MediaCheckpointType = checkpoint.Type,
+                        LicenseEvidence = licenseEvidence
+                    };
+                    ModelDownloadClient.PinRequestToRevision(download, revision);
+                    await ModelDownloadClient.Current.StartDownloadAsync(download, CancellationToken.None);
+                }
+
+                bool queued;
+                if (ModelRevisionIdentity.IsValid(checkpoint.Revision))
+                {
+                    // The catalogue's licence hint is not live metadata fetched at this commit.
+                    // Treat it as unavailable so the exact-revision UI always requires review.
+                    var decision = ModelLicenseConsentPolicy.Evaluate(checkpoint.License, metadataRetrieved: false);
+                    queued = await ModelLicenseConsentPrompt.ConfirmAndStartAtRevisionAsync(
+                        XamlRoot, checkpoint.HuggingFaceRepoId, checkpoint.FileName,
+                        decision, checkpoint.Revision, StartPinnedDownload);
+                }
+                else
+                {
+                    queued = await ModelLicenseConsentPrompt.ConfirmAndStartRepositoryDownloadAsync(
+                        XamlRoot, checkpoint.HuggingFaceRepoId, checkpoint.FileName, StartPinnedDownload);
+                }
                 if (!queued)
                 {
                     trigger.IsEnabled = true;

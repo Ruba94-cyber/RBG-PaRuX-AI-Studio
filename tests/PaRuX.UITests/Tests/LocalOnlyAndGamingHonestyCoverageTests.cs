@@ -178,29 +178,27 @@ public sealed class LocalOnlyAndGamingHonestyCoverageTests
             // A UIA toggle on an unrealized, below-the-fold switch does nothing, so bring the switch on screen first.
             ScrollUntilOnScreen(toggle, () => !toggle.Properties.IsOffscreen.ValueOrDefault, "Cloud fallback switch on screen");
             page.ToggleSwitch(toggle);
-            ScrollUntilOnScreen(toggle,
-                () =>
-                {
-                    AutomationElement? visibleGuidance = page.FindTextElement("Choose a provider, paste an API key and a model id, then Save.");
-                    return visibleGuidance != null && !visibleGuidance.Properties.IsOffscreen.ValueOrDefault;
-                },
-                "Cloud fallback guidance on screen");
-
             AutomationElement? guidanceText = null;
             UiWait.For(() =>
             {
                 guidanceText = page.FindTextElement("Choose a provider, paste an API key and a model id, then Save.");
-                return guidanceText != null && !guidanceText.Properties.IsOffscreen.ValueOrDefault;
+                return guidanceText != null;
             }, "Cloud fallback explicit configuration guidance text");
             Assert.NotNull(guidanceText);
+            page.ScrollSettingsContentUntilOnScreen(guidanceText!, "Cloud fallback guidance on screen");
+            UiWait.For(() => !guidanceText.Properties.IsOffscreen.ValueOrDefault,
+                "Cloud fallback explicit configuration guidance visible");
 
             AutomationElement? saveButton = null;
             UiWait.For(() =>
             {
                 saveButton = page.GetSaveCloudFallbackButton();
-                return saveButton != null && !saveButton.Properties.IsOffscreen.ValueOrDefault;
+                return saveButton != null;
             }, "Save button in cloud fallback detail panel");
             Assert.NotNull(saveButton);
+            page.ScrollSettingsContentUntilOnScreen(saveButton!, "Cloud fallback Save button on screen");
+            UiWait.For(() => !saveButton.Properties.IsOffscreen.ValueOrDefault,
+                "Save button visible in cloud fallback detail panel");
             Assert.True(saveButton.IsEnabled, "Save button should be enabled for explicit action");
 
             var testButton = page.GetTestCloudFallbackButton();

@@ -132,6 +132,22 @@ public sealed record MediaSelectionModel(bool ShowUse, bool UseEnabled, string U
 /// </summary>
 public static class MediaSelectionPresenter
 {
+    public static string SummarySource(MediaCheckpointStatus status) => status.RoutingUsesOverride
+        ? status.IsCheckpointPinned ? $"{status.RoutingMode} routing · saved pin shadowed" : $"{status.RoutingMode} routing"
+        : status.IsCheckpointPinned ? "custom selection" : "Automatic selection";
+
+    public static string SettingsBadge(MediaCheckpointStatus status) => status.RoutingUsesOverride
+        ? status.RoutingMode + " routing"
+        : status.IsCheckpointPinned ? "Custom" : "Automatic";
+
+    public static string? SettingsRoutingHint(MediaCheckpointStatus status) => status.RoutingUsesOverride
+        ? status.IsCheckpointPinned
+            ? $"The active model is selected by {status.RoutingMode} routing; a saved checkpoint pin is shadowed."
+            : $"The active model is selected by {status.RoutingMode} routing."
+        : status.RoutingMode is "Force" or "Prefer"
+            ? $"No {status.RoutingMode} model is currently available; the active checkpoint is the fallback."
+            : null;
+
     /// <summary>The checkpoint type ("image", "video", "edit") a catalogue capability is assigned through, or null for none.</summary>
     public static string? TypeFor(string capabilityId) => capabilityId switch
     {
@@ -148,26 +164,46 @@ public static class MediaSelectionPresenter
         if (type == null || entry.Support != "supported" || !entry.Installed || string.IsNullOrEmpty(entry.FileName))
             return new MediaSelectionModel(false, false, string.Empty, false, string.Empty);
 
-        bool pinned = current != null && current.IsOverridden
+        bool routed = current?.RoutingUsesOverride == true;
+        bool pinned = current != null && current.IsCheckpointPinned && !routed
             && string.Equals(current.CurrentFile, entry.FileName, StringComparison.OrdinalIgnoreCase);
         if (pinned)
             return new MediaSelectionModel(true, false, "In use", true, "Active: you chose this model.");
-        string line = entry.UsedAutomatically && (current == null || !current.IsOverridden)
-            ? "Active: picked by Automatic."
-            : string.Empty;
-        return new MediaSelectionModel(true, true, "Use this model", entry.UsedAutomatically && line.Length > 0, line);
+        bool active = current != null && string.Equals(current.CurrentFile, entry.FileName, StringComparison.OrdinalIgnoreCase);
+        string line = active ? RouteDescription(current!) : string.Empty;
+        return new MediaSelectionModel(true, true, "Use this model", active, line);
     }
 
     /// <summary>The per-capability header: which choice is active and whether the Automatic button does anything.</summary>
     public static (string ActiveLine, bool AutomaticEnabled, string AutomaticLabel) ForCapability(MediaCheckpointStatus? current)
     {
         if (current == null) return ("Active model unknown.", false, "Automatic");
-        if (current.IsOverridden)
+        if (current.RoutingUsesOverride)
+        {
+            string route = current.RoutingMode switch
+            {
+                "Force" => "Force",
+                "Prefer" => "Prefer",
+                _ => "Automatic"
+            };
+            string pinNote = current.IsCheckpointPinned ? " A saved pin is shadowed by routing." : string.Empty;
+            return ($"Active: {current.CurrentFile} (selected by {route} routing).{pinNote}", current.IsCheckpointPinned, current.IsCheckpointPinned ? "Clear pinned model" : "Automatic (active)");
+        }
+        if (current.IsCheckpointPinned)
             return ("Active: " + current.CurrentFile + " (your choice).", true, "Automatic");
+        if (current.RoutingMode is "Force" or "Prefer")
+        {
+            string fallback = current.RoutingRefusalCode is null ? string.Empty : $" ({current.RoutingRefusalCode})";
+            return ($"Active: {current.CurrentFile} (no {current.RoutingMode} model available{fallback}; using fallback).", false, "Automatic");
+        }
         return (string.IsNullOrWhiteSpace(current.CurrentFile)
             ? "Automatic: no model installed yet."
             : "Automatic: " + current.CurrentFile + ".", false, "Automatic (active)");
     }
+
+    private static string RouteDescription(MediaCheckpointStatus current) => current.RoutingUsesOverride
+        ? $"Active: selected by {current.RoutingMode} routing." + (current.IsCheckpointPinned ? " A saved pin is shadowed by routing." : string.Empty)
+        : current.IsCheckpointPinned ? "Active: you chose this model." : "Active: picked by Automatic.";
 }
 
 /// <summary>Client-side shape check of the "Add a checkpoint from Hugging Face" form. The server repeats and enforces it.</summary>

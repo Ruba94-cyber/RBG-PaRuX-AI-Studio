@@ -323,6 +323,8 @@ public sealed class ModelDownloadRequest
     public string FileName { get; set; } = string.Empty;
     public string DownloadUrl { get; set; } = string.Empty;
     public long SizeBytes { get; set; }
+    /// <summary>Optional publisher-listed SHA-256 that the transfer must match.</summary>
+    public string? ExpectedSha256 { get; set; }
     /// <summary>Media workflow for a safetensors checkpoint: image, video, or edit.
     /// Optional for legacy GGUF requests and recommended checkpoints whose type the server derives.</summary>
     public string? MediaCheckpointType { get; set; }
@@ -666,6 +668,16 @@ public sealed class MediaCheckpointStatus
     /// <summary>The file the next job of this type will load - computed by the same function that builds the graph.</summary>
     public string CurrentFile { get; set; } = string.Empty;
     public bool IsOverridden { get; set; }
+    /// <summary>True when a checkpoint is explicitly pinned in the Model picker, even if a capability Force/Prefer route currently selects another file.</summary>
+    public bool IsCheckpointPinned { get; set; }
+    /// <summary>The explicitly pinned checkpoint, which can differ from CurrentFile when capability routing shadows it.</summary>
+    public string? PinnedFile { get; set; }
+    /// <summary>Capability mode affecting the active file: Automatic, Prefer or Force.</summary>
+    public string RoutingMode { get; set; } = "Automatic";
+    /// <summary>True when the capability router, rather than the checkpoint pin/template, selected the active file.</summary>
+    public bool RoutingUsesOverride { get; set; }
+    /// <summary>Reason a Force route refuses the current configuration, if any.</summary>
+    public string? RoutingRefusalCode { get; set; }
     public List<string> AvailableFiles { get; set; } = new();
     /// <summary>The workflow template whose graph receives this checkpoint.</summary>
     public string Template { get; set; } = string.Empty;
@@ -713,6 +725,10 @@ public sealed class RecommendedCheckpoint
     public string FileName { get; set; } = string.Empty;
     public string DownloadUrl { get; set; } = string.Empty;
     public long EstimatedSizeBytes { get; set; }
+    /// <summary>Immutable listing commit and associated catalogue metadata.</summary>
+    public string? Revision { get; set; }
+    public string? Sha256 { get; set; }
+    public string? License { get; set; }
 }
 
 /// <summary>Second step after a recommended checkpoint finishes downloading into PaRuX's own

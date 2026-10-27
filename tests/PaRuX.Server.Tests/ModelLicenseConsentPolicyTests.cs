@@ -58,6 +58,20 @@ public sealed class ModelLicenseConsentPolicyTests
     }
 
     [Fact]
+    public void Catalogue_license_hint_is_not_treated_as_observed_metadata_at_a_pinned_revision()
+    {
+        const string revision = "6fc90a3b1b653e935a0d175e260736de25b84df5";
+        Assert.True(ModelRevisionIdentity.IsValid(revision));
+
+        var decision = ModelLicenseConsentPolicy.Evaluate("Apache-2.0", metadataRetrieved: false);
+
+        Assert.True(decision.RequiresReview);
+        Assert.False(decision.MetadataRetrieved);
+        Assert.Equal(ModelLicenseMetadataStatus.Unavailable, decision.LicenseMetadataStatus);
+        Assert.Null(decision.PublisherDeclaredLicense);
+    }
+
+    [Fact]
     public void Candidate_consent_preserves_the_catalog_metadata_observation_time()
     {
         DateTime observedUtc = new(2026, 9, 24, 12, 30, 0, DateTimeKind.Utc);
