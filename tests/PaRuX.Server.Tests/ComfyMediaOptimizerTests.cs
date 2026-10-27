@@ -507,6 +507,7 @@ usage: main.py [--cuda-malloc | --disable-cuda-malloc] [--use-pytorch-cross-atte
         await opt.TickAsync(true, default);
 
         Assert.Equal(ModelTuningStates.Skipped, Only(tuning).State);
-        Assert.Equal("No faster profile found", Only(tuning).Reason);
+        Assert.StartsWith("Already optimal for this PC (measured", Only(tuning).Reason);
+        Assert.NotEmpty(Only(tuning).Suggestions);
     }
 }

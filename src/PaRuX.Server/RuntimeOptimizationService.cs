@@ -233,6 +233,10 @@ public sealed class RuntimeOptimizationService
             RuntimeOptimizationServerResult ordinaryWinner = kvChoice.Winner;
             lock (entry.Gate) entry.Status.KvDecision = kvChoice.Reason;
 
+            // Hardware-specific dimensions (GPU layers, backend fit, flash attention, context size, threads). On a PC where the
+            // model fits a NVIDIA GPU entirely this adds no server run at all.
+            ordinaryWinner = await RaceHardwareAsync(entry, ordinaryWinner, gpus, modelBytes, largestVramBytes).ConfigureAwait(false);
+
             // Speculative decoding is a single-stream feature: MTP/n-gram drafting needs extra VRAM and does not batch like C4.
             // Racing it on the C4 serving profile measured it at ~11 tok/s on a 27B (VRAM exhausted) against ~120 tok/s with one
             // slot, so it is raced against its own one-slot plain baseline and only replaces the serving winner when it beats
@@ -347,6 +351,58 @@ public sealed class RuntimeOptimizationService
             if (acquired) _gate.Release();
             entry.Cancellation.Dispose();
         }
+    }
+
+    /// <summary>Races the hardware-aware candidates against the current winner, in two bounded stages (offload/attention/context, then threads).</summary>
+    private async Task<RuntimeOptimizationServerResult> RaceHardwareAsync(
+        Entry entry, RuntimeOptimizationServerResult winner, IReadOnlyList<GpuPerformanceTelemetryDto> gpus, long modelBytes, long telemetryVramBytes)
+    {
+        HardwareSearchFacts facts = CollectHardwareFacts(entry.Status.ModelPath, gpus, modelBytes, telemetryVramBytes);
+        RuntimeOptimizationServerResult current = winner;
+        List<LlamaPerformanceProfileDto> stageA = RuntimeHardwareSearchSpace.BuildOffloadCandidates(current.Profile, facts, entry.Status.Workload);
+        if (stageA.Count > 0)
+        {
+            Set(entry, "running", "Racing GPU offload, attention and context options for this hardware…");
+            var measuredA = new List<RuntimeOptimizationServerResult>();
+            foreach (LlamaPerformanceProfileDto candidate in stageA)
+            {
+                RuntimeOptimizationServerResult measured = await MeasureAsync(entry, candidate, entry.Request.SustainedValidation).ConfigureAwait(false);
+                lock (entry.Gate) entry.Status.ServerCandidates.Add(measured);
+                measuredA.Add(measured);
+            }
+            current = RuntimeHardwareSearchSpace.Choose(current, measuredA);
+        }
+        List<LlamaPerformanceProfileDto> stageB = RuntimeHardwareSearchSpace.BuildThreadCandidates(current.Profile, facts);
+        if (stageB.Count > 0)
+        {
+            Set(entry, "running", "Racing CPU thread counts (the CPU limits speed for this model on this PC)…");
+            var measuredB = new List<RuntimeOptimizationServerResult>();
+            foreach (LlamaPerformanceProfileDto candidate in stageB)
+            {
+                RuntimeOptimizationServerResult measured = await MeasureAsync(entry, candidate, entry.Request.SustainedValidation).ConfigureAwait(false);
+                lock (entry.Gate) entry.Status.ServerCandidates.Add(measured);
+                measuredB.Add(measured);
+            }
+            current = RuntimeHardwareSearchSpace.Choose(current, measuredB);
+        }
+        return current;
+    }
+
+    private static HardwareSearchFacts CollectHardwareFacts(string modelPath, IReadOnlyList<GpuPerformanceTelemetryDto> gpus, long modelBytes, long telemetryVramBytes)
+    {
+        long vram = telemetryVramBytes;
+        if (vram <= 0)
+        {
+            // No NVIDIA telemetry (Vulkan / AMD / Intel): the DXGI inventory still knows the dedicated memory.
+            try { GpuInventoryStatus inv = new GpuInventoryService().GetStatus(); if (inv.Available) vram = inv.LargestDedicatedVideoMemoryBytes; }
+            catch (Exception ex) when (ex is not OutOfMemoryException) { }
+        }
+        long ram = 0;
+        try { ram = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes; } catch (InvalidOperationException) { }
+        int physical = 0;
+        try { physical = CpuTopology.PhysicalCores(); } catch (Exception ex) when (ex is not OutOfMemoryException) { }
+        return new HardwareSearchFacts(modelBytes, vram, ram, Environment.ProcessorCount, physical,
+            SafeReadGguf(modelPath)?.BlockCount, gpus.Any(g => g.MemoryTotalMib is > 0));
     }
 
     internal static List<LlamaPerformanceProfileDto> BuildTopologyCandidates(

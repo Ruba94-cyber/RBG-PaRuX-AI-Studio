@@ -2844,7 +2844,8 @@ namespace PaRuX.Views
                 if (!reconciled)
                     _candidateDownloadUnknown.Add(selectedCandidate.Key);
                 _status.Text = reconciled
-                    ? "Candidate start response was not confirmed. The Core queue and managed library were refreshed; retry is safe if no matching transfer is active."
+                    ? "Candidate start response was not confirmed (" + LimitDisplay(ex.Message, 180)
+                        + "). The Core queue and managed library were refreshed; retry is safe if no matching transfer is active."
                     : "Candidate start status is unknown because the Core queue could not be refreshed. PaRuX has blocked another start until Model Hub can reconcile it. Details: "
                         + LimitDisplay(ex.Message, 180);
             }

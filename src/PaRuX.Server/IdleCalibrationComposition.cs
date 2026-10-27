@@ -44,6 +44,13 @@ internal static class IdleCalibrationComposition
             IsFreshModel = IsFresh,
             FreshModelHandled = path => new PostDownloadOptimizationQueue().MarkDone(path),
             Tuning = tuning,
+            TextFacts = (path, backend, winner, tps) => BuildTextFacts(gpuInventory.GetStatus(), path, backend, winner, tps),
+            RepoListing = async (path, ct) =>
+            {
+                string? repo = ModelDownloadService.RepoIdFor(path);
+                if (repo is null) return (null, Array.Empty<(string FileName, long SizeBytes)>());
+                return (repo, await sp.GetRequiredService<ModelDownloadService>().ListRepoGgufFilesAsync(repo, ct).ConfigureAwait(false));
+            },
             Targets = Targets,
             Environment = async ct =>
             {
@@ -62,6 +69,28 @@ internal static class IdleCalibrationComposition
         TimeSpan? idle = int.TryParse(Environment.GetEnvironmentVariable("PARUX_IDLE_CALIBRATION_IDLE_SECONDS"), out int seconds) && seconds is >= 5 and <= 86400
             ? TimeSpan.FromSeconds(seconds) : null;
         return new IdleCalibrationService(deps, tracker, new IdleCalibrationRegistry(), idle);
+    }
+
+    /// <summary>Local, cheap facts about the model and this PC for the post-tuning suggestions. Header read failures just leave a field unknown.</summary>
+    internal static TextTuningFacts BuildTextFacts(GpuInventoryStatus gpus, string path, string backend, LlamaPerformanceProfileDto? winner, double? tps)
+    {
+        long size = 0;
+        try { size = new FileInfo(path).Length; } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        int context = winner?.ContextSize ?? 0;
+        long? kv = null;
+        try
+        {
+            if (context > 0 && File.Exists(path))
+                kv = PaRuX.Intelligence.KvCacheSizeEstimator.Estimate(PaRuX.Intelligence.GgufMetadataReader.Read(path), context, winner?.CacheTypeK ?? "q8_0", winner?.CacheTypeV);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { }
+        long ram = 0;
+        try { ram = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes; } catch (InvalidOperationException) { }
+        bool nvidia = gpus.Adapters.Any(a => a.VendorId == 0x10DE && !a.IsSoftware);
+        bool draft = false;
+        try { draft = SpeculativeDraftDiscovery.Discover(path).Count > 0; } catch (IOException) { }
+        return new TextTuningFacts(Path.GetFileName(path), size, backend, nvidia, gpus.Available ? gpus.LargestDedicatedVideoMemoryBytes : 0,
+            ram, tps, context, kv, draft, "chat");
     }
 
     internal static bool IsFresh(string path) =>

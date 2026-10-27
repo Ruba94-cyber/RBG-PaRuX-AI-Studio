@@ -48,6 +48,36 @@ internal sealed class ModelTuningTracker
         lock (_gate) if (Find(id) is { } item) Set(item, ModelTuningStates.Skipped, reason, null);
     }
 
+    /// <summary>
+    /// Terminal "nothing faster than the current settings" state. Still published as <see cref="ModelTuningStates.Skipped"/> (only
+    /// five states exist) but never a dead end: the reason states what was measured and the suggestions say what could help next.
+    /// </summary>
+    internal void Optimal(string id, string reason, IReadOnlyList<ModelTuningSuggestionDto>? suggestions = null)
+    {
+        lock (_gate)
+            if (Find(id) is { } item)
+            {
+                Set(item, ModelTuningStates.Skipped, reason, null);
+                item.Suggestions = Bound(suggestions);
+            }
+    }
+
+    /// <summary>Replaces the suggestions of a job (used when the slower, network-backed ones arrive after the result).</summary>
+    internal void SetSuggestions(string id, IReadOnlyList<ModelTuningSuggestionDto>? suggestions)
+    {
+        lock (_gate) if (Find(id) is { } item && ModelTuningStates.IsTerminal(item.State)) { item.Suggestions = Bound(suggestions); item.UpdatedUtc = _utcNow(); }
+    }
+
+    internal const int MaximumSuggestions = 6;
+    private static List<ModelTuningSuggestionDto> Bound(IReadOnlyList<ModelTuningSuggestionDto>? suggestions) =>
+        suggestions is null ? new() : suggestions.Take(MaximumSuggestions).Select(CloneSuggestion).ToList();
+
+    private static ModelTuningSuggestionDto CloneSuggestion(ModelTuningSuggestionDto s) => new()
+    {
+        Kind = s.Kind, Title = s.Title, Detail = s.Detail, ExpectedGain = s.ExpectedGain, ActionKind = s.ActionKind,
+        RepoId = s.RepoId, FileName = s.FileName, SizeBytes = s.SizeBytes
+    };
+
     internal void Failed(string id, string reason)
     {
         lock (_gate) if (Find(id) is { } item) Set(item, ModelTuningStates.Failed, reason, null);
@@ -106,6 +136,7 @@ internal sealed class ModelTuningTracker
     private void Set(ModelTuningItemDto item, string state, string? reason, double? gain)
     {
         item.State = state;
+        if (!ModelTuningStates.IsTerminal(state)) item.Suggestions = new List<ModelTuningSuggestionDto>();
         item.Reason = reason;
         item.GainPercent = gain;
         item.UpdatedUtc = _utcNow();
@@ -115,7 +146,8 @@ internal sealed class ModelTuningTracker
     {
         Id = i.Id, Kind = i.Kind, ModelLabel = i.ModelLabel, ModelPath = i.ModelPath, Workload = i.Workload, State = i.State,
         GainPercent = i.GainPercent, Reason = i.Reason, UpdatedUtc = i.UpdatedUtc,
-        Proposal = i.Proposal is null ? null : new ModelTuningProposalDto { Kind = i.Proposal.Kind, RepoId = i.Proposal.RepoId, FileName = i.Proposal.FileName, SizeBytes = i.Proposal.SizeBytes }
+        Proposal = i.Proposal is null ? null : new ModelTuningProposalDto { Kind = i.Proposal.Kind, RepoId = i.Proposal.RepoId, FileName = i.Proposal.FileName, SizeBytes = i.Proposal.SizeBytes },
+        Suggestions = i.Suggestions.Select(CloneSuggestion).ToList()
     };
 }
 

@@ -170,6 +170,8 @@ public sealed class ModelTuningTests : IDisposable
         public List<CalibrationTarget> Targets = new();
         public readonly HashSet<string> Fresh = new(StringComparer.OrdinalIgnoreCase);
         public readonly List<string> Handled = new();
+        public Func<string, string, LlamaPerformanceProfileDto?, double?, TextTuningFacts?>? TextFactsFn;
+        public Func<string, CancellationToken, Task<(string? RepoId, IReadOnlyList<(string FileName, long SizeBytes)> Files)>>? ListingFn;
     }
 
     private Rig NewRig(params string[] models)
@@ -194,6 +196,8 @@ public sealed class ModelTuningTests : IDisposable
             IsFreshModel = p => rig.Fresh.Contains(p),
             FreshModelHandled = p => { rig.Fresh.Remove(p); rig.Handled.Add(p); },
             Tuning = rig.Tuning,
+            TextFacts = (p, b, w, t) => rig.TextFactsFn?.Invoke(p, b, w, t),
+            RepoListing = (p, ct) => rig.ListingFn is { } f ? f(p, ct) : Task.FromResult<(string?, IReadOnlyList<(string FileName, long SizeBytes)>)>((null, Array.Empty<(string FileName, long SizeBytes)>())),
             Environment = _ => Task.FromResult<CalibrationEnvironment?>(new CalibrationEnvironment("text-cuda", "b11871", "rtx5080")),
             Start = request =>
             {
@@ -341,7 +345,62 @@ public sealed class ModelTuningTests : IDisposable
 
         ModelTuningItemDto item = OnlyItem(rig);
         Assert.Equal(ModelTuningStates.Skipped, item.State);
-        Assert.Equal("No faster profile found", item.Reason);
+        Assert.Equal("Already optimal for this PC (measured 51.0 tok/s)", item.Reason);
+        Assert.NotEmpty(item.Suggestions); // never a dead end
+    }
+
+    [Fact]
+    public async Task Already_optimal_publishes_local_suggestions_at_once_and_repository_ones_when_the_listing_answers()
+    {
+        Rig rig = NewRig("Qwen3-8B-Q8_0.gguf");
+        string path = rig.Targets[0].ModelPath;
+        rig.TextFactsFn = (p, backend, w, tps) => new TextTuningFacts(
+            Path.GetFileName(p), 8L << 30, backend, true, 6L << 30, 32L << 30, tps, 32768, 4L << 30, false, "chat");
+        rig.ListingFn = (p, ct) => Task.FromResult<(string?, IReadOnlyList<(string FileName, long SizeBytes)>)>(("org/Qwen3-8B-GGUF", new List<(string, long)>
+        {
+            ("Qwen3-8B-Q8_0.gguf", 8L << 30), ("Qwen3-8B-Q4_K_M.gguf", 5L << 30)
+        }));
+        rig.Fresh.Add(path);
+        rig.Now = rig.Now.AddSeconds(30);
+        await rig.Service.TickAsync(default);
+        RuntimeOptimizationRun run = rig.Run!;
+        run.Status = "completed";
+        run.ServerCandidates.Add(Candidate("plain", 50));
+        run.ServerCandidates.Add(Candidate("kv", 50.5));
+        run.Winner = new LlamaPerformanceProfileDto { Id = "kv" };
+
+        rig.Service.OnOptimizationCompleted(run, new RuntimeOptimizationCompletion(path, "chat", "text-cuda", "b11871", "rtx5080"),
+            new LocalBenchmarkHistoryStore(Path.Combine(_dir, "hist")), string.Empty);
+
+        Assert.Equal(ModelTuningStates.Skipped, OnlyItem(rig).State);
+        Assert.StartsWith("Already optimal for this PC (measured 50.5", OnlyItem(rig).Reason);
+        for (int i = 0; i < 100 && !OnlyItem(rig).Suggestions.Any(s => s.Kind == "smaller_quant"); i++) await Task.Delay(20);
+        ModelTuningSuggestionDto quant = Assert.Single(OnlyItem(rig).Suggestions, s => s.Kind == "smaller_quant");
+        Assert.Equal("Qwen3-8B-Q4_K_M.gguf", quant.FileName);
+        Assert.Equal("download_file", quant.ActionKind);
+    }
+
+    [Fact]
+    public async Task A_listing_that_fails_still_leaves_a_finished_actionable_card()
+    {
+        Rig rig = NewRig("Qwen3-8B-Q8_0.gguf");
+        string path = rig.Targets[0].ModelPath;
+        rig.TextFactsFn = (p, backend, w, tps) => new TextTuningFacts(
+            Path.GetFileName(p), 8L << 30, backend, true, 24L << 30, 32L << 30, tps, 8192, null, false, "chat");
+        rig.ListingFn = (p, ct) => throw new HttpRequestException("offline");
+        rig.Fresh.Add(path);
+        rig.Now = rig.Now.AddSeconds(30);
+        await rig.Service.TickAsync(default);
+        RuntimeOptimizationRun run = rig.Run!;
+        run.Status = "completed";
+        run.ServerCandidates.Add(Candidate("plain", 50));
+        run.Winner = new LlamaPerformanceProfileDto { Id = "plain" };
+
+        rig.Service.OnOptimizationCompleted(run, new RuntimeOptimizationCompletion(path, "chat", "text-cuda", "b11871", "rtx5080"),
+            new LocalBenchmarkHistoryStore(Path.Combine(_dir, "hist")), string.Empty);
+
+        for (int i = 0; i < 100 && OnlyItem(rig).Suggestions.Count == 0; i++) await Task.Delay(20);
+        Assert.Contains(OnlyItem(rig).Suggestions, s => s.Kind == "info");
     }
 
     [Fact]
