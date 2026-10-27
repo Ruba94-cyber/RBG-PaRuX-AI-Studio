@@ -87,6 +87,13 @@ internal sealed class AutoMaintenanceHostedService : BackgroundService
 
 internal static class AutoMaintenanceComposition
 {
+    /// <summary>Fingerprint token for an installed backend. Non-text backends (e.g. media-comfyui) have no llama build tag,
+    /// so they are recorded as installed instead of failing the whole hardware probe.</summary>
+    internal static string RuntimeFingerprintToken(string backend) =>
+        Array.IndexOf(LocalAiPaths.KnownRuntimeBackends, backend) < 0
+            ? backend + "@installed"
+            : $"{backend}@{LocalAiPaths.GetActiveRuntimeBuildTag(backend) ?? LocalAiPaths.DefaultRuntimeBuildTag(backend)}";
+
     internal static AutoMaintenanceService Create(IServiceProvider sp)
     {
         var gpuInventory = new GpuInventoryService();
@@ -163,7 +170,7 @@ internal static class AutoMaintenanceComposition
                 var runtimes = new List<string>();
                 if (status is not null)
                     foreach (RuntimeBackendStatus b in status.Backends.Where(b => b.Installed))
-                        runtimes.Add($"{b.Backend}@{LocalAiPaths.GetActiveRuntimeBuildTag(b.Backend) ?? LocalAiPaths.DefaultRuntimeBuildTag(b.Backend)}");
+                        runtimes.Add(RuntimeFingerprintToken(b.Backend));
                 try
                 {
                     resolved = InstalledRuntimeResolver.Resolve(await inventory.DiscoverAsync(ct).ConfigureAwait(false),
