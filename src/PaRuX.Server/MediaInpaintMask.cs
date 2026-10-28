@@ -55,6 +55,13 @@ internal static class MediaInpaintMask
         return mask;
     }
 
+    /// <summary>The prompt that conditions the repaint: the user's own words, whitespace-normalised, never rewritten into a scene description.</summary>
+    internal static string RegionPrompt(string? userPrompt)
+    {
+        string text = string.Join(' ', (userPrompt ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return text.Length > 0 ? text : "a photograph";
+    }
+
     internal static int NormalizeGrow(int? requested) => Math.Clamp(requested ?? DefaultGrowPixels, 0, MaximumGrowPixels);
 
     /// <summary>Writes the per-job values into the loaded graph. Kept apart from the HTTP upload so it can be tested.</summary>

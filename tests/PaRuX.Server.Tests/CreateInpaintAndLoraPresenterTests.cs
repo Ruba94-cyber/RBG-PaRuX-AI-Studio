@@ -235,6 +235,25 @@ public sealed class CreateInpaintAndLoraPresenterTests
     }
 
     [Theory]
+    [InlineData("cambia solo il cielo")]
+    [InlineData("Cambia solo il cielo nell'ultima immagine")]
+    [InlineData("sostituisci il cielo in questa foto")]
+    public void The_region_edit_notice_is_italian_when_the_prompt_is_italian(string text)
+    {
+        string hint = RouterService.RegionEditHint(text)!;
+        Assert.Contains("Questa modifica è stata applicata all'intera immagine", hint);
+        Assert.Contains("Mask inpaint", hint);
+        Assert.DoesNotContain("This edit was applied", hint);
+    }
+
+    [Theory]
+    [InlineData("replace the sky in the last image")]
+    [InlineData("Replace only the sky in the last image with a sunset")]
+    [InlineData("change just the hair in this picture")]
+    public void The_region_edit_notice_stays_english_for_english_prompts(string text) =>
+        Assert.StartsWith("This edit was applied to the whole image", RouterService.RegionEditHint(text));
+
+    [Theory]
     [InlineData("replace the sky in the last image")]
     [InlineData("cambia il cielo")]
     [InlineData("remove the wall")]

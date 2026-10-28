@@ -202,6 +202,14 @@ public sealed class MediaInpaintAndLoraStackTests : IClassFixture<ApiSecurityTes
 
     // ---- inpaint request checks ---------------------------------------------------------------------------------
 
+    [Theory]
+    [InlineData("a bright blue butterfly", "a bright blue butterfly")]
+    [InlineData("  a   blue\r\nbutterfly ", "a blue butterfly")]
+    [InlineData("", "a photograph")]
+    [InlineData(null, "a photograph")]
+    public void The_repaint_prompt_is_the_users_own_words_not_a_scene_rewrite(string? input, string expected) =>
+        Assert.Equal(expected, MediaInpaintMask.RegionPrompt(input));
+
     [Fact]
     public void A_matching_png_mask_is_accepted_even_at_a_lower_resolution()
     {

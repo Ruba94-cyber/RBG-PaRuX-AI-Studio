@@ -44,13 +44,25 @@ internal sealed class ModelDownloadFailure : Exception
     public TimeSpan? RetryAfter { get; }
     public bool Retryable => FailureClass == ModelDownloadFailureClass.Transient;
 
-    /// <summary>Maps an HTTP refusal to a failure class. The numeric status stays on the failure for callers.</summary>
-    public static ModelDownloadFailure FromHttpStatus(HttpStatusCode status, bool tokenSent, TimeSpan? retryAfter)
+    /// <summary>Maps an HTTP refusal to a failure class. The numeric status stays on the failure for callers.
+    /// <paramref name="civitAi"/> selects the CivitAI wording (LoRA lane): the text names the right source and the right credential
+    /// and never includes the token itself.</summary>
+    public static ModelDownloadFailure FromHttpStatus(HttpStatusCode status, bool tokenSent, TimeSpan? retryAfter, bool civitAi = false)
     {
         int code = (int)status;
+        string source = civitAi ? "CivitAI" : "Hugging Face";
         switch (code)
         {
             case 401:
+                if (civitAi)
+                    return new ModelDownloadFailure(ModelDownloadFailureClass.Auth,
+                        tokenSent
+                            ? "CivitAI rejected the saved API key (HTTP 401)."
+                            : "A CivitAI API key is needed: CivitAI requires you to be signed in to download this file (HTTP 401).",
+                        tokenSent
+                            ? "Create a new API key in your CivitAI account settings, replace the saved CivitAI API key in PaRuX, then press Retry."
+                            : "Create an API key in your CivitAI account settings, add it as the CivitAI API key in PaRuX, then press Retry.",
+                        code);
                 return new ModelDownloadFailure(ModelDownloadFailureClass.Auth,
                     tokenSent
                         ? "Hugging Face rejected the saved access token (HTTP 401)."
@@ -60,6 +72,15 @@ internal sealed class ModelDownloadFailure : Exception
                         : "Add a Hugging Face access token in Model Hub settings, then press Retry.",
                     code);
             case 403:
+                if (civitAi)
+                    return new ModelDownloadFailure(ModelDownloadFailureClass.Auth,
+                        tokenSent
+                            ? "CivitAI refused this file for the saved API key (HTTP 403)."
+                            : "A CivitAI API key is needed, or this file is restricted on CivitAI (HTTP 403).",
+                        tokenSent
+                            ? "Check that the account behind the CivitAI API key may download this file, or replace the key, then press Retry."
+                            : "Add a CivitAI API key (created in your CivitAI account settings) and make sure the account may download this file, then press Retry.",
+                        code);
                 return new ModelDownloadFailure(ModelDownloadFailureClass.Auth,
                     tokenSent
                         ? "Licence not accepted or token refused: Hugging Face refused this file for the saved token (HTTP 403)."
@@ -71,8 +92,11 @@ internal sealed class ModelDownloadFailure : Exception
             case 404:
             case 410:
                 return new ModelDownloadFailure(ModelDownloadFailureClass.Permanent,
-                    "The file was not found at the pinned repository revision (HTTP " + code + ").",
-                    "Check the repository and revision, or choose another source.", code);
+                    civitAi
+                        ? "The file was not found on CivitAI (HTTP " + code + ")."
+                        : "The file was not found at the pinned repository revision (HTTP " + code + ").",
+                    civitAi ? "Check the CivitAI model version, or choose another source."
+                            : "Check the repository and revision, or choose another source.", code);
             case 408:
             case 429:
             case 500:
@@ -80,12 +104,13 @@ internal sealed class ModelDownloadFailure : Exception
             case 503:
             case 504:
                 return new ModelDownloadFailure(ModelDownloadFailureClass.Transient,
-                    "Hugging Face is temporarily unavailable (HTTP " + code + ").",
+                    source + " is temporarily unavailable (HTTP " + code + ").",
                     "PaRuX retries automatically with backoff and keeps the partial file.", code, retryAfter);
             default:
                 return new ModelDownloadFailure(ModelDownloadFailureClass.Permanent,
-                    "Hugging Face refused the request (HTTP " + code + ").",
-                    "Check the repository and revision, or choose another source.", code);
+                    source + " refused the request (HTTP " + code + ").",
+                    civitAi ? "Check the CivitAI model version, or choose another source."
+                            : "Check the repository and revision, or choose another source.", code);
         }
     }
 }

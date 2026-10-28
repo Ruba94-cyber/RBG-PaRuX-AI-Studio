@@ -1431,7 +1431,20 @@ public sealed class LocalAiProcessManager
             return new RuntimeResult(false, "The previous text runtime did not stop, so the media assistant was not started.");
 
         string model = File.Exists(LocalAiPaths.SmallUncensoredModel) ? LocalAiPaths.SmallUncensoredModel : LocalAiPaths.SmallModel;
-        string exe = Path.Combine(LocalAiPaths.RuntimeVulkanPath, LocalAiPaths.LlamaServerExecutable);
+        // The assistant answers chat for the whole media burst window (about a minute) and writes the image prompts. Measured on the
+        // RTX 5080 with this exact argv: 27 tok/s on the Vulkan build against 178 tok/s on CUDA for the same 4B model, with the same
+        // ~3.2 GiB of VRAM and a Z-Image job still fitting beside it. So an NVIDIA machine with the CUDA runtime installed uses CUDA;
+        // everything else keeps the Vulkan build.
+        string assistantRuntime = LocalAiPaths.RuntimeVulkanPath;
+        try
+        {
+            TextLaunchTier assistantTier = TextLaunchTierSelector.Select(InventoryProbe(), await GetVramMibAsync(ct).ConfigureAwait(false));
+            if (assistantTier.HeavyGpu && assistantTier.Backend == TextRuntimeBackend.Cuda)
+                assistantRuntime = LocalAiPaths.ResolveGpuTextRuntimePath(preferCuda: true);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch { /* inventory unreadable: the Vulkan assistant is the known-good fallback */ }
+        string exe = Path.Combine(assistantRuntime, LocalAiPaths.LlamaServerExecutable);
         if (!File.Exists(exe)) return new RuntimeResult(false, "File not found: " + exe);
         if (!File.Exists(model)) return new RuntimeResult(false, "File not found: " + model);
         string? portRefusal = ChooseTextPortForLaunch();
@@ -1443,12 +1456,13 @@ public sealed class LocalAiProcessManager
             "--ctx-size", "16384", "--parallel", "1", "--batch-size", "256",
             "--ubatch-size", "64", "--flash-attn", "on", "--cache-type-k", "q8_0", "--cache-type-v", "q8_0", "--jinja", "--reasoning", "auto",
             "--reasoning-effort", "low", "--reasoning-budget", "768", "--temp", "0.8", "--top-p", "0.95", "--top-k", "40", "--min-p", "0.02",
-            "--device", "Vulkan0", "--gpu-layers", "all", "--sleep-idle-seconds", "-1"
+            "--gpu-layers", "all", "--sleep-idle-seconds", "-1"
         };
+        if (PathsEqual(assistantRuntime, LocalAiPaths.RuntimeVulkanPath)) { args.Add("--device"); args.Add("Vulkan0"); }
         args.AddRange(WebUiArguments());
         onOutgoingTextReleased?.Invoke();
         var assistantWatch = Stopwatch.StartNew();
-        RuntimeResult assistantResult = await LaunchAndWaitAsync(exe, args, LocalAiPaths.RuntimeVulkanPath, wanted, LocalAiPaths.TextPidFile,
+        RuntimeResult assistantResult = await LaunchAndWaitAsync(exe, args, assistantRuntime, wanted, LocalAiPaths.TextPidFile,
             null, () => IsTextHealthyAsync(ct), () => StopText(), TimeSpan.FromMinutes(3), ct,
             ProbeTextOutputSanityAsync).ConfigureAwait(false);
         MediaSwapTimings.Record("media-assistant-launch", assistantWatch.Elapsed, assistantResult.Success ? "ready" : "failed");
@@ -1638,6 +1652,16 @@ public sealed class LocalAiProcessManager
         MediaSwapTimings.Record("text-restore", restoreWatch.Elapsed, restored.Success ? "ready" : "failed");
         if (restored.Success && !GamingActive) await WarmRestoredTextAsync(ct).ConfigureAwait(false);
         return restored;
+    }
+
+    /// <summary>Raised after a media burst ended and the flagship text model is back, with the GPU lease already released.
+    /// MediaPrewarmService listens and may start an idle ComfyUI for the next image.</summary>
+    internal event Action? TextRestoredAfterMedia;
+
+    internal void RaiseTextRestoredAfterMedia()
+    {
+        try { TextRestoredAfterMedia?.Invoke(); }
+        catch (Exception ex) { Trace.TraceWarning("Post-restore media prewarm request failed: " + ex.Message); }
     }
 
     /// <summary>Test seam: replaces the network step of the post-restore warm-up. Production code never sets it.</summary>
@@ -2113,6 +2137,7 @@ public sealed class LocalAiProcessManager
         };
         foreach (string arg in args) psi.ArgumentList.Add(arg);
         if (launchProfile != null) RuntimeLaunchOptimizer.ApplyEnvironment(psi, launchProfile);
+        if (baseName == "comfyui") ComfyLaunchEnvironment.Apply(psi);
         // The actual-launch fence: derived from the very argv/environment given to this process
         // (after every override), not from what a caller intended to launch.
         TextLaunchDescriptor? launchDescriptor = null;

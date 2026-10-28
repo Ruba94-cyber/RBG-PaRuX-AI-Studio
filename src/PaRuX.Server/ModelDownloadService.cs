@@ -2194,7 +2194,7 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
                 }
                 else
                 {
-                    ModelDownloadFailure refusal = StatusFailure(rangeResponse, hubToken is not null);
+                    ModelDownloadFailure refusal = StatusFailure(rangeResponse, entry.LoraLane ? ResolveLoraToken() is not null : hubToken is not null, entry.LoraLane);
                     rangeResponse.Dispose();
                     throw refusal;
                 }
@@ -2202,7 +2202,7 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
 
             response ??= await SendTransferRequestAsync(request.DownloadUrl, 0, hubToken, ct, entry.LoraLane);
             if (!response.IsSuccessStatusCode)
-                throw StatusFailure(response, hubToken is not null);
+                throw StatusFailure(response, entry.LoraLane ? ResolveLoraToken() is not null : hubToken is not null, entry.LoraLane);
 
             bool resumed = alreadyDownloaded > 0 && response.StatusCode == HttpStatusCode.PartialContent;
             long total;
@@ -2405,13 +2405,13 @@ public sealed class ModelDownloadService : PaRuX.Server.Orchestration.Gaming.IGa
     private static bool IsRedirect(HttpStatusCode status) =>
         (int)status is 301 or 302 or 303 or 307 or 308;
 
-    private static ModelDownloadFailure StatusFailure(HttpResponseMessage response, bool tokenSent)
+    private static ModelDownloadFailure StatusFailure(HttpResponseMessage response, bool tokenSent, bool civitAi = false)
     {
         TimeSpan? retryAfter = null;
         var header = response.Headers.RetryAfter;
         if (header?.Delta is TimeSpan delta) retryAfter = delta;
         else if (header?.Date is DateTimeOffset date) retryAfter = date - DateTimeOffset.UtcNow;
-        return ModelDownloadFailure.FromHttpStatus(response.StatusCode, tokenSent, retryAfter);
+        return ModelDownloadFailure.FromHttpStatus(response.StatusCode, tokenSent, retryAfter, civitAi);
     }
 
     /// <summary>Win32 ERROR_DISK_FULL (112) and ERROR_HANDLE_DISK_FULL (39), or POSIX ENOSPC (28).</summary>

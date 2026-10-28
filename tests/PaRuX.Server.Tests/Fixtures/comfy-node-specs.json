@@ -1,5 +1,5 @@
 {
-  "_comment": "Input and output shape of every ComfyUI node the shipped workflow templates use, read from /object_info of a real ComfyUI 0.42.1 (portable build) started with --cpu on a throw-away port. Tests compare each template against it so a graph that names a node, input or output slot the real server does not have fails here, not at the first user job.",
+  "_comment": "Input and output shape of every ComfyUI node the shipped workflow templates use, read from /object_info of a real ComfyUI 0.42.1 (portable build) started with --cpu on a throw-away port. Tests compare each template against it so a graph that names a node, input or output slot the real server does not have fails here, not at the first user job. The inpaint graph nodes (ImageScale, GrowMask, ImageToMask, SetLatentNoiseMask, ImageCompositeMasked) were added from ComfyUI 0.43.0.",
   "comfyuiVersion": "0.42.1",
   "nodes": {
     "CFGGuider": {
@@ -120,12 +120,53 @@
       "optional": [],
       "outputs": 3
     },
+    "GrowMask": {
+      "required": [
+        "expand",
+        "mask",
+        "tapered_corners"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "ImageCompositeMasked": {
+      "required": [
+        "destination",
+        "resize_source",
+        "source",
+        "x",
+        "y"
+      ],
+      "optional": [
+        "mask"
+      ],
+      "outputs": 1
+    },
+    "ImageScale": {
+      "required": [
+        "crop",
+        "height",
+        "image",
+        "upscale_method",
+        "width"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
     "ImageScaleToTotalPixels": {
       "required": [
         "image",
         "megapixels",
         "resolution_steps",
         "upscale_method"
+      ],
+      "optional": [],
+      "outputs": 1
+    },
+    "ImageToMask": {
+      "required": [
+        "channel",
+        "image"
       ],
       "optional": [],
       "outputs": 1
@@ -282,6 +323,14 @@
       "optional": [
         "codec"
       ],
+      "outputs": 1
+    },
+    "SetLatentNoiseMask": {
+      "required": [
+        "mask",
+        "samples"
+      ],
+      "optional": [],
       "outputs": 1
     },
     "T5TokenizerOptions": {

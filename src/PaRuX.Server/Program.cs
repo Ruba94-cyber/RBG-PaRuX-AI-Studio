@@ -725,6 +725,7 @@ app.MapPost("/api/v1/images/generations", async (
 
 // Starts ComfyUI ahead of the first media job (Create opened, or a chat message asking for an image/video). Never blocks: the
 // response is the current honest state (starting / warm / skipped / failed / cancelled). Gaming Mode and a busy GPU refuse.
+_ = app.Services.GetRequiredService<MediaPrewarmService>(); // eager: it listens for the end of a media burst
 app.MapPost("/api/v1/media/prewarm", (MediaPrewarmService prewarm, string? reason) =>
     Results.Accepted("/api/v1/media/prewarm", prewarm.Request(reason))).RequireDesktopOwner();
 app.MapGet("/api/v1/media/prewarm", (MediaPrewarmService prewarm) => Results.Ok(prewarm.Snapshot())).RequireDesktopOwner();

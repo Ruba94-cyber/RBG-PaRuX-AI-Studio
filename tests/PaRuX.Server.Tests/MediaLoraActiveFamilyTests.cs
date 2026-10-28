@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Text;
+using PaRuX.Contracts;
 using PaRuX.Server;
 using Xunit;
 

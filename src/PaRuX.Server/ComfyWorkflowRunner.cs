@@ -160,7 +160,10 @@ public sealed class ComfyWorkflowRunner
             // when another family is active, and is refused by name when that default is not installed.
             MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForPipeline("inpaint", LocalAiPaths.InpaintWorkflowTemplate);
             MediaLoraStackCheck loraStack = MediaLoraStack.ResolveOrRefuse(effective, loras);
-            string refinedPrompt = await RefinePromptAsync(prompt, ct);
+            // The user's words describe only what goes into the painted area. The silent refinement rewrites a request into a whole-scene
+            // prompt (subject, setting, lighting), which on a small mask buried "a blue butterfly" under the scene and the repaint ignored it
+            // (measured: same seed and mask, the verbatim prompt paints the butterfly, the scene-style rewrite does not).
+            string refinedPrompt = MediaInpaintMask.RegionPrompt(prompt);
             string uploadedSource = await UploadImageAsync(sourceImage, sourceFileName, ct);
             string uploadedMask = await UploadImageAsync(mask, "inpaint_mask.png", ct);
             string path = await SubmitAndWaitAsync(LocalAiPaths.InpaintWorkflowTemplate, request =>
@@ -654,12 +657,18 @@ public sealed class ComfyWorkflowRunner
             try
             {
                 await Task.Delay(MediaBurstIdleDelay, restore.Token);
-                await using MediaExecutionCoordinator.Lease exclusive = await MediaExecutionCoordinator.Current
-                    .AcquireAsync("text-exclusive:media-burst-restore", restore.Token).ConfigureAwait(false);
-                if (_runtime.GamingActive) return;
-                await TextInferenceQuiescence.WaitForIdleAsync(
-                    TimeSpan.FromMinutes(10), restore.Token).ConfigureAwait(false);
-                await _runtime.RestoreTextProfileAsync(restore.Token).ConfigureAwait(false);
+                bool restored;
+                await using (MediaExecutionCoordinator.Lease exclusive = await MediaExecutionCoordinator.Current
+                    .AcquireAsync("text-exclusive:media-burst-restore", restore.Token).ConfigureAwait(false))
+                {
+                    if (_runtime.GamingActive) return;
+                    await TextInferenceQuiescence.WaitForIdleAsync(
+                        TimeSpan.FromMinutes(10), restore.Token).ConfigureAwait(false);
+                    restored = (await _runtime.RestoreTextProfileAsync(restore.Token).ConfigureAwait(false)).Success;
+                }
+                // The exclusive lease is released: a bounded, admission-checked ComfyUI prewarm may now run, so the next image in this
+                // session does not pay ComfyUI's cold start again. The subscriber decides (RAM/VRAM/Gaming/GPU-busy) and reports honestly.
+                if (restored && !_runtime.GamingActive) _runtime.RaiseTextRestoredAfterMedia();
             }
             catch (OperationCanceledException) { }
             catch { /* best-effort; the next explicit text request will self-heal via StartTextAsync */ }

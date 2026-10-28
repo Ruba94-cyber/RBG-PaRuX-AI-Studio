@@ -61,8 +61,26 @@ namespace PaRuX.Services
         /// <summary>The note added to a chat edit reply when the request was about one region: the edit ran on the whole image.</summary>
         public static string? RegionEditHint(string? input) =>
             IsRegionEditRequest(input)
-                ? "This edit was applied to the whole image, so other parts may have changed. To change only one area, open Create > Image edit > Mask inpaint, paint over that area and run it there."
+                ? (LooksItalian(input)
+                    ? "Questa modifica è stata applicata all'intera immagine, quindi anche altre parti potrebbero essere cambiate. Per cambiare una sola zona, apri Create > Image edit > Mask inpaint, dipingi quella zona ed eseguila lì."
+                    : "This edit was applied to the whole image, so other parts may have changed. To change only one area, open Create > Image edit > Mask inpaint, paint over that area and run it there.")
                 : null;
+
+        private static readonly Regex ItalianWordsRx = new Regex(
+            @"\b(?:il|lo|la|le|gli|un|una|di|del|della|dello|nel|nella|sul|sulla|che|per|con|solo|soltanto|cambia|cambiare|sostituisci|rimuovi|modifica|ricolora|ridipingi|cielo|nuvole|sfondo|immagine|foto|questa|quella|ultima|fammi|crea|genera|più|rosso|blu|verde|nero|bianco|colore)\b",
+            Opts);
+        private static readonly Regex EnglishWordsRx = new Regex(
+            @"\b(?:the|and|only|just|change|replace|swap|remove|sky|image|picture|photo|this|that|last|make|with|into|color|colour|red|blue|green|black|white)\b",
+            Opts);
+
+        /// <summary>Cheap language guess for the fixed notices PaRuX adds to a reply: Italian when Italian words clearly outnumber English ones (English is the base).</summary>
+        public static bool LooksItalian(string? input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return false;
+            int it = ItalianWordsRx.Matches(input).Count;
+            if (it == 0) return false;
+            return it > EnglishWordsRx.Matches(input).Count;
+        }
 
         private static readonly Regex VideoRx = new Regex(
             @"\b(genera(mi)?\s+(un\s+)?video|crea(mi)?\s+(un\s+)?video|fai\s+(un\s+)?video"

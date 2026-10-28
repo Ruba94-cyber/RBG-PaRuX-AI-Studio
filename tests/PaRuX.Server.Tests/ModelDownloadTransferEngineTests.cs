@@ -866,6 +866,31 @@ public sealed class ModelDownloadTransferRulesTests
     }
 
     [Theory]
+    [InlineData(401, false)]
+    [InlineData(401, true)]
+    [InlineData(403, false)]
+    [InlineData(403, true)]
+    [InlineData(404, false)]
+    [InlineData(503, false)]
+    [InlineData(418, false)]
+    public void CivitAI_refusals_name_CivitAI_and_never_Hugging_Face(int status, bool tokenSent)
+    {
+        ModelDownloadFailure failure = ModelDownloadFailure.FromHttpStatus((HttpStatusCode)status, tokenSent, null, civitAi: true);
+        string text = failure.Message + " " + failure.Remediation;
+        Assert.Contains("CivitAI", text);
+        Assert.DoesNotContain("Hugging Face", text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("huggingface", text, StringComparison.OrdinalIgnoreCase);
+        if (status == 401) Assert.Contains("API key", text);
+    }
+
+    [Fact]
+    public void Hugging_Face_401_text_is_unchanged_when_the_source_is_not_CivitAI()
+    {
+        ModelDownloadFailure failure = ModelDownloadFailure.FromHttpStatus(HttpStatusCode.Unauthorized, false, null);
+        Assert.Contains("Hugging Face repository needs an access token", failure.Message);
+    }
+
+    [Theory]
     [InlineData("https://huggingface.co/a/b/resolve/x/f.gguf", true)]
     [InlineData("https://cdn-lfs.hf.co/x", true)]
     [InlineData("https://cas-bridge.xethub.hf.co/x", true)]

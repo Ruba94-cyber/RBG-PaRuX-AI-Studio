@@ -14,7 +14,13 @@ namespace PaRuX.Server;
 /// </summary>
 public sealed class MediaPrewarmService
 {
-    internal const int MinFreeVramMib = 2048;
+    /// <summary>Measured live (RTX 5080, ComfyUI 0.43, PyTorch 2.14): a started, idle ComfyUI holds 228 MiB of VRAM (the CUDA context).
+    /// No weights are loaded, so this is all the prewarm needs beside the resident text model.</summary>
+    internal const int MinFreeVramMib = 1024;
+    /// <summary>Measured live: an idle ComfyUI has about 0.99 GiB resident (working set); 1.1 GiB is planned.</summary>
+    internal const long IdleFootprintBytes = 1100L << 20;
+    /// <summary>RAM that must still be available after the idle footprint is added, so the resident text model and Windows keep room.</summary>
+    internal const long HeadroomAfterBytes = 1536L << 20;
     internal static readonly TimeSpan AttemptTimeout = TimeSpan.FromMinutes(4);
     internal static readonly TimeSpan RetryCooldown = TimeSpan.FromSeconds(60);
     internal static readonly TimeSpan IdleExpiry = TimeSpan.FromMinutes(10);
@@ -53,6 +59,7 @@ public sealed class MediaPrewarmService
             IdleExpiry,
             AttemptTimeout))
     {
+        process.TextRestoredAfterMedia += () => Request("post-restore");
     }
 
     internal MediaPrewarmService(Hooks hooks) => _hooks = hooks;
@@ -183,13 +190,31 @@ public sealed class MediaPrewarmService
         return new string(value.Where(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_').ToArray());
     }
 
-    /// <summary>RAM admission with the text model still resident (nothing is discounted), then free VRAM. Null admits.</summary>
+    /// <summary>
+    /// A prewarm adds only an idle ComfyUI (about 1 GiB of RAM, 228 MiB of VRAM), so the execution profile's percentage limit, which sizes
+    /// whole model loads, is replaced here by what actually matters: the memory still available after that footprint. A real generation is
+    /// not affected: it stops the resident text model first and does its own admission. Returns a refusal reason, or null to admit.
+    /// </summary>
+    internal static string? EvaluatePrewarmRam(SystemRamSnapshot? ram)
+    {
+        if (ram is not { IsValid: true }) return "Not prewarmed: system RAM could not be measured.";
+        long available = (long)ram.AvailableBytes;
+        long needed = IdleFootprintBytes + HeadroomAfterBytes;
+        if (available >= needed) return null;
+        return "Not prewarmed: only " + (available / (double)(1L << 30)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
+            + " GiB of RAM is available, an idle ComfyUI needs about " + (IdleFootprintBytes / (double)(1L << 30)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
+            + " GiB plus " + (HeadroomAfterBytes / (double)(1L << 30)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " GiB of headroom.";
+    }
+
+    /// <summary>Temperature admission from the active profile, RAM by the idle-footprint rule, then free VRAM. Null admits.</summary>
     private static async Task<string?> DefaultAdmissionAsync(CancellationToken ct)
     {
         PaRuX.Contracts.ModelExecutionProfile profile = ExecutionProfileStore.Current.Get().Effective;
-        ExecutionResourceDecision ram = await ExecutionResourceGuard.CheckCurrentAsync(
-            profile, enforceCurrentVram: false, ct).ConfigureAwait(false);
-        if (!ram.Allowed) return "Not prewarmed: " + ram.Message;
+        ExecutionResourceDecision thermal = await ExecutionResourceGuard.CheckCurrentAsync(
+            profile, enforceCurrentVram: false, ct, enforceCurrentSystemRam: false).ConfigureAwait(false);
+        if (!thermal.Allowed) return "Not prewarmed: " + thermal.Message;
+        string? ramRefusal = EvaluatePrewarmRam(ExecutionResourceGuard.TryGetSystemRamSnapshot());
+        if (ramRefusal != null) return ramRefusal;
         int? free = await GpuMemoryReleaseWaiter.SampleFreeMibAsync(ct).ConfigureAwait(false);
         if (free is null) return "Not prewarmed: free VRAM could not be measured.";
         if (free < MinFreeVramMib)
