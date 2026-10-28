@@ -260,6 +260,34 @@ public sealed class MediaImageFamiliesTests : IDisposable
         Assert.Equal("sd_xl_base_1.0.safetensors", MediaCheckpointResolution.FileNameForProvenance("image"));
     }
 
+    [Fact]
+    public void Inpaint_falls_back_to_any_installed_z_image_turbo_variant_preferring_bf16()
+    {
+        WriteHeader(Path.Combine(LocalAiPaths.CheckpointsPath, "sd_xl_base_1.0.safetensors"), SdxlNames);
+        LocalAiPaths.SetMediaCheckpointOverride("image", "sd_xl_base_1.0.safetensors");
+        WriteHeader(Path.Combine(LocalAiPaths.DiffusionModelsPath, "z_image_turbo_fp8.safetensors"), ZImageNames);
+        WriteHeader(Path.Combine(LocalAiPaths.DiffusionModelsPath, "z_image_turbo_bf16.safetensors"), ZImageNames);
+
+        MediaCheckpointEffective effective = MediaCheckpointResolution.ResolveForPipeline("inpaint", LocalAiPaths.Img2ImgWorkflowTemplate);
+
+        Assert.Equal("z_image_turbo_bf16.safetensors", effective.File);
+        Assert.Null(effective.FamilyId);
+    }
+
+    [Fact]
+    public void Inpaint_refusal_names_the_expected_files_and_the_setup_action_when_no_z_image_turbo_is_installed()
+    {
+        WriteHeader(Path.Combine(LocalAiPaths.CheckpointsPath, "sd_xl_base_1.0.safetensors"), SdxlNames);
+        LocalAiPaths.SetMediaCheckpointOverride("image", "sd_xl_base_1.0.safetensors");
+
+        InvalidOperationException error = Assert.Throws<InvalidOperationException>(
+            () => MediaCheckpointResolution.ResolveForPipeline("inpaint", LocalAiPaths.Img2ImgWorkflowTemplate));
+
+        Assert.Contains("mask inpainting", error.Message);
+        Assert.Contains("z_image_turbo_bf16.safetensors", error.Message);
+        Assert.Contains("Set up Create", error.Message);
+    }
+
     // ---- catalogue pins and lanes ----
 
     private static readonly string[] NewFamilyIds = { "sdxl", "sdxl-anime", "realvisxl-v5", "flux1-schnell", "chroma" };
