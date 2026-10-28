@@ -147,6 +147,8 @@ namespace PaRuX.Views
                 _editSourceLabel.Text = filePath;
                 SelectMode("Edit");
             };
+            // Status, progress and results sit above the tabs so a tall mode panel (LoRA stack, inpaint editor) never scrolls them off screen.
+            body.Children.Add(statusBlock);
             body.Children.Add(BuildModeTabs(new (string, UIElement)[]
             {
                 ("Image", Section("IMAGE", BuildImagePanel())),
@@ -158,7 +160,6 @@ namespace PaRuX.Views
                 ("Workflows", Section("COMFYUI WORKFLOWS AND LORAS", BuildWorkflowLoraPanel())),
                 ("Gallery", gallery)
             }));
-            body.Children.Add(statusBlock);
             return scroll;
         }
 
