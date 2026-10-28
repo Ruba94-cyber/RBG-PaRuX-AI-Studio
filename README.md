@@ -148,16 +148,17 @@ The Android companion can request, supervise and approve an exact task, but it d
 
 Local creation workflows include:
 
-- image generation and editing;
-- img2img;
-- video;
+- image generation and editing (Z-Image, Qwen-Image and Qwen-Image-Edit, SDXL checkpoints, FLUX.1 schnell, Chroma), img2img, **mask inpainting** and a **stack of up to three LoRAs** with a family-compatibility check;
+- video (LTX-Video 2B and others), music (ACE-Step), background removal;
 - ComfyUI workflow import and LoRA install with consent;
-- speech-to-text and text-to-speech;
+- speech-to-text, text-to-speech and a hands-free **voice conversation mode** in Chat;
 - 3D generation;
 - artifact capture;
 - progress and cancellation.
 
-Availability depends on the local engines and models installed on the machine.
+All of it is also available from Chat in English and Italian ("create an image of…", "crea un video di…"). The **Model Hub media area** lists engines and models for each media type, split into Standard and Uncensored groups, discovered from Hugging Face with a "best for this PC" proposal and automatic routing by lane. After every download (text or media) PaRuX tunes the model for your hardware in the background, and when nothing is faster it says so and suggests concrete next steps. Character cards (SillyTavern/Chub JSON or PNG) import as personas.
+
+Availability depends on the local engines and models installed on the machine, and on your hardware: the media paths were verified on one NVIDIA PC; AMD/Intel, CPU-only and low-VRAM paths are covered by automated tests only.
 
 ### Dataset, training and evaluation
 
@@ -401,7 +402,7 @@ PaRuX is under **active development**.
 
 **Release acceptance: PARTIAL — active software gaps; PHYSICAL_PC_ACCEPTANCE_REQUIRED.** A successful software build alone does not establish stable-release acceptance.
 
-Not yet validated: GPU runs, clean MSI installation and physical-device acceptance are NOT RUN. Open items include Hugging Face LoRA adapters, Linux/macOS support, and music or talking-character video.
+**Version 2.0.0** adds local media creation from Create and Chat, the Model Hub media area, automatic per-model optimization and faster text/media switching (see [CHANGELOG.md](CHANGELOG.md)). Known limitations: real speech through a microphone is unproven on the test PC; character LoRA training, Wan 2.2 14B, HunyuanVideo, CogVideoX and Linux/macOS support are not implemented; hardware other than the NVIDIA test PC is covered by automated tests only; physical-PC acceptance remains open.
 
 Windows is the reference product and acceptance platform. The source tree contains working implementations alongside ongoing benchmark, packaging, behavioral and physical-PC acceptance work.
 
@@ -475,3 +476,9 @@ Useful ways to support the project include:
 - improving documentation;
 - sharing reproducible benchmark results;
 - starring the repository.
+
+If PaRuX is useful to you, you can also support its development with a donation:
+
+[![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-00457C?logo=paypal&logoColor=white)](https://www.paypal.com/donate?business=paolo.ruba.1913%40gmail.com&no_recurring=0&item_name=Support+PaRuX&currency_code=EUR)
+
+Donations are voluntary and unlock nothing: every feature stays free.
