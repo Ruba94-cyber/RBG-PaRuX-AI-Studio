@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>PaRuX.WinMlWorker</AssemblyName>
     <RootNamespace>PaRuX.WinMlWorker</RootNamespace>
-    <Version>1.9.6</Version>
+    <Version>2.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <!-- Windows ML 2.x is isolated in this Windows-only helper so PaRuX.Server remains free of

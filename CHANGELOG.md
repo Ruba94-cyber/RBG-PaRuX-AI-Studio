@@ -6,9 +6,39 @@ All notable changes to RBG PaRuX AI Studio are recorded here. The canonical engi
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] — 2026-10-28
 
-The next candidate version is **1.9.6**. Publication remains subject to the canonical BIC backlog and physical Windows acceptance; a successful software gate alone does not make this a released version.
+Local media creation, Model Hub media area, automatic per-model optimization and speed work. Everything below ran on one machine (Windows 11, RTX 5080 16 GB, 27 GB RAM); other hardware is covered by automated tests only.
+
+### Added
+
+- **Media on a clean install, from the app:** image, video, image edit, music (ACE-Step), speech, image-to-3D and background removal each set up and run through Create and through Chat in English and Italian.
+- **Model Hub media area:** engines and models for image, video, music and more, split into Standard and Uncensored groups, discovered from Hugging Face, with a "best for this PC" proposal and automatic routing by lane (Standard / Uncensored / Automatic). Image families include Z-Image, Qwen-Image (+Edit), SDXL checkpoints, FLUX.1 schnell and Chroma; video includes LTX-Video 2B.
+- **Automatic optimization after every download** (text and media): hardware-aware search (GPU offload, flash attention, KV cache, batch, threads, context, media precision and memory flags). When nothing is faster the result says "Already optimal for this PC" and lists concrete next steps; it never ends in a dead end.
+- **Create:** mode tabs, size presets, Music tab, mask inpainting (paint/erase/invert) and a stack of up to three LoRAs with a family-compatibility check.
+- **Chat:** hands-free voice mode (listen, transcribe, answer, read aloud), media from chat, character card import (SillyTavern/Chub JSON or PNG) as personas, guarded Delete for managed models.
+
+### Changed
+
+- Faster text/media switching: ComfyUI prewarm, a cheaper cold start (bytecode cache), and a CUDA media assistant. Measured here: first image after text work 122 s → 20.9 s with prewarm; chat during a media job about 175 tok/s; resident 27B back at 60 tok/s after restore.
+- Downloaded media checkpoints are placed into ComfyUI folders by the server, with a non-destructive migration for files that landed in the text-model folder.
+
+### Fixed
+
+- Automatic maintenance no longer fails when the media runtime is installed (13 consecutive failures before).
+- Image jobs no longer fail with a chat model resident (RAM admission and untrustworthy slot state).
+- Inpainting uses the user's own prompt; CivitAI 401 and region-edit notices are specific and localized; several Create/Hub regressions found by the UI suite.
+
+### Known limitations
+
+- Microphone: transcription of real speech was never proven on the test PC (its microphone only produced steady noise); voice mode is covered by unit tests and is unproven live. Barge-in is press-only.
+- Not implemented: character LoRA training, Wan 2.2 14B, HunyuanVideo, CogVideoX, Qwen-Image-Edit inpainting. Inpainting runs on Z-Image at about 1 MP.
+- Hardware other than the NVIDIA test PC (AMD/Intel Vulkan, CPU only, low VRAM) is exercised by automated tests only; Chroma took about 15 minutes for its first image on the test PC.
+- Release gate still reports 12 active BIC rows and PHYSICAL_PC_ACCEPTANCE_REQUIRED. This release is published by the maintainer's decision, not because those items are closed.
+
+## [1.9.6] — candidate notes (folded into 2.0.0)
+
+Publication remains subject to the canonical BIC backlog and physical Windows acceptance; a successful software gate alone does not make this a released version.
 
 ### Added
 

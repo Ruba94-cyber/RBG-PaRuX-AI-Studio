@@ -7,10 +7,10 @@
     <RootNamespace>PaRuX</RootNamespace>
     <!-- Keep the internal namespace stable while the public process/binary is fully branded. -->
     <AssemblyName>PaRuX</AssemblyName>
-    <Version>1.9.6</Version>
-    <FileVersion>1.9.6.0</FileVersion>
-    <AssemblyVersion>1.9.6.0</AssemblyVersion>
-    <InformationalVersion>1.9.6</InformationalVersion>
+    <Version>2.0.0</Version>
+    <FileVersion>2.0.0.0</FileVersion>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <InformationalVersion>2.0.0</InformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x64</Platforms>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
