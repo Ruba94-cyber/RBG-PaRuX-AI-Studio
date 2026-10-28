@@ -26,6 +26,10 @@ namespace PaRuX.Services
     {
         private MediaCapture? _capture;
         private InMemoryRandomAccessStream? _stream;
+        private ulong _levelPos = 44;
+
+        /// <summary>Raised when Windows reports the capture failed (for example the device was unplugged) while recording.</summary>
+        public event Action<string>? CaptureFailed;
 
         public async Task StartAsync()
         {
@@ -36,6 +40,7 @@ namespace PaRuX.Services
                 string? deviceId = await ChooseMicrophoneAsync();
                 if (deviceId != null) settings.AudioDeviceId = deviceId;
                 await _capture.InitializeAsync(settings);
+                _capture.Failed += (s, e) => CaptureFailed?.Invoke(e.Message);
                 _stream = new InMemoryRandomAccessStream();
                 await _capture.StartRecordToStreamAsync(MediaEncodingProfile.CreateWav(AudioEncodingQuality.Medium), _stream);
             }
@@ -50,6 +55,36 @@ namespace PaRuX.Services
                 Log.Write("Microphone start failed: " + ex.GetType().Name + " 0x" + ex.HResult.ToString("X8") + " " + ex.Message);
                 throw new VoiceCaptureException(VoiceMessages.NoMicrophone(), false, ex);
             }
+        }
+
+        /// <summary>
+        /// Peak level (0..1) of the audio written since the previous call, read from the tail of the in-memory
+        /// WAV while recording (used for voice-activity detection). 0 when nothing new was written or the
+        /// format is not 16-bit PCM.
+        /// </summary>
+        public async Task<double> PeekLevelAsync()
+        {
+            InMemoryRandomAccessStream? s = _stream;
+            if (s == null) return 0;
+            ulong size = s.Size;
+            if (size <= _levelPos) return 0;
+            uint count = (uint)Math.Min(size - _levelPos, 65536UL);
+            count &= ~1u;
+            if (count == 0) return 0;
+            using IInputStream input = s.GetInputStreamAt(_levelPos);
+            using var reader = new DataReader(input);
+            uint loaded = await reader.LoadAsync(count);
+            var bytes = new byte[loaded];
+            reader.ReadBytes(bytes);
+            reader.DetachStream();
+            _levelPos += loaded & ~1u;
+            int peak = 0;
+            for (int i = 0; i + 1 < bytes.Length; i += 2)
+            {
+                int v = Math.Abs((short)(bytes[i] | (bytes[i + 1] << 8)));
+                if (v > peak) peak = v;
+            }
+            return peak / 32768.0;
         }
 
         /// <summary>Stops and returns the recorded WAV bytes.</summary>

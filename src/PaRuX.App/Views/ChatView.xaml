@@ -503,6 +503,22 @@
                             ToolTipService.ToolTip="Dictate: click to start recording, click again to stop (Esc cancels, 2 min max)">
                             <FontIcon x:Name="MicIcon" Glyph="&#xE720;" FontSize="15" />
                         </Button>
+                        <Button
+                            x:Name="VoiceModeButton"
+                            AutomationProperties.AutomationId="Chat_VoiceMode_Toggle"
+                            AutomationProperties.Name="Start voice conversation"
+                            Click="VoiceMode_Click"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            CornerRadius="{StaticResource PaRuXRadiusMedium}"
+                            Foreground="{ThemeResource PaRuXTextTertiaryBrush}"
+                            VerticalAlignment="Bottom"
+                            Height="36"
+                            Width="36"
+                            Padding="0"
+                            ToolTipService.ToolTip="Voice mode: hands-free conversation. PaRuX listens, answers aloud, then listens again (Esc leaves)">
+                            <FontIcon x:Name="VoiceModeIcon" Glyph="&#xE9D9;" FontSize="15" />
+                        </Button>
                     </StackPanel>
 
                     <TextBox
@@ -525,6 +541,17 @@
                         TextChanged="InputBox_TextChanged" />
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceXS}" VerticalAlignment="Bottom">
+                        <TextBlock
+                            x:Name="VoiceModeStatus"
+                            AutomationProperties.AutomationId="Chat_VoiceMode_Status_Text"
+                            Visibility="Collapsed"
+                            VerticalAlignment="Center"
+                            MaxWidth="280"
+                            MaxLines="2"
+                            TextWrapping="Wrap"
+                            TextTrimming="CharacterEllipsis"
+                            FontSize="12"
+                            Foreground="{ThemeResource PaRuXTextSecondaryBrush}" />
                         <TextBlock
                             x:Name="VoiceIndicator"
                             AutomationProperties.AutomationId="Chat_Voice_Indicator_Text"
