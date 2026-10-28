@@ -1962,6 +1962,7 @@ namespace PaRuX.Views
         private async void Mic_Click(object sender, RoutedEventArgs e)
         {
             if (_voiceStarting) return;
+            if (_voiceConversation != null) { ShowTransientStatus("Voice mode is on. Turn it off (Esc) to dictate a single message."); return; }
             switch (_voice.Phase)
             {
                 case VoiceRecordingPhase.Recording:
@@ -2161,6 +2162,12 @@ namespace PaRuX.Views
 
         private void OnChatPreviewKeyDownVoice(object sender, KeyRoutedEventArgs e)
         {
+            if (e.Key == VirtualKey.Escape && _voiceConversation != null)
+            {
+                e.Handled = true;
+                _voiceConversation.Stop();
+                return;
+            }
             if (e.Key == VirtualKey.Escape && _voice.Phase == VoiceRecordingPhase.Recording)
             {
                 e.Handled = true;
@@ -2172,10 +2179,72 @@ namespace PaRuX.Views
         {
             try
             {
+                _voiceConversation?.Stop();
                 if (_voice.Phase == VoiceRecordingPhase.Recording) CancelVoiceRecording();
                 StopReadAloud();
             }
             catch (Exception ex) { Log.Write("Voice cleanup failed: " + ex.Message); }
+        }
+
+        // ------------------------------------------------------------------
+        // Voice mode (hands-free conversation). All policy lives in VoiceConversationController.
+        // ------------------------------------------------------------------
+        private VoiceConversationController? _voiceConversation;
+
+        private async void VoiceMode_Click(object sender, RoutedEventArgs e)
+        {
+            VoiceConversationController? active = _voiceConversation;
+            if (active != null)
+            {
+                // Press while the reply is read aloud (or while paused) = barge-in / resume; otherwise leave the mode.
+                if (!active.BargeIn()) active.Stop();
+                return;
+            }
+            if (_voiceStarting || _voice.Phase != VoiceRecordingPhase.Idle) { ShowTransientStatus("Finish the current voice recording first."); return; }
+            if (GamingManager.Current.IsActive) { ShowTransientStatus(VoiceMessages.GamingMode("voice conversation")); return; }
+            if (ChatSession.Current.IsBusy) { ShowTransientStatus("Wait for the current reply to finish, then turn Voice mode on."); return; }
+
+            StopReadAloud();
+            var controller = new VoiceConversationController(
+                new SystemVoiceClock(), new WinRtVoiceMicrophone(), new LocalVoiceTranscriber(),
+                new ChatSessionVoiceChat(), new KokoroVoiceSpeaker(), new LocalVoiceEnvironment());
+            controller.Changed += (state, text) => _dispatcher.TryEnqueue(() => ApplyVoiceModeUi(state, text));
+            _voiceConversation = controller;
+            ApplyVoiceModeUi(VoiceConversationState.Starting, "Starting voice conversation…");
+            VoiceConversationEnd end;
+            try { end = await controller.RunAsync(); }
+            catch (Exception ex)
+            {
+                Log.Write("Voice conversation crashed: " + ex);
+                end = new VoiceConversationEnd(VoiceConversationEndReason.Error, VoiceConversationMessages.Unexpected(ex.Message));
+            }
+            _voiceConversation = null;
+            ApplyVoiceModeUi(VoiceConversationState.Off, string.Empty);
+            Log.Write("Voice conversation ended: " + end.Reason + " - " + end.Message);
+            if (end.Reason != VoiceConversationEndReason.UserStopped) ShowPersistentVoiceStatus(end.Message);
+            else ShowTransientStatus(end.Message);
+        }
+
+        private void ApplyVoiceModeUi(VoiceConversationState state, string text)
+        {
+            bool on = state != VoiceConversationState.Off;
+            VoiceModeStatus.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            string label = VoiceConversationController.StateLabel(state);
+            VoiceModeStatus.Text = on ? label + (text.StartsWith(label, StringComparison.OrdinalIgnoreCase) ? text.Substring(label.Length) : " — " + text) : string.Empty;
+            ToolTipService.SetToolTip(VoiceModeStatus, on ? text : null);
+            VoiceModeIcon.Glyph = on ? "" : "";
+            VoiceModeButton.Foreground = on
+                ? (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"]
+                : LocalBrush("PaRuXTextTertiaryBrush");
+            string tip = !on ? "Voice mode: hands-free conversation. PaRuX listens, answers aloud, then listens again (Esc leaves)"
+                : state == VoiceConversationState.Speaking ? "Interrupt the reply and speak (Esc leaves Voice mode)"
+                : state == VoiceConversationState.Paused ? "Resume listening (Esc leaves Voice mode)"
+                : "Turn Voice mode off (Esc)";
+            ToolTipService.SetToolTip(VoiceModeButton, tip);
+            AutomationProperties.SetName(VoiceModeButton, !on ? "Start voice conversation"
+                : state == VoiceConversationState.Speaking ? "Interrupt and speak"
+                : state == VoiceConversationState.Paused ? "Resume listening" : "Stop voice conversation");
+            AutomationProperties.SetHelpText(VoiceModeStatus, VoiceModeStatus.Text);
         }
 
         private void ConfigureReadAloudButton(Button button, ChatMessage message)
