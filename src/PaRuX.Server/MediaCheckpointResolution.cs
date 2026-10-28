@@ -68,11 +68,18 @@ internal static class MediaCheckpointResolution
         if (family is null || family.Pipelines.Contains(pipeline, StringComparer.Ordinal)) return effective;
 
         ConfigAssets.EnsureAll();
-        string defaultFile = ReadTemplateUnet(templatePath);
-        if (string.IsNullOrEmpty(defaultFile) || !File.Exists(LocalAiPaths.MainModelPath(defaultFile)))
+        string templateDefault = ReadTemplateUnet(templatePath);
+        string? defaultFile = FindInstalledZImageTurbo(templateDefault);
+        if (defaultFile is null)
+        {
+            string what = pipeline == "inpaint" ? "mask inpainting" : "image-to-image";
+            string expected = string.IsNullOrEmpty(templateDefault)
+                ? "z_image_turbo_bf16.safetensors, z_image_turbo_fp8.safetensors or z_image_turbo_nvfp4.safetensors"
+                : templateDefault + " (or z_image_turbo_bf16.safetensors / z_image_turbo_fp8.safetensors)";
             throw new InvalidOperationException("The active image model (" + family.DisplayName
-                + ") cannot do " + (pipeline == "inpaint" ? "mask inpainting" : "image-to-image") + " yet, and the Z-Image model that can (" + (string.IsNullOrEmpty(defaultFile) ? "the default" : defaultFile)
-                + ") is not installed. Install or activate a Z-Image model to use " + (pipeline == "inpaint" ? "mask inpainting" : "image-to-image") + ".");
+                + ") cannot do " + what + " yet, and no Z-Image Turbo model is installed. Expected one of: " + expected
+                + " in models/diffusion_models. Use Set up Create in Model Hub to install Z-Image Turbo, or activate an installed Z-Image model, to use " + what + ".");
+        }
         return effective with
         {
             IsOverridden = false,
@@ -86,6 +93,23 @@ internal static class MediaCheckpointResolution
         };
     }
 
+    /// <summary>The Z-Image Turbo file a Z-Image-only pipeline can load: the template's own file when installed, else any installed
+    /// z_image_turbo variant, preferring bf16 (runs on every GPU), then fp8, then others by name. Null when none is installed.</summary>
+    internal static string? FindInstalledZImageTurbo(string templateDefault)
+    {
+        if (!string.IsNullOrEmpty(templateDefault) && File.Exists(LocalAiPaths.MainModelPath(templateDefault))) return templateDefault;
+        try
+        {
+            string dir = LocalAiPaths.DiffusionModelsPath;
+            if (!Directory.Exists(dir)) return null;
+            return Directory.EnumerateFiles(dir, "z_image_turbo*.safetensors")
+                .Select(Path.GetFileName).OfType<string>()
+                .OrderBy(n => n.Contains("bf16", StringComparison.OrdinalIgnoreCase) ? 0 : n.Contains("fp8", StringComparison.OrdinalIgnoreCase) ? 1 : 2)
+                .ThenBy(n => n, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
+
     /// <summary>The checkpoint file an image-to-image job reports as its model (see <see cref="ResolveForImg2Img"/>).</summary>
     public static string? FileNameForImg2ImgProvenance()
     {
@@ -97,7 +121,7 @@ internal static class MediaCheckpointResolution
         RegistryFamily? family = detection.FamilyId is null ? null : MediaCompanionRegistry.Shipped.FindFamily(detection.FamilyId);
         if (family is null || family.Pipelines.Contains("img2img", StringComparer.Ordinal)) return file;
         string defaultFile = ReadTemplateUnet(LocalAiPaths.Img2ImgWorkflowTemplate);
-        return string.IsNullOrEmpty(defaultFile) ? file : defaultFile;
+        return FindInstalledZImageTurbo(defaultFile) ?? (string.IsNullOrEmpty(defaultFile) ? file : defaultFile);
     }
 
     /// <summary>The ComfyUI models folder (full path) a downloaded main model belongs in, by its family: a single-file checkpoint goes to

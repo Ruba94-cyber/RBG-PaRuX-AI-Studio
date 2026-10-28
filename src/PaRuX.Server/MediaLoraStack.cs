@@ -55,6 +55,8 @@ internal static class MediaLoraStack
         "qwen-image" => "qwen",
         "wan2.2-ti2v-5b" => "wan",
         "sdxl" => "sdxl",
+        "flux1-schnell" => "flux",
+        "chroma" => "chroma",
         _ => null
     };
 
@@ -81,6 +83,7 @@ internal static class MediaLoraStack
         "qwen" => "Qwen-Image",
         "wan" => "Wan",
         "sdxl" => "SDXL",
+        "chroma" => "Chroma",
         "sd15" => "SD 1.5",
         "sd3" => "SD 3",
         _ => "unknown"

@@ -214,6 +214,10 @@ public sealed class CreateInpaintAndLoraPresenterTests
 
         using JsonDocument odd = JsonDocument.Parse("[1,2]");
         Assert.Empty(CreateLoraStackPresenter.ParseInstalled(odd.RootElement).Choices);
+        Assert.Contains("(Chroma: chroma1-hd.safetensors)", CreateLoraStackPresenter.Intro("Chroma", "chroma1-hd.safetensors"));
+        Assert.DoesNotContain("SDXL", CreateLoraStackPresenter.Intro("Chroma", "chroma1-hd.safetensors"));
+        Assert.Contains("family not recognised", CreateLoraStackPresenter.Intro("unknown", "mystery.safetensors"));
+        Assert.Equal("Chroma", PaRuX.Server.MediaLoraStack.DisplayName(PaRuX.Server.MediaLoraStack.KeyForRegistryFamily("chroma")));
         Assert.Contains("none", CreateLoraStackPresenter.HubHeader(0, "Z-Image"));
         Assert.Contains("(2)", CreateLoraStackPresenter.HubHeader(2, "Z-Image"));
     }

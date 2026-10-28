@@ -148,7 +148,7 @@ namespace PaRuX.Views
                 }
                 var (family, choices) = CreateLoraStackPresenter.ParseInstalled(body);
                 _loraStackChoices = choices;
-                _loraStackIntro.Text = CreateLoraStackPresenter.Intro(family);
+                _loraStackIntro.Text = CreateLoraStackPresenter.Intro(family, CreateLoraStackPresenter.ParseCheckpointFile(body));
                 for (int i = 0; i < _loraStackCombos.Length; i++)
                 {
                     ComboBox combo = _loraStackCombos[i];

@@ -45,9 +45,16 @@ namespace PaRuX.Services
             _ => choice.Name + " · family not recorded"
         };
 
-        public static string Intro(string checkpointFamilyName) =>
+        public static string Intro(string checkpointFamilyName, string? checkpointFile = null) =>
             "Pick up to " + MaxSlots + " LoRAs. They are applied in order and must be made for the active model"
-            + (string.IsNullOrWhiteSpace(checkpointFamilyName) || checkpointFamilyName == "unknown" ? "." : " (" + checkpointFamilyName + ").");
+            + (string.IsNullOrWhiteSpace(checkpointFamilyName) || checkpointFamilyName == "unknown"
+                ? (string.IsNullOrWhiteSpace(checkpointFile) ? "." : " (" + checkpointFile + ", family not recognised).")
+                : " (" + checkpointFamilyName + (string.IsNullOrWhiteSpace(checkpointFile) ? "" : ": " + checkpointFile) + ").");
+
+        /// <summary>The checkpoint file the compatibility checks used, from the installed-LoRAs response; null when absent.</summary>
+        public static string? ParseCheckpointFile(System.Text.Json.JsonElement root) =>
+            root.ValueKind == System.Text.Json.JsonValueKind.Object && root.TryGetProperty("checkpointFile", out var f)
+                && f.ValueKind == System.Text.Json.JsonValueKind.String ? f.GetString() : null;
 
         public static string EmptyList =>
             "No LoRA is installed. Install one from COMFYUI WORKFLOWS AND LORAS below, or copy a .safetensors file into ComfyUI's models/loras folder.";
