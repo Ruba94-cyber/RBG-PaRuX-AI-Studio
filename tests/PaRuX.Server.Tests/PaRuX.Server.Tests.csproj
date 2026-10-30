@@ -198,6 +198,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\BrowserProcessTreePolicy.cs" Link="ComputerUse\BrowserProcessTreePolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\CodingTaskRunLease.cs" Link="CodingAgent\CodingTaskRunLease.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ResourceSnapshot.cs" Link="ModelHub\ResourceSnapshot.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ResourceHardwareSnapshotMapper.cs" Link="ModelHub\ResourceHardwareSnapshotMapper.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ModelFitClassifier.cs" Link="ModelHub\ModelFitClassifier.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ExternalModelImportPolicy.cs" Link="ModelHub\ExternalModelImportPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\Integrations\ClientIntegrationModels.cs" Link="Integrations\ClientIntegrationModels.cs" />
