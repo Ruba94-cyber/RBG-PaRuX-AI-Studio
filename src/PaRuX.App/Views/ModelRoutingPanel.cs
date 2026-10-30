@@ -327,6 +327,10 @@ namespace PaRuX.Views
             body.Children.Add(_candidates);
 
             var actions = new StackPanel { Spacing = 8 };
+            var modelDetailsButton = new Button { Content = "Model details" };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(modelDetailsButton, "ModelRouting_CandidateDetails_Button");
+            modelDetailsButton.Click += async (_, _) => await ShowSelectedCandidateDetailsAsync();
+            actions.Children.Add(modelDetailsButton);
             var immediateActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             var auto = new Button { Content = "Use selected policy now" };
             auto.Click += async (_, _) => await ApplyPolicyAsync();
@@ -556,44 +560,37 @@ namespace PaRuX.Views
                 .OrderByDescending(c => c.IntelligenceScore ?? -1)
                 .ThenBy(c => c.FileName, StringComparer.OrdinalIgnoreCase))
             {
-                string scale = candidate.ParameterBillions.HasValue
-                    ? candidate.ParameterBillions.Value.ToString("0.#") + "B" : "scale ?";
-                string capability = candidate.CapabilityScore.HasValue
-                    ? "measured capability " + (candidate.CapabilityScore.Value * 100).ToString("0.0") + "%"
-                    : candidate.IntelligenceScore.HasValue
-                        ? "capability estimate " + (candidate.IntelligenceScore.Value * 100).ToString("0.0") + "%"
-                        : "capability unmeasured";
+                ManagedModelInfo? installed = _installedModels.FirstOrDefault(m =>
+                    string.Equals(m.FileName, candidate.FileName, StringComparison.OrdinalIgnoreCase));
+                string label = ModelHubRowPresentation.CompactManualLabel(installed?.Alias, candidate.FileName);
                 string speed = candidate.BenchmarkTokensPerSecond.HasValue
-                    ? candidate.BenchmarkTokensPerSecond.Value.ToString("0.0") + " tok/s" : "speed unmeasured";
+                    ? candidate.BenchmarkTokensPerSecond.Value.ToString("0.0") + " tok/s" : "speed not measured";
                 string fit = candidate.HardwareCompatible switch
                 {
-                    true => "hardware fit",
-                    false => "hardware mismatch",
-                    _ => "fit unknown"
+                    true => "Fits this PC",
+                    false => "Hardware mismatch",
+                    _ => "Fit unknown"
                 };
-                string flags = (candidate.IsCurrentAssignment ? " · assigned" : string.Empty)
-                    + (candidate.IsCurrentlyLoaded ? " · loaded" : string.Empty);
+                string status = candidate.IsCurrentAssignment ? " · Assigned" : string.Empty;
+                if (candidate.IsCurrentlyLoaded) status += " · Loaded";
 
                 var item = new ListViewItem { Tag = candidate };
-                var stack = new StackPanel { Spacing = 2, Padding = new Thickness(2, 4, 2, 4) };
-                stack.Children.Add(new TextBlock
+                var stack = new StackPanel { Spacing = 3, Padding = new Thickness(2, 4, 2, 4) };
+                var title = new TextBlock
                 {
-                    Text = candidate.FileName + " · " + scale + flags,
+                    Text = label + status,
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    TextWrapping = TextWrapping.Wrap
-                });
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxLines = 2,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                ToolTipService.SetToolTip(title, candidate.FileName);
+                stack.Children.Add(title);
                 stack.Children.Add(new TextBlock
                 {
-                    Text = capability + " · " + speed + " · " + fit,
+                    Text = speed + " · " + fit,
                     FontSize = 12,
                     Opacity = 0.76,
-                    TextWrapping = TextWrapping.Wrap
-                });
-                stack.Children.Add(new TextBlock
-                {
-                    Text = "Capability evidence: " + candidate.IntelligenceEvidence,
-                    FontSize = 11,
-                    Opacity = 0.62,
                     TextWrapping = TextWrapping.Wrap
                 });
                 item.Content = stack;
@@ -602,6 +599,76 @@ namespace PaRuX.Views
                     _candidates.SelectedItem = item;
             }
             if (_candidates.SelectedIndex < 0 && _candidates.Items.Count > 0) _candidates.SelectedIndex = 0;
+        }
+
+        private async Task ShowSelectedCandidateDetailsAsync()
+        {
+            CandidateEvidenceDto? candidate = SelectedCandidate();
+            if (candidate == null)
+            {
+                _status.Text = "Select a registered model first.";
+                return;
+            }
+
+            ManagedModelInfo? installed = _installedModels.FirstOrDefault(m =>
+                string.Equals(m.FileName, candidate.FileName, StringComparison.OrdinalIgnoreCase));
+            string measuredCapability = candidate.CapabilityScore.HasValue
+                ? (candidate.CapabilityScore.Value * 100).ToString("0.0") + "% (measured)"
+                : candidate.IntelligenceScore.HasValue
+                    ? (candidate.IntelligenceScore.Value * 100).ToString("0.0") + "% (estimated)"
+                    : "Not measured";
+            string speed = candidate.BenchmarkTokensPerSecond.HasValue
+                ? candidate.BenchmarkTokensPerSecond.Value.ToString("0.0") + " tok/s"
+                : "Not measured";
+            string fit = candidate.HardwareCompatible switch
+            {
+                true => "Compatible",
+                false => "Incompatible",
+                _ => "Unknown"
+            };
+
+            var details = new StackPanel { Spacing = 10 };
+            void AddDetail(string label, string? value)
+            {
+                var section = new StackPanel { Spacing = 3 };
+                section.Children.Add(new TextBlock
+                {
+                    Text = label,
+                    FontSize = 12,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                });
+                section.Children.Add(new TextBlock
+                {
+                    Text = string.IsNullOrWhiteSpace(value) ? "Unknown" : value,
+                    TextWrapping = TextWrapping.Wrap,
+                    IsTextSelectionEnabled = true
+                });
+                details.Children.Add(section);
+            }
+            AddDetail("Model file", candidate.FileName);
+            AddDetail("Quantization", installed?.Quantization);
+            AddDetail("Parameter size", candidate.ParameterBillions.HasValue
+                ? candidate.ParameterBillions.Value.ToString("0.#") + "B" : null);
+            AddDetail("Hardware compatibility", fit);
+            AddDetail("Capability", measuredCapability);
+            AddDetail("Measured speed", speed);
+            AddDetail("Capability evidence", candidate.IntelligenceEvidence);
+
+            var dialog = new ContentDialog
+            {
+                Title = ModelHubRowPresentation.CompactManualLabel(installed?.Alias, candidate.FileName),
+                Content = new ScrollViewer
+                {
+                    Content = details,
+                    MaxHeight = 440,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                },
+                CloseButtonText = "Close",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = XamlRoot
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(dialog, "ModelRouting_CandidateDetails_Dialog");
+            await dialog.ShowAsync();
         }
 
         private CandidateEvidenceDto? SelectedCandidate() =>
