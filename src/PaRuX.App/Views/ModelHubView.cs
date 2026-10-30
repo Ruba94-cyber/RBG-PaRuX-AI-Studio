@@ -31,6 +31,8 @@ namespace PaRuX.Views
         private readonly Button _candidateUtilityResetButton = new Button
         { Content = "Reset criteria", IsEnabled = false, Visibility = Visibility.Collapsed };
         private readonly TextBlock _hardwareSummary = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.75 };
+        private readonly Button _hardwareDetailsButton = new Button { Content = "Hardware details", IsEnabled = false };
+        private string _hardwareDetailText = string.Empty;
         private readonly TextBlock _discoveryRefreshStatus = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.75 };
         private string? _discoveryRefreshPausedReason;
         private readonly ProgressBar _busy = new ProgressBar { IsIndeterminate = true, Visibility = Visibility.Collapsed };
@@ -300,6 +302,11 @@ namespace PaRuX.Views
             body.Children.Add(_discoveryRefreshStatus);
             AutomationProperties.SetAutomationId(_status, "ModelHub_Status_Text");
             body.Children.Add(_hardwareSummary);
+            AutomationProperties.SetAutomationId(_hardwareDetailsButton, "ModelHub_HardwareDetails_Button");
+            _hardwareDetailsButton.HorizontalAlignment = HorizontalAlignment.Left;
+            _hardwareDetailsButton.Click += async (_, _) => await ShowModelDetailsAsync("Hardware fit details",
+                new (string Label, string? Value)[] { ("Detected hardware and fit rules", _hardwareDetailText) });
+            body.Children.Add(_hardwareDetailsButton);
 
             _suggestionsSection = Section("SUGGESTED FOR THIS PC · CANDIDATES, NOT VALIDATED", _suggestions);
             AutomationProperties.SetAutomationId(_suggestionsSection, ModelSuggestionPresenter.SectionAutomationId);
@@ -3915,7 +3922,9 @@ namespace PaRuX.Views
         {
             if (_hardware == null)
             {
-                _hardwareSummary.Text = "Hardware fit: unavailable. Variant size guidance remains visible, but PaRuX will not fabricate a VRAM recommendation.";
+                _hardwareSummary.Text = "Hardware fit unavailable. Estimates are not verified.";
+                _hardwareDetailText = "Hardware inventory is unavailable; PaRuX cannot confirm a VRAM fit.";
+                _hardwareDetailsButton.IsEnabled = true;
                 return;
             }
 
@@ -3935,9 +3944,13 @@ namespace PaRuX.Views
                         : adapters.Count == 0
                         ? (_hardware.GpuDetected ? "CUDA GPU · " + _hardware.VramTotalMib + " MiB" : "no dedicated GPU capacity reported")
                         : string.Join(" · ", adapters.Select(adapter => adapter.Name + " " + FormatBytes(adapter.DedicatedVideoMemoryBytes)));
-            _hardwareSummary.Text = "Hardware fit source: " + (_hardware.GpuInventoryAvailable ? _hardware.GpuInventorySource : "runtime fallback")
+            _hardwareDetailText = "Hardware fit source: "
+                + (_hardware.GpuInventoryAvailable ? _hardware.GpuInventorySource : "runtime fallback")
                 + " · " + gpu + " · system RAM " + FormatBytes(_hardware.RamTotalBytes)
                 + ". Independent GPU VRAM pools are never summed as an automatic single-model fit.";
+            _hardwareSummary.Text = "This PC: " + ModelHubRowPresentation.CompactDescription(gpu, 84)
+                + " · RAM " + FormatBytes(_hardware.RamTotalBytes);
+            _hardwareDetailsButton.IsEnabled = true;
         }
 
         private async Task SearchAsync(int? expectedRefreshGeneration = null)
