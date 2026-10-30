@@ -54,6 +54,28 @@ public sealed class ModelFitVerdictTests
     }
 
     [Fact]
+    public void Settings_and_hub_agree_on_cpu_only_pc_with_known_ram()
+    {
+        var resources = new ResourceSnapshot
+        {
+            GpuAvailable = false,
+            RamAvailable = true,
+            RamTotalMb = 16 * 1024
+        };
+        var model = new GgufModelInfo { SizeBytes = 2 * Gib };
+
+        ModelHardwareFitEstimate hub = ModelHardwareFitEstimator.Estimate(
+            model.SizeBytes, Hardware(vramGib: 0, ramGib: 16), model, 0,
+            ModelHardwareFitEstimator.LaunchCacheType);
+        ModelFit settings = ModelFitClassifier.Classify(model, resources);
+
+        Assert.Equal(ModelFitVerdict.Fits, hub.Verdict);
+        Assert.Equal(ModelHardwareFitTier.PartialOffload, hub.Tier);
+        Assert.Equal(ModelFit.CpuRamOnly, settings);
+        Assert.StartsWith("Fits · ", ModelFitClassifier.Describe(settings));
+    }
+
+    [Fact]
     public void Missing_hardware_is_unknown_and_never_a_guessed_zero()
     {
         ModelHardwareFitEstimate noInventory = ModelHardwareFitEstimator.Estimate(10 * Gib, null);
@@ -83,6 +105,7 @@ public sealed class ModelFitVerdictTests
     [InlineData(ModelFit.ExcellentFit, "Fits")]
     [InlineData(ModelFit.GoodFit, "Tight")]
     [InlineData(ModelFit.WorksWithOffload, "Big")]
+    [InlineData(ModelFit.CpuRamOnly, "Fits")]
     [InlineData(ModelFit.NotRecommended, "Big")]
     [InlineData(ModelFit.Unknown, "Unknown")]
     public void Settings_leads_with_the_shared_verdict_word(ModelFit fit, string word)
@@ -116,6 +139,7 @@ public sealed class ModelFitVerdictTests
         ModelFit.ExcellentFit => ModelHardwareFitTier.ExcellentFullGpu,
         ModelFit.GoodFit => ModelHardwareFitTier.FullGpuLikely,
         ModelFit.WorksWithOffload => ModelHardwareFitTier.PartialOffload,
+        ModelFit.CpuRamOnly => ModelHardwareFitTier.PartialOffload,
         ModelFit.NotRecommended => ModelHardwareFitTier.NotRecommended,
         _ => ModelHardwareFitTier.Unknown
     };
