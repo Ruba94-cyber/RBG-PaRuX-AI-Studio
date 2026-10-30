@@ -11,19 +11,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Changed
 
 - Model Hub and manual Chat model selection use concise labels, with detailed descriptions and quantization choices separated into dialogs (earlier changes on main).
-- Model Routing focuses on role/policy selection; candidate management, capability modes, Arena and read-only backend comparison are now optional expanded sections.
+- Model Routing focuses on role/policy selection; candidate management, capability modes, Arena and read-only backend comparison are now optional expanded sections. The registered candidate list shows compact speed/fit summaries, with quantization and supporting evidence in a dedicated Details dialog.
 - Tools & Automations keeps skill and server listings in view while MCP, automation and workflow creation forms, including advanced JSON, start collapsed.
 - Media Gallery has a compact two-row search/filter toolbar and a Details dialog for the complete prompt, metadata and local path.
 - Runtime suggestions retain their supporting evidence in a Details dialog; advanced context tuning is collapsed by default.
 - Observability displays concise metric and benchmark summaries with expandable evidence.
 - Update Manager shows installed model names first and file/quantization/source only when expanded. Projects keeps inventory and artifact history available in collapsible sections.
-- Settings adapts to narrow windows with a compact category dropdown and refreshes only the visible category instead of querying every service on entry.
-- Create's media model selector keeps the exact selected file for routing while shortening the displayed name, adding a full-identity details dialog, and moving the global content lane under optional preferences.
+- Settings adapts to narrow windows with a compact category dropdown, refreshes only the visible category, and offers search across existing setting labels with keyboard-aware category suggestions and empty-result feedback.
+- Create's media model selector keeps the exact selected file for routing while shortening the displayed name, adding a full-identity details dialog, and moving the global content lane under optional preferences. The job-cancel action is visible only during an active operation.
 - First-run onboarding uses a shorter introduction and collapses bundled-runtime and storage configuration details, without removing the manual component, model or local chat verification actions.
 
 ### Validation status
 
-- Source-level regression contracts added for progressive disclosure, adaptive Settings, onboarding and retained model actions. They have **not been executed** in this environment.
+- Source-level regression contracts added for progressive disclosure, searchable/adaptive Settings, onboarding, contextual cancellation and retained model actions. They have **not been executed** in this environment.
 - Windows WinUI build, FlaUI interaction/regression tests and real-device acceptance have **not been executed** for these UX changes. This entry is not a new release or a performance claim.
 
 ## [2.0.0] — 2026-10-28
