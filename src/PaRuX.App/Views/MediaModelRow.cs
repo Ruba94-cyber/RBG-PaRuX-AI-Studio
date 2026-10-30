@@ -83,8 +83,13 @@ namespace PaRuX.Views
     {
         private readonly string _idPrefix;
         private readonly ComboBox _model = new ComboBox { MinWidth = 280 };
-        private readonly TextBlock _hint = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.7 };
+        private readonly TextBlock _hint = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxLines = 2, FontSize = 12, Opacity = 0.7
+        };
         private readonly MediaLaneControl _lane;
+        private readonly Button _detailsButton = new Button { Content = "Details" };
         private IReadOnlyList<MediaModelPickerItem> _items = Array.Empty<MediaModelPickerItem>();
         private string _type;
         private bool _loading;
@@ -101,14 +106,25 @@ namespace PaRuX.Views
             _model.SelectionChanged += async (_, _) => await OnModelChangedAsync();
             _lane = new MediaLaneControl(idPrefix);
 
-            var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-            var modelColumn = new StackPanel { Spacing = 3 };
-            modelColumn.Children.Add(new TextBlock { Text = "Model", FontSize = 11, Opacity = 0.68 });
-            modelColumn.Children.Add(_model);
-            controls.Children.Add(modelColumn);
-            controls.Children.Add(_lane);
+            var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            _model.MinWidth = 0;
+            _model.Width = 340;
+            controls.Children.Add(_model);
+            AutomationProperties.SetAutomationId(_detailsButton, idPrefix + "_ModelDetails_Button");
+            AutomationProperties.SetName(_detailsButton, "View selected model details");
+            _detailsButton.Click += async (_, _) => await ShowDetailsAsync();
+            controls.Children.Add(_detailsButton);
+            Children.Add(new TextBlock { Text = "Model", FontSize = 11, Opacity = 0.68 });
             Children.Add(controls);
             Children.Add(_hint);
+            var laneEditor = new Expander
+            {
+                Header = "Content preferences",
+                Content = _lane,
+                IsExpanded = false
+            };
+            AutomationProperties.SetAutomationId(laneEditor, idPrefix + "_ContentLane_Expander");
+            Children.Add(laneEditor);
             _model.Items.Add(MediaModelPickerPresenter.AutomaticLabel);
             _model.SelectedIndex = 0;
             Loaded += async (_, _) => await RefreshAsync();
@@ -137,7 +153,13 @@ namespace PaRuX.Views
                 {
                     _items = state.Items;
                     _model.Items.Clear();
-                    foreach (MediaModelPickerItem item in state.Items) _model.Items.Add(item.Label);
+                    foreach (MediaModelPickerItem item in state.Items)
+                    {
+                        var option = new ComboBoxItem { Content = CompactModelLabel(item.Label) };
+                        ToolTipService.SetToolTip(option, item.Label);
+                        AutomationProperties.SetName(option, item.Label);
+                        _model.Items.Add(option);
+                    }
                     _model.SelectedIndex = state.SelectedIndex;
                 }
                 finally { _loading = false; }
@@ -147,6 +169,44 @@ namespace PaRuX.Views
             {
                 _hint.Text = "The installed models could not be listed: " + ex.Message;
             }
+        }
+
+        private static string CompactModelLabel(string label)
+        {
+            if (string.IsNullOrEmpty(label) || label.Length <= 60) return label;
+            // Retain both the family prefix and distinguishing quantization or pin suffix.
+            return label.Substring(0, 35).TrimEnd() + "…" + label.Substring(label.Length - 20);
+        }
+
+        private async Task ShowDetailsAsync()
+        {
+            MediaModelPickerItem? chosen = _model.SelectedIndex >= 0 && _model.SelectedIndex < _items.Count
+                ? _items[_model.SelectedIndex] : null;
+            var details = new StackPanel { Spacing = 8 };
+            details.Children.Add(new TextBlock
+            {
+                Text = chosen?.FileName is { Length: > 0 } ? "Selected model file" : "Automatic model selection",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+            });
+            var identity = new TextBox
+            {
+                Text = chosen?.FileName ?? "PaRuX chooses the best compatible model for each request.",
+                IsReadOnly = true,
+                TextWrapping = TextWrapping.Wrap,
+                AcceptsReturn = true
+            };
+            AutomationProperties.SetAutomationId(identity, _idPrefix + "_FullModelIdentity_TextBox");
+            details.Children.Add(identity);
+            details.Children.Add(new TextBlock { Text = _hint.Text, TextWrapping = TextWrapping.Wrap });
+            var dialog = new ContentDialog
+            {
+                Title = "Model selection details",
+                Content = details,
+                CloseButtonText = "Close",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = XamlRoot
+            };
+            await dialog.ShowAsync();
         }
 
         private async Task OnModelChangedAsync()
