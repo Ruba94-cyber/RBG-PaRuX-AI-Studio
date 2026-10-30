@@ -128,19 +128,25 @@ namespace PaRuX.Views
         private UIElement BuildMcpSection()
         {
             var panel = new StackPanel { Spacing = 10 };
-            panel.Children.Add(new TextBlock
+            var form = new StackPanel { Spacing = 10 };
+            form.Children.Add(new TextBlock
             {
-                Text = "Pick a known server to fill in the launch command, or type your own below. A server that needs a folder or file still needs that one path edited in Arguments.",
+                Text = "Choose a preset or enter a command. Review paths and arguments before connecting.",
                 TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.72
             });
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_mcpPreset, "MCP server preset");
-            panel.Children.Add(_mcpPreset);
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            row.Children.Add(_mcpName); row.Children.Add(_mcpCommand); row.Children.Add(_mcpArgs);
+            form.Children.Add(_mcpPreset);
+            var fields = new StackPanel { Spacing = 8 };
+            fields.Children.Add(_mcpName);
+            fields.Children.Add(_mcpCommand);
+            fields.Children.Add(_mcpArgs);
             var add = new Button { Content = "Add MCP server" };
             add.Click += async (_, _) => await AddMcpAsync();
-            row.Children.Add(add);
-            panel.Children.Add(row);
+            fields.Children.Add(add);
+            form.Children.Add(fields);
+            var editor = new Expander { Header = "Add an MCP server", Content = form, IsExpanded = false };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(editor, "Tools_Mcp_Create_Expander");
+            panel.Children.Add(editor);
             panel.Children.Add(_mcp);
             return panel;
         }
@@ -148,23 +154,32 @@ namespace PaRuX.Views
         private UIElement BuildAutomationSection()
         {
             var panel = new StackPanel { Spacing = 10 };
-            var top = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var form = new StackPanel { Spacing = 10 };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_triggerType, "Trigger type");
-            top.Children.Add(_automationName); top.Children.Add(_triggerType);
-            panel.Children.Add(top);
-            panel.Children.Add(new TextBlock { Text = "Trigger configuration JSON", FontSize = 12, Opacity = 0.7 });
+            form.Children.Add(_automationName);
+            form.Children.Add(_triggerType);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_triggerJson, "Trigger JSON");
-            panel.Children.Add(_triggerJson);
-            panel.Children.Add(_automationGoal);
-            panel.Children.Add(_automationRole);
+            var triggerEditor = new Expander
+            {
+                Header = "Advanced trigger configuration (JSON)",
+                Content = _triggerJson,
+                IsExpanded = false
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(triggerEditor, "Tools_Automation_Json_Expander");
+            form.Children.Add(triggerEditor);
+            form.Children.Add(_automationGoal);
+            form.Children.Add(_automationRole);
             var create = new Button { Content = "Create automation" };
             create.Click += async (_, _) => await CreateAutomationAsync();
-            panel.Children.Add(create);
-            panel.Children.Add(new TextBlock
+            form.Children.Add(create);
+            form.Children.Add(new TextBlock
             {
-                Text = "Available trigger types are sourced from the shared contract. Malformed/unsafe definitions are rejected by the server before persistence.",
-                FontSize = 12, TextWrapping = TextWrapping.Wrap, Opacity = 0.7
+                Text = "Triggers are validated by Core before saving. Expand JSON to customize the selected trigger.",
+                TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.72
             });
+            var editor = new Expander { Header = "New automation", Content = form, IsExpanded = false };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(editor, "Tools_Automation_Create_Expander");
+            panel.Children.Add(editor);
             panel.Children.Add(_automations);
             return panel;
         }
@@ -172,18 +187,28 @@ namespace PaRuX.Views
         private UIElement BuildWorkflowSection()
         {
             var panel = new StackPanel { Spacing = 10 };
-            panel.Children.Add(_workflowName);
-            panel.Children.Add(_workflowDescription);
-            panel.Children.Add(new TextBlock
+            var form = new StackPanel { Spacing = 10 };
+            form.Children.Add(_workflowName);
+            form.Children.Add(_workflowDescription);
+            var stepsEditor = new Expander
             {
-                Text = "Steps are an explicit JSON array of {name, goal, role, dependsOnStepIndexes}. Dependencies may only point backward; the Core validates the DAG before saving.",
-                TextWrapping = TextWrapping.Wrap,
-                Opacity = 0.72
+                Header = "Edit workflow steps (JSON)",
+                Content = _workflowStepsJson,
+                IsExpanded = false
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(stepsEditor, "Tools_Workflow_Json_Expander");
+            form.Children.Add(stepsEditor);
+            form.Children.Add(new TextBlock
+            {
+                Text = "Steps run in dependency order. Core checks the workflow before saving.",
+                TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.72
             });
-            panel.Children.Add(_workflowStepsJson);
             var create = new Button { Content = "Create workflow template" };
             create.Click += async (_, _) => await CreateWorkflowAsync();
-            panel.Children.Add(create);
+            form.Children.Add(create);
+            var editor = new Expander { Header = "New workflow template", Content = form, IsExpanded = false };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(editor, "Tools_Workflow_Create_Expander");
+            panel.Children.Add(editor);
             panel.Children.Add(_workflows);
             return panel;
         }
