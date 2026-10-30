@@ -30,14 +30,31 @@ namespace PaRuX.Services
             if (model == null || resources == null || model.SizeBytes <= 0)
                 return ModelFit.Unknown;
 
-            bool hasGpuCapacity = resources.GpuAvailable && resources.VramTotalMb > 0;
-            bool hasRamCapacity = resources.RamAvailable && resources.RamTotalMb > 0;
+            RuntimeManagerHardwareStatus hardware = resources.CoreHardware ?? FromResources(resources);
+            RuntimeAcceleratorProfile? profile = hardware.AcceleratorProfile;
+            // Core can see a physical NVIDIA/AMD/Intel adapter that has no
+            // installed eligible backend. Raw nvidia-smi VRAM must not count
+            // as runnable GPU capacity in that case.
+            bool hasGpuCapacity = profile == null
+                ? resources.GpuAvailable && resources.VramTotalMb > 0
+                : profile.AcceleratorEligible
+                    && (profile.SharedMemoryPrimary
+                        ? profile.SharedSystemMemoryLimitBytes > 0
+                        : profile.DedicatedVideoMemoryBytes > 0);
+            bool hasRamCapacity = resources.RamAvailable && resources.RamTotalMb > 0
+                || hardware.RamTotalBytes > 0;
             if (!hasGpuCapacity && !hasRamCapacity)
                 return ModelFit.Unknown;
 
+            // Avoid mutating Core DTOs: status belongs to the transport layer.
+            // When the server omits a RAM reading, use the local OS measurement.
+            if (hardware.RamTotalBytes <= 0 && resources.RamAvailable)
+            {
+                hardware = FromResources(resources, profile);
+            }
             ModelHardwareFitEstimate estimate = ModelHardwareFitEstimator.Estimate(
                 model.SizeBytes,
-                FromResources(resources),
+                hardware,
                 model,
                 0,
                 ModelHardwareFitEstimator.LaunchCacheType);
@@ -69,9 +86,11 @@ namespace PaRuX.Services
         /// <summary>Translate the resource monitor's available capacity to the shared
         /// estimator. GPU absence must not hide known system RAM, and missing GPU VRAM
         /// must not be synthesized from a zero or a device name.</summary>
-        private static RuntimeManagerHardwareStatus FromResources(ResourceSnapshot resources)
+        private static RuntimeManagerHardwareStatus FromResources(
+            ResourceSnapshot resources, RuntimeAcceleratorProfile? normalizedProfile = null)
         {
-            bool hasGpuCapacity = resources.GpuAvailable && resources.VramTotalMb > 0;
+            bool hasGpuCapacity = resources.GpuAvailable && resources.VramTotalMb > 0
+                && normalizedProfile == null;
             return new RuntimeManagerHardwareStatus
             {
                 GpuDetected = hasGpuCapacity,
@@ -79,6 +98,7 @@ namespace PaRuX.Services
                 RamTotalBytes = resources.RamAvailable ? Math.Max(0, resources.RamTotalMb) * MiB : 0,
                 GpuInventoryAvailable = hasGpuCapacity,
                 GpuInventorySource = "resource-monitor",
+                AcceleratorProfile = normalizedProfile,
                 GpuAdapters = hasGpuCapacity
                     ? new List<GpuAdapterStatus>
                     {
