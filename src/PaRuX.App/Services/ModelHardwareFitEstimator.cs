@@ -144,8 +144,11 @@ namespace PaRuX.Services
             long assumedContext = contextLength > 0
                 ? contextLength
                 : (model?.ContextLength is > 0 ? Math.Min(model.ContextLength!.Value, DefaultAssumedContextLength) : 0);
-            long? kvBytes = assumedContext > 0
-                ? KvCacheSizeEstimator.Estimate(model!, assumedContext, cacheType, cacheType)
+            // A context length alone does not provide GGUF attention geometry. Download
+            // previews and older clients can pass a context without a parsed header; use
+            // the explicitly labelled size heuristic instead of dereferencing null.
+            long? kvBytes = model != null && assumedContext > 0
+                ? KvCacheSizeEstimator.Estimate(model, assumedContext, cacheType, cacheType)
                 : null;
 
             // Weights + the real cache + the same runtime/compute reserve, versus the old
