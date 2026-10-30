@@ -100,6 +100,16 @@ public sealed class ProgressiveDisclosureUiContractTests
     }
 
     [Fact]
+    public void Quantization_picker_does_not_force_an_oversized_control_on_narrow_windows()
+    {
+        string modelHub = ReadSource("ModelHubView.Compact.cs");
+        Assert.Contains("MinWidth = 0, // Let WinUI size the picker", modelHub, StringComparison.Ordinal);
+        Assert.Contains("ModelHub_VariantPicker_ComboBox", modelHub, StringComparison.Ordinal);
+        Assert.Contains("ModelHub_QuantizationDialog", modelHub, StringComparison.Ordinal);
+        Assert.Contains("dialog.IsPrimaryButtonEnabled", modelHub, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Settings_search_finds_ui_labels_without_duplicating_settings_or_refreshing_all_categories()
     {
         string xamlPath = Path.Combine(FindRepositoryRoot(), "src", "PaRuX.App", "Views", "SettingsView.xaml");
