@@ -32,12 +32,22 @@
             <StackPanel x:Name="SettingsCategoryRail" Spacing="2" />
         </ScrollViewer>
 
-        <ComboBox x:Name="SettingsCompactCategoryPicker"
-                  Grid.Row="0" Grid.Column="1" Visibility="Collapsed"
-                  Margin="12,8,12,0" HorizontalAlignment="Stretch"
-                  AutomationProperties.AutomationId="Settings_CompactCategory_ComboBox"
-                  AutomationProperties.Name="Settings category"
-                  SelectionChanged="SettingsCompactCategoryPicker_SelectionChanged" />
+        <StackPanel Grid.Row="0" Grid.Column="1" Margin="12,8,12,4" Spacing="6">
+            <AutoSuggestBox x:Name="SettingsSearchBox"
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="Settings_Search_Box"
+                            AutomationProperties.Name="Find a setting"
+                            PlaceholderText="Find a setting, e.g. GPU, microphone, privacy…"
+                            QueryIcon="Find"
+                            TextChanged="SettingsSearchBox_TextChanged"
+                            QuerySubmitted="SettingsSearchBox_QuerySubmitted"
+                            SuggestionChosen="SettingsSearchBox_SuggestionChosen" />
+            <ComboBox x:Name="SettingsCompactCategoryPicker"
+                      Visibility="Collapsed" HorizontalAlignment="Stretch"
+                      AutomationProperties.AutomationId="Settings_CompactCategory_ComboBox"
+                      AutomationProperties.Name="Settings category"
+                      SelectionChanged="SettingsCompactCategoryPicker_SelectionChanged" />
+        </StackPanel>
 
         <ScrollViewer x:Name="SettingsContentScroll" Grid.Column="1" Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24,20,24,32">
         <StackPanel x:Name="SettingsContentPanel" Spacing="{StaticResource PaRuXSpaceXL}" MaxWidth="760" HorizontalAlignment="Left">
