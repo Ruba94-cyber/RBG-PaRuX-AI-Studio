@@ -30,8 +30,16 @@ namespace PaRuX.Services
             if (model == null || resources == null || model.SizeBytes <= 0)
                 return ModelFit.Unknown;
 
-            RuntimeManagerHardwareStatus hardware = resources.CoreHardware ?? FromResources(resources);
-            RuntimeAcceleratorProfile? profile = hardware.AcceleratorProfile;
+            RuntimeAcceleratorProfile? profile = resources.CoreHardware?.AcceleratorProfile;
+            // A legacy Core response may list physical DXGI adapters but has no
+            // normalized proof of an installed usable text backend. In that case
+            // retain observed RAM but exclude every physical VRAM total.
+            RuntimeManagerHardwareStatus hardware = profile != null
+                ? resources.CoreHardware!
+                : FromResources(resources);
+            if (profile == null && hardware.RamTotalBytes <= 0
+                && resources.CoreHardware is { RamTotalBytes: > 0 } previous)
+                hardware.RamTotalBytes = previous.RamTotalBytes;
             // Core can see a physical NVIDIA/AMD/Intel adapter that has no
             // installed eligible backend. Raw nvidia-smi VRAM must not count
             // as runnable GPU capacity in that case.
