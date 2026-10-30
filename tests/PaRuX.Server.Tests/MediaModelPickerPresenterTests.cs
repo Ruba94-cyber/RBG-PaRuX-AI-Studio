@@ -86,6 +86,27 @@ namespace PaRuX.Server.Tests
             Assert.Contains("never falls back to Standard", MediaModelPickerPresenter.LaneHint("Uncensored"));
         }
 
+        [Theory]
+        [InlineData("Automatic (recommended)", 60, "Automatic (recommended)")]
+        [InlineData("  model-Q4_K_M.gguf  ", 60, "model-Q4_K_M.gguf")]
+        [InlineData(null, 60, "Unknown model")]
+        public void Compact_model_display_preserves_short_names(string? input, int limit, string expected)
+        {
+            Assert.Equal(expected, MediaModelPickerPresenter.CompactDisplayLabel(input, limit));
+        }
+
+        [Fact]
+        public void Compact_model_display_preserves_family_and_quantization_suffix()
+        {
+            string full = "qwen-super-long-experimental-image-model-with-many-details-and-settings-Q4_K_M.gguf";
+            string display = MediaModelPickerPresenter.CompactDisplayLabel(full, 48);
+            Assert.True(display.Length <= 48);
+            Assert.StartsWith("qwen-", display);
+            Assert.EndsWith("Q4_K_M.gguf", display);
+            Assert.Contains("…", display);
+            Assert.Equal(full, new MediaModelPickerItem(display, full).FileName);
+        }
+
         [Fact]
         public void Provenance_line_and_details_show_the_model_and_the_routers_reason()
         {
