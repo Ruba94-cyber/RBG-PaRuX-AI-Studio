@@ -66,6 +66,23 @@ public sealed class ProgressiveDisclosureUiContractTests
         Assert.Contains("model.RepoId", updates, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Narrow_layouts_do_not_use_one_overflowing_row_for_all_primary_filters()
+    {
+        string gallery = ReadSource("MediaGalleryView.cs");
+        string routing = ReadSource("ModelRoutingPanel.cs");
+        string runtime = ReadSource("RuntimeManagerView.cs");
+
+        Assert.Contains("var filterBar = new Grid", gallery, StringComparison.Ordinal);
+        Assert.Contains("Grid.SetRow(_filterCombo, 1)", gallery, StringComparison.Ordinal);
+        Assert.Contains("Grid.SetRow(_sortCombo, 1)", gallery, StringComparison.Ordinal);
+        Assert.Contains("_searchBox.MinWidth = 0", gallery, StringComparison.Ordinal);
+        Assert.Contains("var roleRow = new StackPanel", routing, StringComparison.Ordinal);
+        Assert.Contains("var policyRow = new StackPanel", routing, StringComparison.Ordinal);
+        Assert.Contains("var defaultsActions = new StackPanel", routing, StringComparison.Ordinal);
+        Assert.Contains("RuntimeManager_ContextOptions_Expander", runtime, StringComparison.Ordinal);
+    }
+
     private static string ReadSource(string name)
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);
