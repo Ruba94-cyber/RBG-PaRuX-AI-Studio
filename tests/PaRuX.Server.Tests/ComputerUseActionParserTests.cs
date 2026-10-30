@@ -240,7 +240,7 @@ public sealed class ComputerUseActionParserTests
         foreach (string implemented in new[]
         {
             "click", "double_click", "right_click", "move", "type",
-            "key", "scroll", "focus_window", "wait", "done"
+            "key", "scroll", "focus_window", "wait", "ui_assert", "done"
         })
         {
             Assert.Contains(allowed, node => node!.GetValue<string>() == implemented);
@@ -251,6 +251,7 @@ public sealed class ComputerUseActionParserTests
     [InlineData("ui_invoke")]
     [InlineData("ui_set_value")]
     [InlineData("ui_wait_for")]
+    [InlineData("ui_assert")]
     public void Uia_actions_are_typed_and_declared_in_the_constrained_schema(string action)
     {
         Assert.True(ComputerUseActionParser.IsExecutable(action));
