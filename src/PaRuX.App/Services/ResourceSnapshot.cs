@@ -24,6 +24,9 @@ namespace PaRuX.Services
         /// <summary>Core-authoritative adapter/backend pair, or null when Core is unavailable.
         /// Raw GPU names and memory totals are telemetry, not proof that a text backend is installed.</summary>
         public RuntimeManagerHardwareStatus? CoreHardware { get; set; }
+        /// <summary>True for a real desktop poll that attempted to verify the
+        /// installed Core backend. A timeout does not establish GPU eligibility.</summary>
+        public bool CoreHardwareProbeAttempted { get; set; }
 
         /// <summary>Shared iGPU aperture is part of system RAM, not additional dedicated VRAM.</summary>
         public bool GpuMemoryIsShared { get; set; }
