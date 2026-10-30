@@ -80,6 +80,7 @@ namespace PaRuX.Views
         private readonly Dictionary<string, Button> _categoryButtons = new Dictionary<string, Button>();
         private string _selectedSettingsCategory = "General";
         private bool _syncingCompactSettingsCategory;
+        private bool _settingsCategoryRefreshEnabled;
 
         private void BuildSettingsCategoryRail()
         {
@@ -147,11 +148,8 @@ namespace PaRuX.Views
             // A new category starts at its top; otherwise it inherits the previous category's scroll offset
             // and can open scrolled past its own heading.
             SettingsContentScroll?.ChangeView(null, 0, null, true);
-            if (string.Equals(category, "Models", StringComparison.Ordinal))
-            {
-                _ = RefreshDiscoveryPolicyAsync();
-                _ = RefreshAutoCheckAsync();
-            }
+            if (_settingsCategoryRefreshEnabled)
+                RefreshVisibleSettingsCategory();
         }
 
         private void SettingsCompactCategoryPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -180,46 +178,85 @@ namespace PaRuX.Views
         public void OnShown()
         {
             LoadFromSettings();
-            _ = RefreshDiagnosticsAsync();
-            _ = RefreshRemoteAccessAsync();
-            _ = RefreshAutoFallbackAsync();
-            _ = RefreshInternetStatusAsync();
-            _ = RefreshWebAccessAsync();
-            _ = RefreshApiKeysAsync();
-            _ = RefreshIntegrationsAsync();
-            // The Gaming card used to show hard-coded placeholder state until Refresh was pressed.
-            _ = RefreshGamingStatusAsync();
-            _ = RefreshDetectedModelsAsync();
-            _ = RefreshDiscoveryPolicyAsync();
-            _ = RefreshAutoCheckAsync();
-            _ = RefreshExternalBackendAsync();
-            _ = RefreshCloudFallbackAsync();
-            _ = RefreshDesktopIntegrationsAsync();
-            _ = RefreshDocumentOutputAsync();
-            _ = RefreshMediaLaneAsync();
-            _ = RefreshMediaCheckpointsAsync();
-            _ = RefreshRecommendedCheckpointsAsync();
-            _ = RefreshCustomWorkflowsAsync();
-            _ = RefreshPersonasAsync();
-            _ = RefreshMcpServersAsync();
-            _ = RefreshMemoryListAsync();
-            _ = RefreshRagSourcesAsync();
-            _ = RefreshEmbeddingEngineStatusAsync();
-            _ = RefreshSkillsAsync();
-            _ = RefreshSpeechEngineStatusAsync();
-            _ = RefreshModelBudgetAsync();
-            _ = RefreshRecommendedModelsAsync();
-            _ = RefreshManagedModelsAsync();
-            _ = RefreshModelBenchmarksAsync();
-            _ = RefreshCompareModelsAsync();
-            _ = RefreshGroupChatModelsAsync();
-            _ = RefreshLocalAiRootAsync();
-            _ = RefreshRuntimeComponentsAsync();
-            _ = RefreshAvatarEngineStatusAsync();
-            _ = RefreshTrainingEngineStatusAsync();
-            _ = RefreshThreedEngineStatusAsync();
-            _ = RefreshAgentTasksAsync();
+            _settingsCategoryRefreshEnabled = true;
+            // Only the selected category queries Core. The previous implementation launched
+            // nearly forty unrelated network calls whenever Settings opened.
+            RefreshVisibleSettingsCategory();
             if (!_diagTimer.IsRunning) _diagTimer.Start();
+        }
+
+        private void RefreshVisibleSettingsCategory()
+        {
+            // All refreshes use the existing Core clients and read-only permission boundaries.
+            // Switching a category always reloads its state so hidden panels cannot become stale.
+            switch (_selectedSettingsCategory)
+            {
+                case "General":
+                    _ = RefreshDiagnosticsAsync();
+                    break;
+                case "Models":
+                    _ = RefreshDetectedModelsAsync();
+                    _ = RefreshDiscoveryPolicyAsync();
+                    _ = RefreshAutoCheckAsync();
+                    _ = RefreshExternalBackendAsync();
+                    _ = RefreshModelBudgetAsync();
+                    _ = RefreshRecommendedModelsAsync();
+                    _ = RefreshManagedModelsAsync();
+                    _ = RefreshModelBenchmarksAsync();
+                    _ = RefreshCompareModelsAsync();
+                    break;
+                case "Chat Behavior":
+                    _ = RefreshAutoFallbackAsync();
+                    _ = RefreshPersonasAsync();
+                    _ = RefreshGroupChatModelsAsync();
+                    break;
+                case "Your PC apps":
+                    _ = RefreshDesktopIntegrationsAsync();
+                    break;
+                case "Media Generation":
+                    _ = RefreshDocumentOutputAsync();
+                    _ = RefreshMediaLaneAsync();
+                    _ = RefreshMediaCheckpointsAsync();
+                    _ = RefreshRecommendedCheckpointsAsync();
+                    _ = RefreshSpeechEngineStatusAsync();
+                    _ = RefreshAvatarEngineStatusAsync();
+                    _ = RefreshTrainingEngineStatusAsync();
+                    _ = RefreshThreedEngineStatusAsync();
+                    break;
+                case "Automation":
+                    _ = RefreshCustomWorkflowsAsync();
+                    _ = RefreshMcpServersAsync();
+                    _ = RefreshSkillsAsync();
+                    break;
+                case "Agents":
+                    _ = RefreshAgentTasksAsync();
+                    break;
+                case "Integrations":
+                    _ = RefreshApiKeysAsync();
+                    _ = RefreshIntegrationsAsync();
+                    break;
+                case "Gaming & AI Sharing":
+                    _ = RefreshGamingStatusAsync();
+                    break;
+                case "PaRuX Platform":
+                    _ = RefreshLocalAiRootAsync();
+                    _ = RefreshRuntimeComponentsAsync();
+                    break;
+                case "Privacy & Network":
+                    _ = RefreshRemoteAccessAsync();
+                    _ = RefreshInternetStatusAsync();
+                    _ = RefreshWebAccessAsync();
+                    _ = RefreshCloudFallbackAsync();
+                    break;
+                case "Data":
+                    _ = RefreshMemoryListAsync();
+                    _ = RefreshRagSourcesAsync();
+                    _ = RefreshEmbeddingEngineStatusAsync();
+                    break;
+                case "Advanced":
+                    _ = RefreshDiagnosticsAsync();
+                    break;
+            }
         }
 
         // ------------------------------------------------------------------
