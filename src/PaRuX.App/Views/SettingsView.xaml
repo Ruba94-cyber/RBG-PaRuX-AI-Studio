@@ -17,18 +17,29 @@
         <SolidColorBrush x:Key="PaRuXDotOffBrush" Color="{ThemeResource PaRuXOffColor}" />
     </UserControl.Resources>
 
-    <Grid>
+    <Grid x:Name="SettingsLayoutGrid" SizeChanged="SettingsLayoutGrid_SizeChanged">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="192" />
+            <ColumnDefinition x:Name="SettingsRailColumn" Width="192" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
         <!-- ==================== Category rail ==================== -->
-        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Padding="12,20,4,20">
+        <ScrollViewer x:Name="SettingsRailScroll" Grid.Column="0" Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="12,20,4,20">
             <StackPanel x:Name="SettingsCategoryRail" Spacing="2" />
         </ScrollViewer>
 
-        <ScrollViewer x:Name="SettingsContentScroll" Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="24,20,24,32">
+        <ComboBox x:Name="SettingsCompactCategoryPicker"
+                  Grid.Row="0" Grid.Column="1" Visibility="Collapsed"
+                  Margin="12,8,12,0" HorizontalAlignment="Stretch"
+                  AutomationProperties.AutomationId="Settings_CompactCategory_ComboBox"
+                  AutomationProperties.Name="Settings category"
+                  SelectionChanged="SettingsCompactCategoryPicker_SelectionChanged" />
+
+        <ScrollViewer x:Name="SettingsContentScroll" Grid.Column="1" Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24,20,24,32">
         <StackPanel x:Name="SettingsContentPanel" Spacing="{StaticResource PaRuXSpaceXL}" MaxWidth="760" HorizontalAlignment="Left">
 
             <!-- ==================== Page header ==================== -->
