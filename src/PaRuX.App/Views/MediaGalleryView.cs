@@ -84,15 +84,22 @@ namespace PaRuX.Views
             root.Children.Add(headerPanel);
 
             // Filter bar
-            var filterBar = new StackPanel
+            var filterBar = new Grid
             {
-                Orientation = Orientation.Horizontal,
-                Spacing = 10,
+                ColumnSpacing = 10,
+                RowSpacing = 8,
                 Margin = new Thickness(0, 4, 0, 4)
             };
+            filterBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            filterBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            filterBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            filterBar.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            filterBar.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             AutomationProperties.SetAutomationId(_searchBox, "MediaGallery_Search_Box");
             _searchBox.TextChanged += (_, _) => ApplyFilterAndSort();
+            _searchBox.MinWidth = 0;
+            Grid.SetColumnSpan(_searchBox, 2);
             filterBar.Children.Add(_searchBox);
 
             _filterCombo.Items.Add(new ComboBoxItem { Content = "All Media", Tag = MediaGalleryFilter.All });
@@ -103,6 +110,8 @@ namespace PaRuX.Views
             AutomationProperties.SetAutomationId(_filterCombo, "MediaGallery_Filter_Combo");
             AutomationProperties.SetName(_filterCombo, "Filter media");
             _filterCombo.SelectionChanged += (_, _) => ApplyFilterAndSort();
+            Grid.SetRow(_filterCombo, 1);
+            _filterCombo.HorizontalAlignment = HorizontalAlignment.Stretch;
             filterBar.Children.Add(_filterCombo);
 
             _sortCombo.Items.Add(new ComboBoxItem { Content = "Newest First", Tag = MediaGallerySort.NewestFirst });
@@ -113,10 +122,13 @@ namespace PaRuX.Views
             AutomationProperties.SetAutomationId(_sortCombo, "MediaGallery_Sort_Combo");
             AutomationProperties.SetName(_sortCombo, "Sort media");
             _sortCombo.SelectionChanged += (_, _) => ApplyFilterAndSort();
+            Grid.SetRow(_sortCombo, 1);
+            Grid.SetColumn(_sortCombo, 1);
             filterBar.Children.Add(_sortCombo);
 
             AutomationProperties.SetAutomationId(_refreshButton, "MediaGallery_Refresh_Button");
             _refreshButton.Click += async (_, _) => await RefreshAsync();
+            Grid.SetColumn(_refreshButton, 2);
             filterBar.Children.Add(_refreshButton);
 
             root.Children.Add(filterBar);
