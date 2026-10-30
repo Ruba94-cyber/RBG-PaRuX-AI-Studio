@@ -1479,6 +1479,7 @@ namespace PaRuX.Views
                 {
                     ModelFit.ExcellentFit => "PaRuXSuccessColor",
                     ModelFit.WorksWithOffload => "PaRuXCautionTextBrush",
+                    ModelFit.CpuRamOnly => "PaRuXCautionTextBrush",
                     ModelFit.NotRecommended => "PaRuXDangerTextBrush",
                     _ => null
                 };
