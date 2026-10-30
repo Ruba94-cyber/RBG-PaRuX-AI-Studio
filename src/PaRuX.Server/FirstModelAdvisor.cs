@@ -21,10 +21,6 @@ public static class FirstModelAdvisor
     /// context plus the compute buffers, which is close to what llama.cpp actually reserves.</summary>
     private const double RuntimeOverheadFactor = 1.25;
 
-    /// <summary>System RAM is shared with Windows, the browser, and whatever else is open. Offering
-    /// a model that needs every byte of it is offering a machine that stops responding.</summary>
-    private const double UsableSystemRamFraction = 0.60;
-
     /// <summary>
     /// The one adapter a single model would be loaded onto: the largest real GPU, never the sum and
     /// never "whichever came back first". Both the memory figure and the name must come from here,
@@ -47,9 +43,12 @@ public static class FirstModelAdvisor
         if (modelBytes <= 0) return ModelSuitability.Unknown;
 
         long needed = (long)(modelBytes * RuntimeOverheadFactor);
+        // First-run, Model Hub and the runtime profile must use one conservative
+        // RAM capacity. A separate 60% rule could promote a model that the
+        // real Core hardware budget (especially on 8-GiB PCs) would reject.
         long usableRam = usableSystemRamOverride.HasValue
             ? Math.Max(0, usableSystemRamOverride.Value)
-            : (long)(ramBytes * UsableSystemRamFraction);
+            : RuntimeHardwareProfileResolver.ConservativeUsableSystemRamBytes(Math.Max(0, ramBytes));
 
         if (acceleratorMemoryBytes > 0 && needed <= acceleratorMemoryBytes) return ModelSuitability.FitsOnGpu;
         // Part on the GPU, the rest in RAM. This runs, and it runs several times slower than a model
