@@ -21,7 +21,7 @@ namespace PaRuX.Views
     {
         private readonly ComboBox _role = new ComboBox { MinWidth = 150 };
         private readonly ComboBox _mode = new ComboBox { MinWidth = 190 };
-        private readonly ComboBox _installed = new ComboBox { MinWidth = 360, PlaceholderText = "Choose installed GGUF…" };
+        private readonly ComboBox _installed = new ComboBox { MinWidth = 260, PlaceholderText = "Choose a model…" };
         private readonly Button _addInstalled = new Button { Content = "Add installed model to role", IsEnabled = false };
         private readonly TextBlock _installedStatus = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.78 };
         private readonly ListView _candidates = new ListView { SelectionMode = ListViewSelectionMode.Single, MinHeight = 180, MaxHeight = 420 };
@@ -34,6 +34,8 @@ namespace PaRuX.Views
         private readonly TextBlock _backendRaceResult = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.78 };
         private readonly CheckBox _codingAuto = new CheckBox { Content = "Choose the coding model automatically from measured local results" };
         private readonly TextBlock _codingSelection = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.82 };
+        private readonly Button _codingDetailsButton = new Button { Content = "Comparison details", IsEnabled = false };
+        private string? _codingDetailsText;
         private bool _codingSelectionLoading;
         private readonly ComboBox _overrideMode = new ComboBox { MinWidth = 240 };
         private readonly ComboBox _overrideModel = new ComboBox { MinWidth = 260, PlaceholderText = "Choose model for override…" };
@@ -123,13 +125,37 @@ namespace PaRuX.Views
             });
             body.Children.Add(new TextBlock
             {
-                Text = "Core compares the coding-role candidates using real /code task outcomes measured on this PC: verified-task quality 50%, reliability 30%, speed 20% (verified runs only). A model that does not fit this hardware is never chosen. Until at least two fitting candidates have 3 measured tasks each, the coding role's assigned model is used.",
-                TextWrapping = TextWrapping.Wrap,
-                FontSize = 12,
-                Opacity = 0.72
+                Text = "Automatic selection uses measured coding results when enough evidence is available.",
+                TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.76
             });
             body.Children.Add(_codingAuto);
             body.Children.Add(_codingSelection);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(
+                _codingDetailsButton, "ModelRouting_CodingComparisonDetails_Button");
+            _codingDetailsButton.Click += async (_, _) =>
+            {
+                if (string.IsNullOrWhiteSpace(_codingDetailsText)) return;
+                var dialog = new ContentDialog
+                {
+                    Title = "Coding model comparison",
+                    Content = new ScrollViewer
+                    {
+                        Content = new TextBlock
+                        {
+                            Text = "Measured results: verified-task quality 50%, reliability 30%, speed 20%. "
+                                + "Only fitting models with enough local evidence are compared.\n\n"
+                                + _codingDetailsText,
+                            TextWrapping = TextWrapping.Wrap
+                        },
+                        MaxHeight = 440
+                    },
+                    CloseButtonText = "Close",
+                    XamlRoot = XamlRoot,
+                    MaxWidth = 700
+                };
+                await dialog.ShowAsync();
+            };
+            body.Children.Add(_codingDetailsButton);
             return body;
         }
 
@@ -141,11 +167,17 @@ namespace PaRuX.Views
                 _codingSelectionLoading = true;
                 _codingAuto.IsChecked = decision.Mode == CodingModelSelectionMode.Auto;
                 _codingSelectionLoading = false;
-                _codingSelection.Text = DescribeCodingSelection(decision);
+                _codingDetailsText = DescribeCodingSelection(decision);
+                _codingDetailsButton.IsEnabled = true;
+                _codingSelection.Text = "In use for /code: " + (decision.SelectedFileName ?? "No coding model assigned")
+                    + (decision.EffectiveSource == CodingModelSelectionMode.Auto
+                        ? " · automatic measured choice" : " · assigned model");
             }
             catch (Exception ex)
             {
                 _codingSelectionLoading = false;
+                _codingDetailsText = null;
+                _codingDetailsButton.IsEnabled = false;
                 _codingSelection.Text = "Coding model selection is unavailable: " + ex.Message;
             }
         }
@@ -212,7 +244,7 @@ namespace PaRuX.Views
             });
             body.Children.Add(new TextBlock
             {
-                Text = "PaRuX keeps capability and speed separate. A 4B may be much faster than a 27B without being the better model for coding/reasoning. Capability Profiler results are empirical; when they are missing, model scale is only a disclosed prior, never treated as proof of intelligence.",
+                Text = "Choose which models PaRuX uses for each task. Keep automatic routing or customize individual roles.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.76
             });
@@ -480,10 +512,12 @@ namespace PaRuX.Views
             {
                 var item = new ComboBoxItem
                 {
-                    Content = (string.IsNullOrWhiteSpace(model.Alias) ? model.FileName : model.Alias + " · " + model.FileName)
-                        + (model.LastBenchmarkTokensPerSecond.HasValue ? " · " + model.LastBenchmarkTokensPerSecond.Value.ToString("0.0") + " tok/s" : string.Empty),
+                    Content = string.IsNullOrWhiteSpace(model.Alias) ? model.FileName : model.Alias,
                     Tag = model.FileName
                 };
+                ToolTipService.SetToolTip(item, model.FileName + " · " + model.Quantization
+                    + (model.LastBenchmarkTokensPerSecond.HasValue
+                        ? " · " + model.LastBenchmarkTokensPerSecond.Value.ToString("0.0") + " tok/s" : string.Empty));
                 string key = string.Concat(model.FileName.Select(character => char.IsLetterOrDigit(character) ? character : '_'));
                 Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(item, "ModelRouting_InstalledModel_" + key + "_Item");
                 _installed.Items.Add(item);
