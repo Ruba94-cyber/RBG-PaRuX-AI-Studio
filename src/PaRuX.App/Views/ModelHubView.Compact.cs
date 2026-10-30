@@ -27,7 +27,11 @@ namespace PaRuX.Views
                     Text = label, FontSize = 12, Opacity = 0.72,
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
                 });
-                section.Children.Add(new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap });
+                section.Children.Add(new TextBlock
+                {
+                    Text = value, TextWrapping = TextWrapping.Wrap,
+                    IsTextSelectionEnabled = true
+                });
                 content.Children.Add(section);
             }
             if (modelCardUri is { Scheme: "https", Host: "huggingface.co" })
@@ -46,8 +50,9 @@ namespace PaRuX.Views
             var dialog = new ContentDialog
             {
                 Title = title, Content = scroll, CloseButtonText = "Close",
-                XamlRoot = XamlRoot, MaxWidth = 640
+                XamlRoot = XamlRoot, MaxWidth = 720
             };
+            dialog.Resources["ContentDialogMaxWidth"] = 720d;
             AutomationProperties.SetAutomationId(dialog, "ModelHub_ModelDetails_Dialog");
             await dialog.ShowAsync();
         }
@@ -103,8 +108,9 @@ namespace PaRuX.Views
                 CloseButtonText = "Cancel",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot,
-                MaxWidth = 660
+                MaxWidth = 720
             };
+            dialog.Resources["ContentDialogMaxWidth"] = 720d;
             AutomationProperties.SetAutomationId(dialog, "ModelHub_QuantizationDialog");
             picker.SelectionChanged += (_, _) =>
             {

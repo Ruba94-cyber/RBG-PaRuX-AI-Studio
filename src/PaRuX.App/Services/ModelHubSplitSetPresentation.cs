@@ -71,6 +71,24 @@ namespace PaRuX.Services
         /// </summary>
         public sealed record RecommendedSetOption(string RepoId, ModelQuantChoice Choice);
 
+        /// <summary>
+        /// Choose a complete balanced variant for ordinary browsing, without overriding
+        /// an explicit setup hint. This is a UI default, not a hardware recommendation:
+        /// the user still reviews the real size, plan and licence before any download.
+        /// </summary>
+        public static int PreferredBalancedQuantChoiceIndex(
+            IReadOnlyList<QuantChoiceOption> choices, string? quantizationHint)
+        {
+            int fallback = PreferredQuantChoiceIndex(choices, quantizationHint);
+            if (fallback < 0 || !string.IsNullOrWhiteSpace(quantizationHint)) return fallback;
+            foreach (string balanced in new[] { "Q4_K_M", "IQ4_XS", "Q4_0" })
+                for (int i = 0; i < choices.Count; i++)
+                    if (choices[i].CanDownload
+                        && string.Equals(choices[i].Choice.Quantization, balanced, StringComparison.OrdinalIgnoreCase))
+                        return i;
+            return fallback;
+        }
+
         public static RecommendedSetOption? PickRecommendedSet(
             IEnumerable<ModelSearchResult> searchResults, string expectedRepoId, string? quantizationHint)
         {

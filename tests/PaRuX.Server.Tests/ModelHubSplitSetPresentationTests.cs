@@ -75,6 +75,35 @@ public sealed class ModelHubSplitSetPresentationTests
 
 
     [Fact]
+    public void Browsing_prefers_complete_balanced_quantization_over_alphabetical_low_precision()
+    {
+        var options = ModelHubSplitSetPresentation.BuildQuantChoiceOptions(new[]
+        {
+            new ModelQuantChoice { SetName = "tiny", Quantization = "Q2_K", Complete = true, PartCount = 1 },
+            new ModelQuantChoice { SetName = "balanced-broken", Quantization = "Q4_K_M", Complete = false, PartCount = 2 },
+            new ModelQuantChoice { SetName = "balanced", Quantization = "Q4_K_M", Complete = true, PartCount = 1 },
+            new ModelQuantChoice { SetName = "large", Quantization = "Q8_0", Complete = true, PartCount = 1 }
+        });
+        int preferred = ModelHubSplitSetPresentation.PreferredBalancedQuantChoiceIndex(options, null);
+        Assert.Equal("balanced", options[preferred].Choice.SetName);
+        Assert.True(options[preferred].CanDownload);
+        Assert.Equal("large", options[ModelHubSplitSetPresentation.PreferredBalancedQuantChoiceIndex(options, "Q8_0")].Choice.SetName);
+    }
+
+    [Fact]
+    public void Browsing_falls_back_to_complete_variant_when_balanced_is_missing()
+    {
+        var options = ModelHubSplitSetPresentation.BuildQuantChoiceOptions(new[]
+        {
+            new ModelQuantChoice { SetName = "broken", Quantization = "Q4_K_M", Complete = false, PartCount = 2 },
+            new ModelQuantChoice { SetName = "available", Quantization = "Q3_K_M", Complete = true, PartCount = 1 }
+        });
+        Assert.Equal("available", options[ModelHubSplitSetPresentation.PreferredBalancedQuantChoiceIndex(options, null)].Choice.SetName);
+        Assert.Equal(-1, ModelHubSplitSetPresentation.PreferredBalancedQuantChoiceIndex(
+            Array.Empty<ModelHubSplitSetPresentation.QuantChoiceOption>(), null));
+    }
+
+    [Fact]
     public void RecommendedModel_RejectsAnUnrelatedSearchResultInsteadOfDownloadingAnotherRepository()
     {
         var unrelated = new ModelSearchResult

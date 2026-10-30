@@ -4074,12 +4074,10 @@ namespace PaRuX.Views
             {
                 IReadOnlyList<ModelHubSplitSetPresentation.QuantChoiceOption> choices =
                     ModelHubSplitSetPresentation.BuildQuantChoiceOptions(repo.QuantChoices);
-                int firstDownloadable = ModelHubSplitSetPresentation.PreferredQuantChoiceIndex(choices, null);
                 bool fromFirstModelSetup = string.Equals(
                     repo.RepoId, _firstModelHandoffRepoId, StringComparison.OrdinalIgnoreCase);
-                int preferred = fromFirstModelSetup
-                    ? ModelHubSplitSetPresentation.PreferredQuantChoiceIndex(choices, _firstModelHandoffQuantHint)
-                    : firstDownloadable;
+                int preferred = ModelHubSplitSetPresentation.PreferredBalancedQuantChoiceIndex(
+                    choices, fromFirstModelSetup ? _firstModelHandoffQuantHint : null);
                 bool canReviewDefault = preferred >= 0 && preferred < choices.Count && choices[preferred].CanDownload;
 
                 var card = new StackPanel { Spacing = 7 };
@@ -4098,8 +4096,11 @@ namespace PaRuX.Views
                     ModelHubSplitSetPresentation.QuantChoiceOption suggested = choices[preferred];
                     card.Children.Add(new TextBlock
                     {
-                        Text = (fromFirstModelSetup ? "Setup choice: " : "Suggested: ")
-                            + suggested.Choice.Quantization + " · ~" + FormatBytes(suggested.Choice.SizeBytes),
+                        Text = (fromFirstModelSetup ? "Setup choice: " : "Default to review: ")
+                            + suggested.Choice.Quantization
+                            + (suggested.Choice.SizeBytes > 0
+                                ? " · ~" + FormatBytes(suggested.Choice.SizeBytes)
+                                : " · size not published"),
                         FontSize = 12, Opacity = 0.82, TextWrapping = TextWrapping.Wrap
                     });
                 }
