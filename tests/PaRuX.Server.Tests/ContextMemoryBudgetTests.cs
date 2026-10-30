@@ -53,6 +53,34 @@ public sealed class ContextMemoryBudgetTests
         IsSoftware = software
     };
 
+    [Theory]
+    [InlineData(4, 2)]
+    [InlineData(8, 4)]
+    [InlineData(12, 6)]
+    [InlineData(16, 8)]
+    [InlineData(32, 24)]
+    [InlineData(64, 48)]
+    public void Hardware_profile_preserves_nonzero_low_ram_budget_without_changing_larger_hosts(
+        long totalGiB, long usableGiB)
+    {
+        Assert.Equal(usableGiB * Gib,
+            RuntimeHardwareProfileResolver.ConservativeUsableSystemRamBytes(totalGiB * Gib));
+    }
+
+    [Fact]
+    public void Eight_gib_integrated_gpu_uses_one_bounded_four_gib_shared_ram_pool()
+    {
+        RuntimeManagerStatus machine = Machine(8 * Gib, vulkanInstalled: true);
+        GpuInventoryStatus inventory = Inventory(Adapter("Intel integrated", 0x8086, 128 * Mib, 8 * Gib));
+        RuntimeHardwareProfile hardware = RuntimeHardwareProfileResolver.Resolve(machine, inventory);
+        ContextMemoryBudget.Budget budget = ContextMemoryBudget.For(machine, hardware);
+
+        Assert.True(hardware.UsesSharedSystemMemoryAsPrimary);
+        Assert.Equal(4 * Gib, hardware.UsableSystemRamBytes);
+        Assert.Equal(4 * Gib, budget.VramBytes);
+        Assert.Equal(0, budget.OffloadableRamBytes);
+    }
+
     [Fact]
     public void Cpu_only_uses_system_RAM_as_one_pool()
     {
