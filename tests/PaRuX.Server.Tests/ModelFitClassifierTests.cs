@@ -78,6 +78,33 @@ public sealed class ModelFitClassifierTests
     }
 
     [Fact]
+    public void Nvidia_telemetry_without_a_verified_core_backend_is_not_treated_as_executable_gpu()
+    {
+        var snapshot = new ResourceSnapshot
+        {
+            GpuAvailable = true, VramTotalMb = 16 * 1024, GpuName = "NVIDIA eGPU",
+            RamAvailable = true, RamTotalMb = 16 * 1024,
+            CoreHardwareProbeAttempted = true // request timed out or Core offline
+        };
+
+        Assert.Equal(ModelFit.CpuRamOnly,
+            ModelFitClassifier.Classify(new GgufModelInfo { SizeBytes = 2L * 1024 * 1024 * 1024 }, snapshot));
+    }
+
+    [Fact]
+    public void Unverified_gpu_and_no_reliable_ram_stay_unknown()
+    {
+        var snapshot = new ResourceSnapshot
+        {
+            GpuAvailable = true, VramTotalMb = 24 * 1024,
+            CoreHardwareProbeAttempted = true, RamAvailable = false
+        };
+
+        Assert.Equal(ModelFit.Unknown,
+            ModelFitClassifier.Classify(new GgufModelInfo { SizeBytes = 2L * 1024 * 1024 * 1024 }, snapshot));
+    }
+
+    [Fact]
     public void Cpu_fit_description_is_honest_about_speed()
     {
         string label = ModelFitClassifier.Describe(ModelFit.CpuRamOnly);
