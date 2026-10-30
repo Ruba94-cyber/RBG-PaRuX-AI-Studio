@@ -498,8 +498,7 @@ namespace PaRuX.Views
 
             _installedStatus.Text = _installed.Items.Count == 0
                 ? "No unassigned managed GGUF models are available for this role. Import or install a model in Model Hub, or choose another role."
-                : _installed.Items.Count + " eligible managed model(s) available."
-                    + ((_installed.SelectedItem as ComboBoxItem)?.Tag is string selected ? " Selected: " + selected + "." : string.Empty);
+                : _installed.Items.Count + " installed model(s) available for this role.";
         }
 
         private void RenderInstalledPicker()
