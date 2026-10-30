@@ -1,4 +1,5 @@
 using PaRuX.Intelligence;
+using PaRuX.Contracts;
 using PaRuX.Services;
 using Xunit;
 
@@ -85,6 +86,30 @@ public sealed class ModelFitClassifierTests
             GpuAvailable = true, VramTotalMb = 16 * 1024, GpuName = "NVIDIA eGPU",
             RamAvailable = true, RamTotalMb = 16 * 1024,
             CoreHardwareProbeAttempted = true // request timed out or Core offline
+        };
+
+        Assert.Equal(ModelFit.CpuRamOnly,
+            ModelFitClassifier.Classify(new GgufModelInfo { SizeBytes = 2L * 1024 * 1024 * 1024 }, snapshot));
+    }
+
+    [Fact]
+    public void Legacy_core_dxgi_inventory_without_backend_profile_cannot_claim_gpu_fit()
+    {
+        var snapshot = new ResourceSnapshot
+        {
+            GpuAvailable = true, VramTotalMb = 16 * 1024,
+            CoreHardwareProbeAttempted = true,
+            RamAvailable = true, RamTotalMb = 16 * 1024,
+            CoreHardware = new RuntimeManagerHardwareStatus
+            {
+                RamTotalBytes = 16L * 1024 * 1024 * 1024,
+                GpuInventoryAvailable = true,
+                GpuAdapters = new()
+                {
+                    new() { Name = "NVIDIA physical card",
+                        DedicatedVideoMemoryBytes = 16L * 1024 * 1024 * 1024 }
+                }
+            }
         };
 
         Assert.Equal(ModelFit.CpuRamOnly,
