@@ -60,6 +60,15 @@ public sealed class FirstModelAdvisorTests
     // ---- the advice a person is shown ----
 
     [Fact]
+    public void Plain_first_model_classification_matches_conservative_eight_gib_runtime_budget()
+    {
+        Assert.Equal(ModelSuitability.CpuOnly,
+            FirstModelAdvisor.Classify(2 * Gb, 0, 8 * Gb));
+        Assert.Equal(ModelSuitability.TooLarge,
+            FirstModelAdvisor.Classify(4 * Gb, 0, 8 * Gb));
+    }
+
+    [Fact]
     public void Production_cpu_only_eight_gib_advice_does_not_offer_four_gib_weights_as_a_fit()
     {
         var machine = new RuntimeManagerStatus { RamTotalBytes = 8 * Gb };
