@@ -67,7 +67,7 @@ namespace PaRuX.Views
             AutomationProperties.SetName(_workload, "Workload");
             body.Children.Add(new TextBlock
             {
-                Text = "Manage PaRuX-owned runtimes safely and measure the fastest local inference profile for this exact PC. User-managed software is never silently changed.",
+                Text = "Manage local runtimes and optimize inference for this PC. User-managed tools are never changed automatically.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.78
             });
@@ -85,7 +85,14 @@ namespace PaRuX.Views
             body.Children.Add(_status);
             body.Children.Add(BuildSuggestionsCard());
             body.Children.Add(BuildPerformanceCard());
-            body.Children.Add(BuildContextCard());
+            var contextOptions = new Expander
+            {
+                Header = "Advanced context and memory tuning",
+                Content = BuildContextCard(),
+                IsExpanded = false
+            };
+            AutomationProperties.SetAutomationId(contextOptions, "RuntimeManager_ContextOptions_Expander");
+            body.Children.Add(contextOptions);
             body.Children.Add(new TextBlock
             {
                 Text = "Runtime components",
@@ -110,7 +117,7 @@ namespace PaRuX.Views
             });
             body.Children.Add(new TextBlock
             {
-                Text = "Optimize for this PC measures prompt/decode throughput, TTFT, sustained speed, GPU layout, KV/batch/context choices and safe speculative decoding. Managed runtime updates also pass an automatic regression gate before the new build becomes active.",
+                Text = "Compare measured speed and responsiveness, then apply an optimized local profile. PaRuX validates managed runtime updates before activating them.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.76
             });
