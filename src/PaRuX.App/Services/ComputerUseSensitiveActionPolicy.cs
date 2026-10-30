@@ -34,7 +34,8 @@ namespace PaRuX.Services
         /// and selectors are not semantic evidence; the returned text comes only from the
         /// foreground-scoped UI Automation tree captured for this action.
         /// </summary>
-        internal static string? ResolveObservedTargetLabelOrRole(string? tree, string? selector)
+        internal static string? ResolveObservedTargetLabelOrRole(
+            string? tree, string? selector, long expectedHwnd = 0)
         {
             if (string.IsNullOrWhiteSpace(tree) || tree.Length > 8_000 || string.IsNullOrWhiteSpace(selector))
                 return null;
@@ -55,6 +56,13 @@ namespace PaRuX.Services
                     if (window.ValueKind != JsonValueKind.Object
                         || !window.TryGetProperty("elements", out JsonElement elements)
                         || elements.ValueKind != JsonValueKind.Array)
+                        continue;
+                    if (expectedHwnd > 0
+                        && (!window.TryGetProperty("hwnd", out JsonElement hwnd)
+                            || !(hwnd.ValueKind == JsonValueKind.Number
+                                    && hwnd.TryGetInt64(out long numericHwnd) && numericHwnd == expectedHwnd
+                                || hwnd.ValueKind == JsonValueKind.String
+                                    && long.TryParse(hwnd.GetString(), out long textHwnd) && textHwnd == expectedHwnd)))
                         continue;
                     if (!FindTarget(elements, selector, ref match, ref matchCount))
                         return null;
