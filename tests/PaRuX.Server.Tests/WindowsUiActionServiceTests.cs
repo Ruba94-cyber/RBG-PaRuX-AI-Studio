@@ -127,6 +127,18 @@ public sealed class WindowsUiActionServiceTests
     }
 
     [Fact]
+    public void Duplicate_selector_in_the_same_window_is_not_a_unique_action_target()
+    {
+        const string json = """
+        {"windows":[{"hwnd":1234,"elements":[
+          {"selector":"btn-submit","name":"Submit first"},
+          {"selector":"btn-submit","name":"Submit second"}]}]}
+        """;
+        Assert.False(WindowsUiActionService.IsSelectorObserved(json, "btn-submit", 1234));
+        Assert.False(WindowsUiActionService.IsSelectorObserved(json, "btn-submit"));
+    }
+
+    [Fact]
     public void Excessive_or_binary_text_does_not_reach_input_api()
     {
         Assert.False(WindowsUiActionService.IsValidAction(
