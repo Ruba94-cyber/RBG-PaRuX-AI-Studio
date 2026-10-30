@@ -71,7 +71,7 @@ public sealed class ResourceHardwareSnapshotMapperTests
             }
         });
         Assert.True(state.GpuAvailable);
-        Assert.False(state.GpuBackendEligible);
+        Assert.Equal(false, state.GpuBackendEligible);
         Assert.Equal(16 * 1024, state.VramTotalMb);
         Assert.Contains("CPU fallback", ResourceHardwareSnapshotMapper.DescribeGpu(state));
         Assert.Equal(ModelFit.CpuRamOnly, ModelFitClassifier.Classify(Model(), state));
