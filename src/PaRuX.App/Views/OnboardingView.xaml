@@ -19,7 +19,7 @@
                         <TextBlock Text="Welcome to PaRuX" Style="{StaticResource PaRuXDisplayTextStyle}" VerticalAlignment="Center" />
                     </StackPanel>
                     <TextBlock Style="{StaticResource PaRuXBodyTextStyle}" TextWrapping="Wrap"
-                        Text="The installer includes verified llama.cpp engines (Vulkan, plus CUDA 13.4 for supported NVIDIA GPUs), so no runtime download is needed. A chat model is still required: Set up automatically picks one that fits this PC, or choose your own below. Optional accelerators and media tools can be installed later."
+                        Text="PaRuX includes a local AI runtime. Automatic setup helps you choose and download a compatible chat model. You can also choose manually below."
                         Margin="44,4,0,0" />
                 </StackPanel>
 
@@ -35,7 +35,7 @@
                         <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
                             <TextBlock x:Name="AutoSetupHeadlineText"
                                        AutomationProperties.AutomationId="Onboarding_AutoSetup_Headline_Text"
-                                       Text="Set up PaRuX in one step" TextWrapping="Wrap"
+                                       Text="Start with automatic setup" TextWrapping="Wrap"
                                        Style="{StaticResource PaRuXBodyStrongTextStyle}" />
                             <TextBlock x:Name="AutoSetupDetailText"
                                        AutomationProperties.AutomationId="Onboarding_AutoSetup_Detail_Text"
@@ -64,7 +64,7 @@
                                         Content="Skip" Visibility="Collapsed" Click="AutoSetupSkip_Click" />
                             </StackPanel>
                             <TextBlock AutomationProperties.AutomationId="Onboarding_AutoSetup_Manual_Text"
-                                       Text="Prefer to choose yourself? Everything below stays available: components, your first model and the local chat check."
+                                       Text="Prefer manual setup? Choose a model below. Runtime and storage details are optional."
                                        TextWrapping="Wrap" Style="{StaticResource PaRuXMicroTextStyle}" />
                         </StackPanel>
                     </Border>
@@ -72,7 +72,9 @@
 
                 <!-- First-install effort and bundled runtime overview -->
                 <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
-                    <TextBlock Text="INSTALLATION &amp; BUNDLED RUNTIME" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                    <Expander Header="What's included in PaRuX"
+                              AutomationProperties.AutomationId="Onboarding_BundledDetails_Expander"
+                              IsExpanded="False">
                     <Border x:Name="BundledRuntimeOverviewCard"
                             AutomationProperties.AutomationId="Onboarding_BundledRuntimeOverview_Card"
                             Style="{StaticResource PaRuXCardStyle}">
@@ -119,10 +121,13 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
+                    </Expander>
                 </StackPanel>
 
                 <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
-                    <TextBlock Text="LOCAL AI RUNTIME LOCATION" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                    <Expander Header="Advanced: runtime storage folder"
+                              AutomationProperties.AutomationId="Onboarding_StorageDetails_Expander"
+                              IsExpanded="False">
                     <Border Style="{StaticResource PaRuXCardStyle}">
                         <StackPanel Spacing="{StaticResource PaRuXSpaceM}">
                             <TextBlock TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}"
@@ -138,6 +143,7 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+                    </Expander>
                 </StackPanel>
 
                 <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
