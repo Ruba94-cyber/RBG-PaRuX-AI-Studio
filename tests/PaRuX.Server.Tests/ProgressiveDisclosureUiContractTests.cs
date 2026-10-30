@@ -96,11 +96,15 @@ public sealed class ProgressiveDisclosureUiContractTests
         Assert.Equal("SettingsSearchBox_TextChanged", (string?)search.Attribute("TextChanged"));
         Assert.Equal("SettingsSearchBox_QuerySubmitted", (string?)search.Attribute("QuerySubmitted"));
         Assert.Equal("SettingsSearchBox_SuggestionChosen", (string?)search.Attribute("SuggestionChosen"));
+        Assert.Single(document.Descendants(ui + "TextBlock")
+            .Where(item => (string?)item.Attribute(x + "Name") == "SettingsSearchFeedback"));
 
         string code = ReadSource("SettingsView.xaml.cs");
         Assert.Contains("AppendSearchLabels(section, labels, 0)", code, StringComparison.Ordinal);
         Assert.Contains("SettingsCategories", code, StringComparison.Ordinal);
         Assert.Contains("SettingsSearchBox.ItemsSource = null", code, StringComparison.Ordinal);
+        Assert.Contains("No matching settings. Try a shorter term.", code, StringComparison.Ordinal);
+        Assert.Contains("sender.Text = selected;", code, StringComparison.Ordinal);
         Assert.Contains("SelectSettingsCategory(category)", code, StringComparison.Ordinal);
         Assert.Contains("RefreshVisibleSettingsCategory()", code, StringComparison.Ordinal);
     }
