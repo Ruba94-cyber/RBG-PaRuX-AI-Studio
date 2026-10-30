@@ -24,6 +24,7 @@ namespace PaRuX.Views
         private readonly TextBlock _status = new TextBlock { TextWrapping = TextWrapping.Wrap };
         private readonly ProgressBar _progress = new ProgressBar { Minimum = 0, Maximum = 100, Visibility = Visibility.Collapsed };
         private readonly TextBlock _lastOutput = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.72 };
+        private readonly Button _cancelActiveJobButton = new Button { Content = "Cancel active job", Visibility = Visibility.Collapsed };
         private readonly TextBlock _provenanceText = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.85 };
         private readonly Button _provenanceDetailsButton = new Button { Content = "Details" };
         private readonly StackPanel _provenanceDetailsPanel = new StackPanel { Spacing = 4, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 4, 0, 4) };
@@ -80,6 +81,7 @@ namespace PaRuX.Views
         {
             _status.Text = CreateSetupStatusLine.Checking;
             SetProvenance(null);
+            UpdateCancelJobVisibility();
             PaRuX.Services.MediaPrewarmClient.Request("create-opened");
             foreach (MediaModelRow row in new[] { _imageModelRow, _videoModelRow, _editModelRow }) _ = row.RefreshAsync();
             foreach (MediaSetupCard card in _setupCards) card.StartPolling();
@@ -100,17 +102,16 @@ namespace PaRuX.Views
             body.Children.Add(new TextBlock { Text = "Create", FontSize = 28, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             body.Children.Add(new TextBlock
             {
-                Text = "Image, video, edit, 3D and speech share one local workspace. Successful generated files are stored in PaRuX-managed output folders and registered in Artifact Workspace; user source files remain user-managed.",
+                Text = "Create images, videos, music, speech and more with local AI. Each tool has its own tab; finished results stay in your gallery.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.78
             });
 
             var statusBlock = new StackPanel { Spacing = 8 };
             var top = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            var cancel = new Button { Content = "Cancel active job" };
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(cancel, "Create_Cancel_Active_Job_Button");
-            cancel.Click += (_, _) => CancelActive();
-            top.Children.Add(cancel);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_cancelActiveJobButton, "Create_Cancel_Active_Job_Button");
+            _cancelActiveJobButton.Click += (_, _) => CancelActive();
+            top.Children.Add(_cancelActiveJobButton);
             statusBlock.Children.Add(top);
             statusBlock.Children.Add(_progress);
             statusBlock.Children.Add(_status);
@@ -770,6 +771,7 @@ namespace PaRuX.Views
             _operationMessageSticky = false;
             _progress.Value = 0;
             _progress.Visibility = Visibility.Visible;
+            UpdateCancelJobVisibility();
             SetRunButtonsEnabled(false);
             _status.Text = message;
             return ticket;
@@ -785,6 +787,7 @@ namespace PaRuX.Views
             if (!_operations.IsBusy)
             {
                 _progress.Visibility = Visibility.Collapsed;
+                UpdateCancelJobVisibility();
                 SetRunButtonsEnabled(true);
             }
             if (!string.IsNullOrWhiteSpace(message))
@@ -804,6 +807,9 @@ namespace PaRuX.Views
                 button.IsEnabled = enabled;
             }
         }
+
+        private void UpdateCancelJobVisibility() =>
+            _cancelActiveJobButton.Visibility = _operations.IsBusy ? Visibility.Visible : Visibility.Collapsed;
 
         private void CancelActive()
         {
