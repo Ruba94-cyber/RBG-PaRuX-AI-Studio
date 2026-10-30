@@ -59,7 +59,11 @@ namespace PaRuX.Views
                 foreach (McpServerPreset preset in McpServerPresetCatalog.All)
                     McpPresetCombo.Items.Add(new ComboBoxItem { Content = preset.DisplayName, Tag = preset });
 
-            Loaded += (s, e) => { LoadFromSettings(); _ = RefreshRuntimeComponentsAsync(); };
+            Loaded += (s, e) =>
+            {
+                LoadFromSettings();
+                UpdateSettingsLayout(SettingsLayoutGrid.ActualWidth);
+            };
         }
 
         // ------------------------------------------------------------------
@@ -161,11 +165,16 @@ namespace PaRuX.Views
 
         private void SettingsLayoutGrid_SizeChanged(object sender, SizeChangedEventArgs e)
         {
+            UpdateSettingsLayout(e.NewSize.Width);
+        }
+
+        private void UpdateSettingsLayout(double width)
+        {
             // Preserve the existing category rail for normal windows and keyboard/UIA tests.
             // At narrow widths, a compact picker frees that column for actual settings controls.
             if (SettingsRailColumn == null || SettingsRailScroll == null || SettingsCompactCategoryPicker == null
-                || SettingsContentScroll == null) return;
-            bool compact = e.NewSize.Width < 900;
+                || SettingsContentScroll == null || width <= 0) return;
+            bool compact = width < 900;
             SettingsRailColumn.Width = new GridLength(compact ? 0 : 192);
             SettingsRailScroll.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
             SettingsCompactCategoryPicker.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
