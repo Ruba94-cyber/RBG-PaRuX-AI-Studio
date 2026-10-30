@@ -263,7 +263,7 @@ namespace PaRuX.Views
             outer.Children.Add(new TextBlock { Text = "Model Hub", FontSize = 28, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             outer.Children.Add(new TextBlock
             {
-                Text = "Choose the right local model, not just a file. Compare GGUF quantizations against this PC's real GPU/RAM capacity, manage resumable downloads, inspect installed performance and select compatible Image / Video / Edit checkpoints from one workspace.",
+                Text = "Find a model that fits your PC. Explore details only when you need them.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.78
             });
@@ -3986,23 +3986,52 @@ namespace PaRuX.Views
             foreach (RecommendedModel model in models)
             {
                 ModelHardwareFitEstimate fit = ModelHardwareFitEstimator.Estimate(model.EstimatedSizeBytes, _hardware);
-                var card = new StackPanel { Spacing = 4 };
-                card.Children.Add(new TextBlock { Text = model.Title + " · " + model.Category, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
-                card.Children.Add(new TextBlock { Text = model.Description, TextWrapping = TextWrapping.Wrap, Opacity = 0.76 });
+                var card = new StackPanel { Spacing = 7 };
                 card.Children.Add(new TextBlock
                 {
-                    Text = model.ApproxParams + " · suggested " + model.QuantHint + " · ~" + FormatBytes(model.EstimatedSizeBytes)
-                        + " · " + ModelHubRowPresentation.HardwareFit(fit.Verdict, fit.Summary),
-                    FontSize = 12,
-                    Opacity = 0.72,
+                    Text = model.Title,
+                    FontSize = 16,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                     TextWrapping = TextWrapping.Wrap
                 });
-                var button = new Button { Content = "Review suggested quantization & download" };
-                button.Click += async (_, _) => await ChooseRecommendedFileAsync(model);
-                card.Children.Add(button);
-                _recommended.Children.Add(card);
+                card.Children.Add(new TextBlock
+                {
+                    Text = model.Category + " · " + model.ApproxParams + " · ~" + FormatBytes(model.EstimatedSizeBytes)
+                        + " · " + ModelFitVerdictWords.Of(fit.Verdict),
+                    FontSize = 12, Opacity = 0.8, TextWrapping = TextWrapping.Wrap
+                });
+                card.Children.Add(new TextBlock
+                {
+                    Text = ModelHubRowPresentation.CompactDescription(model.Description),
+                    TextWrapping = TextWrapping.Wrap, MaxLines = 2, Opacity = 0.78
+                });
+                var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var choose = new Button { Content = "Review download" };
+                choose.Click += async (_, _) => await ChooseRecommendedFileAsync(model);
+                actions.Children.Add(choose);
+                var details = new Button { Content = "Details" };
+                AutomationProperties.SetName(details, "Details for " + model.Title);
+                details.Click += async (_, _) => await ShowModelDetailsAsync(model.Title,
+                    new (string Label, string? Value)[]
+                    {
+                        ("Description", model.Description),
+                        ("Category", model.Category),
+                        ("Parameters", model.ApproxParams),
+                        ("Suggested quantization", model.QuantHint),
+                        ("Estimated download size", FormatBytes(model.EstimatedSizeBytes)),
+                        ("Hardware fit estimate", ModelHubRowPresentation.HardwareFit(fit.Verdict, fit.Summary)),
+                        ("Repository", model.HuggingFaceRepoId)
+                    });
+                actions.Children.Add(details);
+                card.Children.Add(actions);
+                _recommended.Children.Add(new Border
+                {
+                    Padding = new Thickness(12), CornerRadius = new CornerRadius(8),
+                    BorderThickness = new Thickness(1), Child = card
+                });
             }
-            if (models.Count == 0) _recommended.Children.Add(new TextBlock { Text = "No curated recommendations are available." });
+            if (models.Count == 0)
+                _recommended.Children.Add(new TextBlock { Text = "No curated recommendations are available." });
         }
 
         private void RenderSearch(IReadOnlyList<ModelSearchResult> results)
@@ -4012,56 +4041,76 @@ namespace PaRuX.Views
             {
                 IReadOnlyList<ModelHubSplitSetPresentation.QuantChoiceOption> choices =
                     ModelHubSplitSetPresentation.BuildQuantChoiceOptions(repo.QuantChoices);
-                var row = new StackPanel { Spacing = 4 };
-                row.Children.Add(new TextBlock { Text = repo.RepoId, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
-                row.Children.Add(new TextBlock { Text = repo.Category + " · " + choices.Count + " quant choice(s) · ♥ " + repo.Likes + " · ↓ " + repo.Downloads, FontSize = 12, Opacity = 0.72 });
-                var picker = new ComboBox { MinWidth = 360, HorizontalAlignment = HorizontalAlignment.Stretch };
-                foreach (ModelHubSplitSetPresentation.QuantChoiceOption option in choices)
-                {
-                    picker.Items.Add(new ComboBoxItem
-                    {
-                        Content = option.Label + " · ~" + FormatBytes(option.Choice.SizeBytes),
-                        Tag = option.Choice,
-                        IsEnabled = option.CanDownload
-                    });
-                }
                 int firstDownloadable = ModelHubSplitSetPresentation.PreferredQuantChoiceIndex(choices, null);
                 bool fromFirstModelSetup = string.Equals(
                     repo.RepoId, _firstModelHandoffRepoId, StringComparison.OrdinalIgnoreCase);
                 int preferred = fromFirstModelSetup
                     ? ModelHubSplitSetPresentation.PreferredQuantChoiceIndex(choices, _firstModelHandoffQuantHint)
                     : firstDownloadable;
-                if (preferred >= 0) picker.SelectedIndex = preferred;
-                if (fromFirstModelSetup && !string.IsNullOrWhiteSpace(_firstModelHandoffQuantHint))
-                    row.Children.Add(new TextBlock
-                    {
-                        Text = "Setup suggestion: " + _firstModelHandoffQuantHint
-                            + ". A complete matching quantization is preselected when available. Review its size and license before downloading.",
-                        TextWrapping = TextWrapping.Wrap,
-                        FontSize = 12,
-                        Opacity = 0.82
-                    });
-                row.Children.Add(picker);
+                bool canReviewDefault = preferred >= 0 && preferred < choices.Count && choices[preferred].CanDownload;
 
-                var choose = new Button { Content = "Review selected quant and download", IsEnabled = firstDownloadable >= 0 };
-                picker.SelectionChanged += (_, _) =>
+                var card = new StackPanel { Spacing = 7 };
+                card.Children.Add(new TextBlock
                 {
-                    choose.IsEnabled = picker.SelectedItem is ComboBoxItem { Tag: ModelQuantChoice selected } && selected.Complete;
+                    Text = repo.RepoId, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    TextWrapping = TextWrapping.Wrap, FontSize = 15
+                });
+                card.Children.Add(new TextBlock
+                {
+                    Text = repo.Category + " · " + choices.Count + " GGUF option(s)",
+                    FontSize = 12, Opacity = 0.78
+                });
+                if (canReviewDefault)
+                {
+                    ModelHubSplitSetPresentation.QuantChoiceOption suggested = choices[preferred];
+                    card.Children.Add(new TextBlock
+                    {
+                        Text = (fromFirstModelSetup ? "Setup choice: " : "Suggested: ")
+                            + suggested.Choice.Quantization + " · ~" + FormatBytes(suggested.Choice.SizeBytes),
+                        FontSize = 12, Opacity = 0.82, TextWrapping = TextWrapping.Wrap
+                    });
+                }
+                var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var review = new Button
+                {
+                    Content = "Review download",
+                    IsEnabled = canReviewDefault
                 };
-                choose.Click += async (_, _) =>
+                review.Click += async (_, _) =>
                 {
-                    if (picker.SelectedItem is not ComboBoxItem { Tag: ModelQuantChoice selected } || !selected.Complete) return;
-                    try { await ChooseQuantChoiceAsync(repo.RepoId, selected); }
-                    catch (Exception ex) { _status.Text = "Could not compare variants: " + ex.Message; }
+                    if (!canReviewDefault) return;
+                    try { await ChooseQuantChoiceAsync(repo.RepoId, choices[preferred].Choice); }
+                    catch (Exception ex) { _status.Text = "Could not review this model: " + ex.Message; }
                     finally { SetBusy(false, _status.Text); }
                 };
-                row.Children.Add(choose);
+                actions.Children.Add(review);
+                var variants = new Button
+                {
+                    Content = "Quantization options",
+                    IsEnabled = choices.Count > 0
+                };
+                AutomationProperties.SetName(variants, "Quantization options for " + repo.RepoId);
+                variants.Click += async (_, _) => await ReviewSearchVariantsAsync(repo, choices, preferred);
+                actions.Children.Add(variants);
+                card.Children.Add(actions);
                 if (choices.Count == 0)
-                    row.Children.Add(new TextBlock { Text = "No grouped GGUF quantisation choices were returned.", FontSize = 12, Opacity = 0.72 });
-                _results.Children.Add(row);
+                    card.Children.Add(new TextBlock
+                    {
+                        Text = "No GGUF variants were found.", FontSize = 12, Opacity = 0.78
+                    });
+                _results.Children.Add(new Border
+                {
+                    Padding = new Thickness(12), CornerRadius = new CornerRadius(8),
+                    BorderThickness = new Thickness(1), Child = card
+                });
             }
             if (results.Count == 0)
-                _results.Children.Add(new TextBlock { Text = _lastSearch.Count == 0 ? "Search to see live Hugging Face GGUF results." : "No result matches the selected category." });
+                _results.Children.Add(new TextBlock
+                {
+                    Text = _lastSearch.Count == 0
+                        ? "Search for a model to compare available GGUF options."
+                        : "No model matches the selected category."
+                });
         }
 
         private async Task ChooseQuantChoiceAsync(string repoId, ModelQuantChoice choice)
@@ -4774,37 +4823,46 @@ namespace PaRuX.Views
             foreach (ManagedModelInfo model in models.OrderBy(m => m.Alias ?? m.FileName, StringComparer.OrdinalIgnoreCase))
             {
                 ModelHardwareFitEstimate fit = ModelHardwareFitEstimator.Estimate(model.SizeBytes, _hardware);
-                var row = new StackPanel { Spacing = 3 };
-                row.Children.Add(new TextBlock { Text = string.IsNullOrWhiteSpace(model.Alias) ? model.FileName : model.Alias + "  (" + model.FileName + ")", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
-                row.Children.Add(new TextBlock
+                string displayName = string.IsNullOrWhiteSpace(model.Alias) ? model.FileName : model.Alias;
+                var card = new StackPanel { Spacing = 7 };
+                card.Children.Add(new TextBlock
                 {
-                    Text = FormatBytes(model.SizeBytes) + " · " + model.Quantization
-                        + " · " + ModelFitVerdictWords.Of(fit.Verdict) + " · " + fit.Summary
-                        + (model.LastBenchmarkTokensPerSecond.HasValue ? " · " + model.LastBenchmarkTokensPerSecond.Value.ToString("0.0") + " tok/s" : string.Empty)
-                        + (string.IsNullOrWhiteSpace(model.RepoId) ? string.Empty : " · " + model.RepoId),
-                    FontSize = 12,
-                    Opacity = 0.72,
-                    TextWrapping = TextWrapping.Wrap
+                    Text = displayName, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    FontSize = 15, TextWrapping = TextWrapping.Wrap
                 });
-                row.Children.Add(new TextBlock
+                card.Children.Add(new TextBlock
                 {
-                    Text = FormatModelProvenance(model.Provenance),
-                    FontSize = 12,
-                    Opacity = 0.82,
-                    TextWrapping = TextWrapping.Wrap
+                    Text = FormatBytes(model.SizeBytes) + " · " + ModelFitVerdictWords.Of(fit.Verdict)
+                        + (model.LastBenchmarkTokensPerSecond.HasValue
+                            ? " · " + model.LastBenchmarkTokensPerSecond.Value.ToString("0.0") + " tok/s"
+                            : string.Empty),
+                    FontSize = 12, Opacity = 0.8, TextWrapping = TextWrapping.Wrap
                 });
-                if (Uri.TryCreate(model.Provenance?.ModelCardUrl, UriKind.Absolute, out Uri? modelCardUri)
-                    && string.Equals(modelCardUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(modelCardUri.Host, "huggingface.co", StringComparison.OrdinalIgnoreCase))
+                var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var detailButton = new Button { Content = "Details" };
+                AutomationProperties.SetName(detailButton, "Details for installed model " + model.FileName);
+                detailButton.Click += async (_, _) =>
                 {
-                    row.Children.Add(new HyperlinkButton
-                    {
-                        Content = "Open the model card for this pinned revision",
-                        NavigateUri = modelCardUri,
-                        HorizontalAlignment = HorizontalAlignment.Left
-                    });
-                }
-                var deleteButton = new Button { Content = "Delete", HorizontalAlignment = HorizontalAlignment.Left };
+                    Uri? modelCardUri = null;
+                    if (Uri.TryCreate(model.Provenance?.ModelCardUrl, UriKind.Absolute, out Uri? parsed)
+                        && string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(parsed.Host, "huggingface.co", StringComparison.OrdinalIgnoreCase))
+                        modelCardUri = parsed;
+                    await ShowModelDetailsAsync(displayName,
+                        new (string Label, string? Value)[]
+                        {
+                            ("File name", model.FileName),
+                            ("Quantization", model.Quantization),
+                            ("Size", FormatBytes(model.SizeBytes)),
+                            ("Hardware fit estimate", ModelHubRowPresentation.HardwareFit(fit.Verdict, fit.Summary)),
+                            ("Measured speed", model.LastBenchmarkTokensPerSecond.HasValue
+                                ? model.LastBenchmarkTokensPerSecond.Value.ToString("0.0") + " tok/s" : "Not measured"),
+                            ("Repository", model.RepoId),
+                            ("Provenance and verification", FormatModelProvenance(model.Provenance))
+                        }, modelCardUri);
+                };
+                actions.Children.Add(detailButton);
+                var deleteButton = new Button { Content = "Delete" };
                 AutomationProperties.SetName(deleteButton, "Delete model " + model.FileName);
                 string capturedFile = model.FileName;
                 long capturedSize = model.SizeBytes;
@@ -4816,10 +4874,16 @@ namespace PaRuX.Views
                     if (deleted) await RefreshAllAsync();
                     else deleteButton.IsEnabled = true;
                 };
-                row.Children.Add(deleteButton);
-                _installed.Children.Add(row);
+                actions.Children.Add(deleteButton);
+                card.Children.Add(actions);
+                _installed.Children.Add(new Border
+                {
+                    Padding = new Thickness(12), CornerRadius = new CornerRadius(8),
+                    BorderThickness = new Thickness(1), Child = card
+                });
             }
-            if (models.Count == 0) _installed.Children.Add(new TextBlock { Text = "No PaRuX-managed GGUF model is installed yet." });
+            if (models.Count == 0)
+                _installed.Children.Add(new TextBlock { Text = "No PaRuX-managed GGUF model is installed yet." });
         }
 
         private void SetBusy(bool value, string message)
