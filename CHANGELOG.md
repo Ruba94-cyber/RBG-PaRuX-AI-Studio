@@ -20,8 +20,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Settings adapts to narrow windows with a compact category dropdown, refreshes only the visible category, and offers search across existing setting labels with keyboard-aware category suggestions and empty-result feedback.
 - Create's media model selector keeps the exact selected file for routing while shortening the displayed name, adding a full-identity details dialog, and moving the global content lane under optional preferences. The job-cancel action is visible only during an active operation.
 - First-run onboarding uses a shorter introduction and collapses bundled-runtime and storage configuration details, without removing the manual component, model or local chat verification actions.
+- Cross-PC compatibility: CPU-only systems with known system RAM now get a bounded CPU/RAM fit verdict instead of automatically showing Unknown; missing accelerator data is not converted to imaginary VRAM. The conservative model-fit RAM reserve now scales on 4–16 GiB hosts, consistently in the desktop estimator and Core profile resolver.
+- GGUF fit previews with an explicit context but no parsed model header use a labelled size heuristic instead of attempting to read absent geometry. Model Hub's quantization picker no longer imposes a fixed 330px minimum width, and Gallery cards stack on narrow or high-DPI screens.
 
 ### Validation status
+
+- Added source-level tests for CPU-only, AMD/Intel UMA, small-memory and missing-metadata fit paths; they have **not been run**. The hardware-diversity matrix is documented in `docs/validation/PHYSICAL_PC_ACCEPTANCE.md`.
+
 
 - Source-level regression contracts added for progressive disclosure, searchable/adaptive Settings, onboarding, contextual cancellation and retained model actions. They have **not been executed** in this environment.
 - Windows WinUI build, FlaUI interaction/regression tests and real-device acceptance have **not been executed** for these UX changes. This entry is not a new release or a performance claim.
