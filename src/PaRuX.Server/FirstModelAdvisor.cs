@@ -365,7 +365,7 @@ public static class FirstModelAdvisor
         long needed = (long)(modelBytes * factor);
         long usableRam = usableSystemRamOverride.HasValue
             ? Math.Max(0, usableSystemRamOverride.Value)
-            : (long)(ramBytes * UsableSystemRamFraction);
+            : RuntimeHardwareProfileResolver.ConservativeUsableSystemRamBytes(Math.Max(0, ramBytes));
 
         if (acceleratorMemoryBytes > 0 && needed <= acceleratorMemoryBytes) return ModelSuitability.FitsOnGpu;
         if (sharedMemoryPrimary)
