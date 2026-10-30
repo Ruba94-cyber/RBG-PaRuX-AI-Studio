@@ -349,7 +349,7 @@ namespace PaRuX.Services
             // Mirror RuntimeHardwareProfileResolver exactly. Low-RAM CPU PCs
             // need a bounded, nonzero budget for smaller models, without
             // counting shared iGPU memory twice or relaxing live admission.
-            long reserve = totalRamBytes <= 12 * GiB
+            long reserve = totalRamBytes <= 16 * GiB
                 ? (totalRamBytes + 1) / 2
                 : Math.Max(8 * GiB, totalRamBytes / 4);
             return Math.Max(0, totalRamBytes - reserve);
