@@ -10,6 +10,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- Computer Use now has a typed, read-only `ui_assert` action for testing a real Windows UIA control's exact name/value/text after a fresh, foreground-PID/HWND-verified observation. The test result is not inferred from the model's claim, and failed or ambiguous assertions are reported as failures. UIA target selectors, sensitive control labels and action delivery now respect the exact intended window; duplicated selectors are refused. The focus-window action refuses ambiguous title matches and redacts private window titles from task logs. Source regression tests added; **Windows build, xUnit/FlaUI and real app execution have NOT RUN for this slice**.
+
 - Model Hub and manual Chat model selection use concise labels, with detailed descriptions and quantization choices separated into dialogs (earlier changes on main).
 - Model Routing focuses on role/policy selection; candidate management, capability modes, Arena and read-only backend comparison are now optional expanded sections. The registered candidate list shows compact speed/fit summaries, with quantization and supporting evidence in a dedicated Details dialog.
 - Tools & Automations keeps skill and server listings in view while MCP, automation and workflow creation forms, including advanced JSON, start collapsed.
