@@ -45,7 +45,7 @@ namespace PaRuX.Services
         /// (including recursive children[]) is usable. Reject arbitrary selector
         /// fields in errors, metadata, control labels or unrelated JSON.
         /// </summary>
-        internal static bool IsSelectorObserved(string? tree, string? selector)
+        internal static bool IsSelectorObserved(string? tree, string? selector, long expectedHwnd = 0)
         {
             if (!IsSafeSelector(selector) || string.IsNullOrWhiteSpace(tree)
                 || tree.Length > 8_000) return false;
@@ -63,6 +63,10 @@ namespace PaRuX.Services
                         || !window.TryGetProperty("elements", out var elements)
                         || elements.ValueKind != System.Text.Json.JsonValueKind.Array)
                         continue;
+                    if (expectedHwnd > 0
+                        && (!window.TryGetProperty("hwnd", out var observedHandle)
+                            || !MatchesWindow(observedHandle, expectedHwnd)))
+                        continue;
                     if (ElementsContainSelector(elements, selector!)) return true;
                 }
                 return false;
@@ -72,6 +76,14 @@ namespace PaRuX.Services
                 return false;
             }
         }
+
+        /// <summary>A multi-window WinApp response must never authorize a selector
+        /// from a different HWND. Accept numeric or decimal-string handles.</summary>
+        private static bool MatchesWindow(System.Text.Json.JsonElement handle, long expectedHwnd) =>
+            handle.ValueKind == System.Text.Json.JsonValueKind.Number
+                && handle.TryGetInt64(out long number) && number == expectedHwnd
+            || handle.ValueKind == System.Text.Json.JsonValueKind.String
+                && long.TryParse(handle.GetString(), out long parsed) && parsed == expectedHwnd;
 
         private static bool ElementsContainSelector(
             System.Text.Json.JsonElement elements, string selector)
