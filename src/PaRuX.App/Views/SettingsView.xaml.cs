@@ -79,12 +79,14 @@ namespace PaRuX.Views
 
         private readonly Dictionary<string, Button> _categoryButtons = new Dictionary<string, Button>();
         private string _selectedSettingsCategory = "General";
+        private bool _syncingCompactSettingsCategory;
 
         private void BuildSettingsCategoryRail()
         {
             if (SettingsCategoryRail == null) return;
             SettingsCategoryRail.Children.Clear();
             _categoryButtons.Clear();
+            SettingsCompactCategoryPicker.Items.Clear();
 
             foreach (string category in SettingsCategories)
             {
@@ -104,6 +106,7 @@ namespace PaRuX.Views
                 button.Click += (s, e) => SelectSettingsCategory(capturedCategory);
                 _categoryButtons[category] = button;
                 SettingsCategoryRail.Children.Add(button);
+                SettingsCompactCategoryPicker.Items.Add(new ComboBoxItem { Content = category, Tag = category });
             }
 
             SelectSettingsCategory(_selectedSettingsCategory);
@@ -111,7 +114,19 @@ namespace PaRuX.Views
 
         private void SelectSettingsCategory(string category)
         {
+            if (!SettingsCategories.Contains(category, StringComparer.Ordinal)) return;
             _selectedSettingsCategory = category;
+
+            if (SettingsCompactCategoryPicker != null)
+            {
+                int selectedIndex = Array.IndexOf(SettingsCategories, category);
+                if (SettingsCompactCategoryPicker.SelectedIndex != selectedIndex)
+                {
+                    _syncingCompactSettingsCategory = true;
+                    try { SettingsCompactCategoryPicker.SelectedIndex = selectedIndex; }
+                    finally { _syncingCompactSettingsCategory = false; }
+                }
+            }
 
             foreach (KeyValuePair<string, Button> kvp in _categoryButtons)
             {
@@ -137,6 +152,28 @@ namespace PaRuX.Views
                 _ = RefreshDiscoveryPolicyAsync();
                 _ = RefreshAutoCheckAsync();
             }
+        }
+
+        private void SettingsCompactCategoryPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_syncingCompactSettingsCategory) return;
+            if (SettingsCompactCategoryPicker.SelectedItem is ComboBoxItem { Tag: string category })
+                SelectSettingsCategory(category);
+        }
+
+        private void SettingsLayoutGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            // Preserve the existing category rail for normal windows and keyboard/UIA tests.
+            // At narrow widths, a compact picker frees that column for actual settings controls.
+            if (SettingsRailColumn == null || SettingsRailScroll == null || SettingsCompactCategoryPicker == null
+                || SettingsContentScroll == null) return;
+            bool compact = e.NewSize.Width < 900;
+            SettingsRailColumn.Width = new GridLength(compact ? 0 : 192);
+            SettingsRailScroll.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            SettingsCompactCategoryPicker.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+            SettingsContentScroll.Padding = compact
+                ? new Thickness(12, 8, 12, 16)
+                : new Thickness(24, 20, 24, 32);
         }
 
         /// <summary>Called by MainWindow each time the settings page is shown.</summary>
