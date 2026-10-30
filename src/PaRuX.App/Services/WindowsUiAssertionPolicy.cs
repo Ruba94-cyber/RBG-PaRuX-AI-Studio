@@ -31,7 +31,7 @@ namespace PaRuX.Services
 
         internal static bool IsValidRequest(string? selector, string? property, string? expected) =>
             WindowsUiActionService.IsSafeSelector(selector)
-            && property is "name" or "value" or "text"
+            && (property is "name" or "value" or "text")
             && expected != null && expected.Length <= MaxExpectedCharacters
             && !expected.Contains('\0');
 
