@@ -17,10 +17,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Runtime suggestions retain their supporting evidence in a Details dialog; advanced context tuning is collapsed by default.
 - Observability displays concise metric and benchmark summaries with expandable evidence.
 - Update Manager shows installed model names first and file/quantization/source only when expanded. Projects keeps inventory and artifact history available in collapsible sections.
+- Settings adapts to narrow windows with a compact category dropdown and refreshes only the visible category instead of querying every service on entry.
+- Create's media model selector keeps the exact selected file for routing while shortening the displayed name, adding a full-identity details dialog, and moving the global content lane under optional preferences.
+- First-run onboarding uses a shorter introduction and collapses bundled-runtime and storage configuration details, without removing the manual component, model or local chat verification actions.
 
 ### Validation status
 
-- Source-level regression contracts added for progressive disclosure and retained actions. They have **not been executed** in this environment.
+- Source-level regression contracts added for progressive disclosure, adaptive Settings, onboarding and retained model actions. They have **not been executed** in this environment.
 - Windows WinUI build, FlaUI interaction/regression tests and real-device acceptance have **not been executed** for these UX changes. This entry is not a new release or a performance claim.
 
 ## [2.0.0] — 2026-10-28
