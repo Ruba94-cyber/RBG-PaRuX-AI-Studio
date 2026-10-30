@@ -152,8 +152,18 @@ namespace PaRuX.Views
                 foreach (ManagedModelInfo model in models.OrderBy(
                     m => string.IsNullOrWhiteSpace(m.Alias) ? m.FileName : m.Alias + " · " + m.FileName, StringComparer.OrdinalIgnoreCase))
                 {
-                    string display = string.IsNullOrWhiteSpace(model.Alias) ? model.FileName : model.Alias + " · " + model.FileName;
-                    AddModelChoice("Manual · " + display, "parux-manual:" + model.FileName);
+                    // Keep the collapsed selector readable while preserving the exact manual pin.
+                    string display = ModelHubRowPresentation.CompactManualLabel(model.Alias, model.FileName);
+                    var item = new ComboBoxItem
+                    {
+                        Content = "Manual · " + display,
+                        Tag = "parux-manual:" + model.FileName
+                    };
+                    string fullDetails = model.FileName + " · " + model.Quantization;
+                    ToolTipService.SetToolTip(item, fullDetails);
+                    Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(item,
+                        "Manual model " + display + ". File " + fullDetails);
+                    ModelSelector.Items.Add(item);
                 }
 
                 ComboBoxItem? selected = ModelSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item =>

@@ -10,6 +10,18 @@ public static class ModelHubRowPresentation
     public static string Quantization(string fileName, string? metadataQuantization) =>
         metadataQuantization ?? GgufFileNaming.QuantizationOrUnknown(fileName);
 
+    /// <summary>
+    /// Short label for the chat model selector. Identity stays in the selector's Tag,
+    /// and the full file/quantization stays in its tooltip and accessible name.
+    /// </summary>
+    public static string CompactManualLabel(string? alias, string fileName)
+    {
+        string? name = string.IsNullOrWhiteSpace(alias)
+            ? System.IO.Path.GetFileNameWithoutExtension(fileName)
+            : alias.Trim();
+        return CompactDescription(string.IsNullOrWhiteSpace(name) ? "Unnamed model" : name, 48);
+    }
+
     /// <summary>Catalogue preview only. The full description remains available in Details.</summary>
     public static string CompactDescription(string? description, int maxLength = 108)
     {

@@ -56,6 +56,24 @@ public sealed class ModelHubRowPresentationTests
         Assert.Equal("Open Details to learn more.", ModelHubRowPresentation.CompactDescription(text));
     }
 
+    [Theory]
+    [InlineData("Friendly model", "very-long-technical-file-name-Q4_K_M.gguf", "Friendly model")]
+    [InlineData(null, "small-model-Q4_K_M.gguf", "small-model-Q4_K_M")]
+    [InlineData("  Named model  ", "ignored.gguf", "Named model")]
+    public void Manual_chat_selector_prefers_a_readable_label(string? alias, string fileName, string expected)
+    {
+        Assert.Equal(expected, ModelHubRowPresentation.CompactManualLabel(alias, fileName));
+    }
+
+    [Fact]
+    public void Manual_chat_selector_truncates_only_display_not_model_identity()
+    {
+        string filename = new string('x', 100) + "-Q4_K_M.gguf";
+        string shortLabel = ModelHubRowPresentation.CompactManualLabel(null, filename);
+        Assert.True(shortLabel.Length <= 48);
+        Assert.EndsWith("…", shortLabel);
+    }
+
     [Fact]
     public void Quantization_returns_explicit_unknown_for_unrecognised_names()
     {
