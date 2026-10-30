@@ -51,40 +51,25 @@ namespace PaRuX.Services
         {
             var snapshot = new ResourceSnapshot();
             PopulateRam(snapshot);
+            // Run the OS telemetry probe and Core profile discovery concurrently.
+            // Neither source waits for the other: slow NVIDIA tooling must not
+            // double the latency on Intel/AMD or CPU-only laptops.
+            Task<RuntimeManagerHardwareStatus?> inventoryTask = TryGetInventoryAsync(ct);
             await PopulateGpuAsync(snapshot, ct).ConfigureAwait(false);
-
-            // Deliberately here rather than at the end of PopulateGpuAsync: that method returns
-            // early from inside its try on every "nvidia-smi answered, but not usefully" path, and
-            // on this AMD workstation that is exactly what happens - nvidia-smi.exe ships in
-            // System32 with the NVIDIA App, runs, and exits with code 4 ("you do not have
-            // sufficient permissions"). Hanging the fallback off the end of that method left it
-            // unreachable on the one machine that needs it.
-            // Always reconcile the physical telemetry with the Core's backend choice.
-            // A visible NVIDIA adapter is not necessarily the GPU selected for text,
-            // and an AMD/Intel shared aperture must never be presented as dedicated VRAM.
-            await PopulateGpuFromInventoryAsync(snapshot, ct).ConfigureAwait(false);
+            RuntimeManagerHardwareStatus? status = await inventoryTask.ConfigureAwait(false);
+            if (status != null)
+                ResourceHardwareSnapshotMapper.Apply(snapshot, status);
             return snapshot;
         }
 
-        /// <summary>Use the Core's normalized GPU/backend decision when reachable.
-        /// A bounded request must not freeze Settings if Core is offline or starting.</summary>
-        private static async Task PopulateGpuFromInventoryAsync(ResourceSnapshot snapshot, CancellationToken ct)
+        /// <summary>Core status is optional for diagnostics. Timeouts or an offline
+        /// server do not prevent returning OS RAM or real GPU telemetry.</summary>
+        private static async Task<RuntimeManagerHardwareStatus?> TryGetInventoryAsync(CancellationToken ct)
         {
-            try
-            {
-                RuntimeManagerHardwareStatus? inventory = await GetInventoryAsync(ct).ConfigureAwait(false);
-                if (inventory != null)
-                    ResourceHardwareSnapshotMapper.Apply(snapshot, inventory);
-            }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-            {
-                // Timeout: retain local RAM/NVIDIA telemetry without inventing a Core profile.
-            }
+            try { return await GetInventoryAsync(ct).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return null; }
             catch (OperationCanceledException) { throw; }
-            catch
-            {
-                // Core unavailable: leave source telemetry intact, with unknown backend eligibility.
-            }
+            catch { return null; }
         }
 
         private static async Task<RuntimeManagerHardwareStatus?> GetInventoryAsync(CancellationToken ct)
