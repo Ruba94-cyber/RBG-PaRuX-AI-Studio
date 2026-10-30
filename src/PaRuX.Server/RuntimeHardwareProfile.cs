@@ -224,10 +224,10 @@ public static class RuntimeHardwareProfileResolver
         // On low-RAM PCs the former unconditional 8 GiB floor reserved 100% of
         // an 8 GiB host, wrongly declaring even tiny CPU models impossible.
         // Leave at least half the RAM for Windows and other processes on hosts
-        // up to 12 GiB; retain the existing 8 GiB / 25% reserve for larger hosts.
+        // up to 16 GiB; retain the existing 8 GiB / 25% reserve for larger hosts.
         // Live memory-pressure admission still applies independently.
         const long gib = 1024L * 1024L * 1024L;
-        long reserve = totalRamBytes <= 12 * gib
+        long reserve = totalRamBytes <= 16 * gib
             ? (totalRamBytes + 1) / 2
             : Math.Max(8 * gib, totalRamBytes / 4);
         return Math.Max(0, totalRamBytes - reserve);
