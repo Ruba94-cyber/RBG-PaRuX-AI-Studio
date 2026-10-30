@@ -1,3 +1,5 @@
+using PaRuX.Contracts;
+
 namespace PaRuX.Services
 {
     /// <summary>What the hardware monitor observed. Split out of ResourceMonitorService so the
@@ -19,6 +21,16 @@ namespace PaRuX.Services
         /// two must stay distinguishable, otherwise a machine with no NVIDIA telemetry would be
         /// shown a confident "0 MB used · 0% util" that nobody measured.
         /// </summary>
+        /// <summary>Core-authoritative adapter/backend pair, or null when Core is unavailable.
+        /// Raw GPU names and memory totals are telemetry, not proof that a text backend is installed.</summary>
+        public RuntimeManagerHardwareStatus? CoreHardware { get; set; }
+
+        /// <summary>Shared iGPU aperture is part of system RAM, not additional dedicated VRAM.</summary>
+        public bool GpuMemoryIsShared { get; set; }
+        public long SharedGpuMemoryLimitMb { get; set; }
+        /// <summary>Null if Core has not confirmed backend eligibility.</summary>
+        public bool? GpuBackendEligible { get; set; }
+
         public bool GpuUsageMeasured { get; set; }
         public long RamUsedMb { get; set; }
         public long RamTotalMb { get; set; }
