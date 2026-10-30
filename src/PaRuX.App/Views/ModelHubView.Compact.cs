@@ -70,7 +70,7 @@ namespace PaRuX.Views
 
             var picker = new ComboBox
             {
-                MinWidth = 330,
+                MinWidth = 0, // Let WinUI size the picker within narrow / high-DPI dialogs.
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 PlaceholderText = "Select a complete quantization"
             };
