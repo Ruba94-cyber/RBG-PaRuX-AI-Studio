@@ -3998,9 +3998,10 @@ namespace PaRuX.Views
                 }
 
                 ResourceSnapshot resources = await ResourceMonitorService.GetSnapshotAsync(CancellationToken.None);
-                string hardware = resources.GpuAvailable
-                    ? "Hardware: " + resources.GpuName + " · " + resources.VramTotalMb.ToString("N0") + " MB VRAM · " + resources.RamTotalMb.ToString("N0") + " MB RAM"
-                    : "Hardware: GPU unavailable · " + resources.RamTotalMb.ToString("N0") + " MB RAM";
+                string hardware = "Hardware: " + ResourceHardwareSnapshotMapper.DescribeGpu(resources)
+                    + (resources.RamAvailable
+                        ? " · " + resources.RamTotalMb.ToString("N0") + " MB RAM"
+                        : " · RAM total unavailable");
                 var hardwareText = new TextBlock { Text = hardware, TextWrapping = TextWrapping.Wrap };
                 ApplyCaptionStyle(hardwareText);
                 panel.Children.Add(hardwareText);
@@ -5125,13 +5126,11 @@ namespace PaRuX.Views
                 ResourceSnapshot resources = await ResourceMonitorService.GetSnapshotAsync(CancellationToken.None);
                 // Only claim usage when it was actually measured: the vendor-agnostic inventory
                 // knows the adapter and its installed VRAM but not what is in use right now.
-                DiagVram.Text = resources.GpuAvailable
-                    ? resources.GpuUsageMeasured
-                        ? resources.GpuName + " · " + resources.VramUsedMb + " / " + resources.VramTotalMb
-                          + " MB · " + resources.GpuUtilizationPercent + "% util"
-                        : resources.GpuName + " · " + resources.VramTotalMb.ToString("N0")
-                          + " MB VRAM · live usage not reported by this adapter"
-                    : "not detected";
+                string gpuDescription = ResourceHardwareSnapshotMapper.DescribeGpu(resources);
+                DiagVram.Text = resources.GpuUsageMeasured && !resources.GpuMemoryIsShared
+                    ? gpuDescription + " · " + resources.VramUsedMb.ToString("N0") + " MB used · "
+                        + resources.GpuUtilizationPercent + "% util"
+                    : gpuDescription + (resources.GpuAvailable ? " · live usage unavailable" : "");
                 DiagRam.Text = resources.RamAvailable
                     ? resources.RamUsedMb + " / " + resources.RamTotalMb + " MB"
                     : "unavailable";
