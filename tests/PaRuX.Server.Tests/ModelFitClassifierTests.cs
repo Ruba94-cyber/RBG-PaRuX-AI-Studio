@@ -35,6 +35,55 @@ public sealed class ModelFitClassifierTests
         ContextLength = 131_072
     };
 
+    [Theory]
+    [InlineData(2, 16, ModelFit.CpuRamOnly)]
+    [InlineData(2, 32, ModelFit.CpuRamOnly)]
+    [InlineData(12, 16, ModelFit.NotRecommended)]
+    public void Cpu_only_pcs_are_classified_using_real_ram_not_missing_vram(long modelGiB, long ramGiB, ModelFit expected)
+    {
+        var cpu = new ResourceSnapshot
+        {
+            GpuAvailable = false,
+            VramTotalMb = 0,
+            RamAvailable = true,
+            RamTotalMb = ramGiB * 1024
+        };
+        var model = new GgufModelInfo { SizeBytes = modelGiB * 1024 * 1024 * 1024 };
+        Assert.Equal(expected, ModelFitClassifier.Classify(model, cpu));
+    }
+
+    [Fact]
+    public void Gpu_with_unreported_vram_uses_cpu_budget_instead_of_inventing_vram()
+    {
+        var hardware = new ResourceSnapshot
+        {
+            GpuAvailable = true,
+            GpuName = "Unknown shared-memory adapter",
+            VramTotalMb = 0,
+            RamAvailable = true,
+            RamTotalMb = 32_768
+        };
+        Assert.Equal(ModelFit.CpuRamOnly,
+            ModelFitClassifier.Classify(new GgufModelInfo { SizeBytes = 2L * 1024 * 1024 * 1024 }, hardware));
+    }
+
+    [Fact]
+    public void Cpu_only_pc_with_unmeasured_ram_stays_unknown()
+    {
+        var resources = new ResourceSnapshot { GpuAvailable = false, RamAvailable = false, RamTotalMb = 32_768 };
+        Assert.Equal(ModelFit.Unknown,
+            ModelFitClassifier.Classify(new GgufModelInfo { SizeBytes = 2L * 1024 * 1024 * 1024 }, resources));
+    }
+
+    [Fact]
+    public void Cpu_fit_description_is_honest_about_speed()
+    {
+        string label = ModelFitClassifier.Describe(ModelFit.CpuRamOnly);
+        Assert.StartsWith("Fits", label);
+        Assert.Contains("CPU/RAM only", label);
+        Assert.Contains("slow", label, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void A_model_whose_kv_cache_will_not_fit_is_no_longer_called_an_excellent_fit()
     {
