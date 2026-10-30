@@ -66,7 +66,7 @@ namespace PaRuX.Views
             var headerPanel = new StackPanel { Spacing = 4 };
             var title = new TextBlock
             {
-                Text = "Media Gallery & Output Browsing",
+                Text = "Media Gallery",
                 FontSize = 20,
                 FontWeight = FontWeights.SemiBold
             };
@@ -75,7 +75,7 @@ namespace PaRuX.Views
 
             var subtitle = new TextBlock
             {
-                Text = "Visual thumbnails and metadata for generated images and videos. Open, reveal, reuse as edit source, or delete with confirmation.",
+                Text = "Browse generated images and videos. Open Details for the full prompt, metadata and file location.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.75,
                 FontSize = 13
@@ -371,21 +371,12 @@ namespace PaRuX.Views
             {
                 Text = item.FormattedDetails,
                 FontSize = 12,
-                Opacity = 0.75
+                Opacity = 0.75,
+                MaxLines = 1,
+                TextTrimming = TextTrimming.CharacterEllipsis
             };
             AutomationProperties.SetAutomationId(detailsText, $"MediaGallery_Details_{item.Id}");
             contentPanel.Children.Add(detailsText);
-
-            var pathText = new TextBlock
-            {
-                Text = item.FilePath,
-                FontSize = 11,
-                Opacity = 0.5,
-                TextTrimming = TextTrimming.CharacterEllipsis
-            };
-            ToolTipService.SetToolTip(pathText, item.FilePath);
-            AutomationProperties.SetAutomationId(pathText, $"MediaGallery_Path_{item.Id}");
-            contentPanel.Children.Add(pathText);
 
             // Action Buttons
             var actions = new StackPanel
@@ -414,6 +405,11 @@ namespace PaRuX.Views
                 }
             };
             actions.Children.Add(openBtn);
+
+            var detailsBtn = new Button { Content = "Details" };
+            AutomationProperties.SetAutomationId(detailsBtn, $"MediaGallery_ViewDetails_{item.Id}");
+            detailsBtn.Click += async (_, _) => await ShowDetailsAsync(item);
+            actions.Children.Add(detailsBtn);
 
             var revealBtn = new Button
             {
@@ -466,6 +462,39 @@ namespace PaRuX.Views
 
             card.Child = grid;
             return card;
+        }
+
+        private async Task ShowDetailsAsync(MediaGalleryItem item)
+        {
+            // Keep technical metadata out of the gallery rows, without hiding or truncating it.
+            var details = new StackPanel { Spacing = 8 };
+            details.Children.Add(new TextBlock { Text = "Prompt", FontWeight = FontWeights.SemiBold });
+            var prompt = new TextBox
+            {
+                Text = item.Prompt ?? string.Empty,
+                IsReadOnly = true,
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                Height = 108
+            };
+            AutomationProperties.SetAutomationId(prompt, $"MediaGallery_FullPrompt_{item.Id}");
+            details.Children.Add(prompt);
+            details.Children.Add(new TextBlock { Text = "Metadata", FontWeight = FontWeights.SemiBold });
+            details.Children.Add(new TextBlock { Text = item.FormattedDetails, TextWrapping = TextWrapping.Wrap });
+            details.Children.Add(new TextBlock { Text = "File location", FontWeight = FontWeights.SemiBold });
+            var path = new TextBox { Text = item.FilePath, IsReadOnly = true };
+            AutomationProperties.SetAutomationId(path, $"MediaGallery_Path_{item.Id}");
+            details.Children.Add(path);
+
+            var dialog = new ContentDialog
+            {
+                Title = string.IsNullOrWhiteSpace(item.Title) ? "Media details" : item.Title,
+                Content = new ScrollViewer { Content = details, MaxHeight = 420 },
+                CloseButtonText = "Close",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = XamlRoot
+            };
+            await dialog.ShowAsync();
         }
 
         private async Task HandleDeleteWithConfirmationAsync(MediaGalleryItem item)
