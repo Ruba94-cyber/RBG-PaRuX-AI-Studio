@@ -36,6 +36,8 @@ public sealed class ModelFitClassifierTests
     };
 
     [Theory]
+    [InlineData(1, 8, ModelFit.CpuRamOnly)]
+    [InlineData(2, 8, ModelFit.CpuRamOnly)]
     [InlineData(2, 16, ModelFit.CpuRamOnly)]
     [InlineData(2, 32, ModelFit.CpuRamOnly)]
     [InlineData(12, 16, ModelFit.NotRecommended)]
