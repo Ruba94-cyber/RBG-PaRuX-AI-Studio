@@ -22,6 +22,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - First-run onboarding uses a shorter introduction and collapses bundled-runtime and storage configuration details, without removing the manual component, model or local chat verification actions.
 - Cross-PC compatibility: CPU-only systems with known system RAM now get a bounded CPU/RAM fit verdict instead of automatically showing Unknown; missing accelerator data is not converted to imaginary VRAM. The conservative model-fit RAM reserve now scales on 4–16 GiB hosts, consistently in the desktop estimator and Core profile resolver.
 - GGUF fit previews with an explicit context but no parsed model header use a labelled size heuristic instead of attempting to read absent geometry. Model Hub's quantization picker no longer imposes a fixed 330px minimum width, and Gallery cards stack on narrow or high-DPI screens.
+- Desktop hardware status now reconciles NVIDIA telemetry with Core-selected AMD/Intel/NVIDIA backend eligibility, keeps integrated shared RAM distinct from dedicated VRAM, and rejects invented GPU fit when Core cannot verify the backend. Native GPU and Core probes are bounded and overlap; failures have a short retry backoff for low-end/offline PCs.
 
 ### Validation status
 
