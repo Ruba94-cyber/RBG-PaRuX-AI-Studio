@@ -131,7 +131,7 @@ public sealed class WindowsUiAssertionPolicyTests
         Assert.True(ComputerUseActionParser.IsExecutable("ui_assert"));
         Assert.DoesNotContain(expectation, ComputerUseActionParser.Describe(action), StringComparison.Ordinal);
         Assert.Equal(ComputerUseSensitiveActionPolicy.Disposition.Allow,
-            ComputerUseSensitiveActionPolicy.Evaluate("ui_assert", null, null, null).Disposition);
+            ComputerUseSensitiveActionPolicy.Evaluate("ui_assert", "Status text", null, null).Disposition);
     }
 
     [Fact]
