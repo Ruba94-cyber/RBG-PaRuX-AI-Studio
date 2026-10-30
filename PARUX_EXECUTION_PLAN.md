@@ -2,6 +2,12 @@
 
 Last executive refresh: **2026-10-30**.
 
+### 2026-10-30 cross-PC compatibility continuation (PARTIAL — physical acceptance outstanding)
+
+The public `main` branch now treats CPU-only Windows x64 PCs as first-class model-fit candidates when measured system RAM exists, instead of requiring GPU VRAM to produce a verdict. The Settings fit label distinguishes CPU/RAM-only compatibility from GPU offload and warns of reduced speed. No GPU memory is fabricated when DXGI or vendor telemetry is unavailable. Model-fit previews with explicit context but no parsed GGUF header take the marked size-heuristic path. The desktop fit estimator and Core hardware profile resolver both use a conservative half-RAM budget through 16 GiB, retaining the older 8 GiB/25% reserve for larger PCs; live admission remains independently constrained by current free-memory evidence. Narrow/high-DPI Gallery cards now stack their controls, and Model Hub's quantization dialog no longer requires a 330px-wide picker.
+
+Regression tests were added/extended for CPU-only 8/16/32 GiB, 4–64 GiB reserve profiles, Intel UMA with 8 GiB RAM, AMD UMA, NVIDIA/dedicated and unknown/missing-inventory behavior; these are source changes **NOT EXECUTED** in this environment. Before declaring broad hardware compatibility, execute the .NET tests, WinUI build, FlaUI, real local text and media operations, live memory-pressure and device disconnect/reconnect checks on the concrete Windows machines listed in `docs/validation/PHYSICAL_PC_ACCEPTANCE.md`. Linux/macOS/x86 are not supported targets; unsupported model backends must still report unavailable rather than silently claiming support. BIC/release acceptance unchanged.
+
 ### 2026-10-30 UI/UX continuation (PARTIAL — Windows validation pending)
 
 On main, progressive disclosure now covers Model Hub, Chat manual model labels, Model Routing, Tools/Automations, Media Gallery, Runtime suggestions and context controls, Observability, Updates and Projects. This continuation adds a responsive Settings category selector (with the desktop rail preserved), per-category on-demand Settings Core refresh in place of eager cross-category fan-out, compact Create media model labels with an exact-identity Details dialog and an optional global media lane editor, and concise first-run Onboarding with collapsible runtime and storage details. Existing Core mutation endpoints, model pin identity, runtime ownership restrictions and approval boundaries were not intentionally altered.
