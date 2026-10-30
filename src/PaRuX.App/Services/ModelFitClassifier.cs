@@ -11,8 +11,9 @@ namespace PaRuX.Services
         ExcellentFit,
         GoodFit,
         WorksWithOffload,
-        CpuRamOnly,
-        NotRecommended
+        NotRecommended,
+        // Append new values to preserve the numeric identity of legacy entries.
+        CpuRamOnly
     }
 
     /// <summary>
