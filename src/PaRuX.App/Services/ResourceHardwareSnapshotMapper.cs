@@ -24,18 +24,23 @@ namespace PaRuX.Services
             if (profile != null)
             {
                 snapshot.GpuBackendEligible = profile.AcceleratorEligible;
-                snapshot.GpuAvailable = profile.GpuPresent;
+                // If DXGI inventory failed, a genuine nvidia-smi reading still
+                // proves physical presence (not executable backend eligibility).
+                snapshot.GpuAvailable = profile.GpuPresent
+                    || (snapshot.GpuAvailable && !status.GpuInventoryAvailable);
                 snapshot.GpuMemoryIsShared = profile.SharedMemoryPrimary;
                 snapshot.SharedGpuMemoryLimitMb = profile.SharedMemoryPrimary
                     ? Math.Max(0, profile.SharedSystemMemoryLimitBytes) / MiB : 0;
 
                 if (!profile.GpuPresent)
                 {
-                    ClearGpuTelemetry(snapshot);
+                    if (status.GpuInventoryAvailable) ClearGpuTelemetry(snapshot);
                     return;
                 }
 
                 string name = profile.AdapterName ?? string.Empty;
+                bool sameAdapter = !string.IsNullOrWhiteSpace(name)
+                    && string.Equals(name, snapshot.GpuName, StringComparison.OrdinalIgnoreCase);
                 if (!string.IsNullOrWhiteSpace(name))
                     snapshot.GpuName = name;
 
@@ -55,8 +60,7 @@ namespace PaRuX.Services
                         snapshot.VramTotalMb = dedicated;
                     // A telemetry sample from another adapter is not this device's
                     // utilisation. Keep usage only when names identify the same GPU.
-                    if (!string.Equals(name, snapshot.GpuName, StringComparison.OrdinalIgnoreCase)
-                        || dedicated <= 0)
+                    if (!sameAdapter || dedicated <= 0)
                     {
                         snapshot.GpuUsageMeasured = false;
                         snapshot.VramUsedMb = 0;
