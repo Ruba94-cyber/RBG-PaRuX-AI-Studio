@@ -6,6 +6,23 @@ All notable changes to RBG PaRuX AI Studio are recorded here. The canonical engi
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — UI/UX refinement (2026-10-30)
+
+### Changed
+
+- Model Hub and manual Chat model selection use concise labels, with detailed descriptions and quantization choices separated into dialogs (earlier changes on main).
+- Model Routing focuses on role/policy selection; candidate management, capability modes, Arena and read-only backend comparison are now optional expanded sections.
+- Tools & Automations keeps skill and server listings in view while MCP, automation and workflow creation forms, including advanced JSON, start collapsed.
+- Media Gallery has a compact two-row search/filter toolbar and a Details dialog for the complete prompt, metadata and local path.
+- Runtime suggestions retain their supporting evidence in a Details dialog; advanced context tuning is collapsed by default.
+- Observability displays concise metric and benchmark summaries with expandable evidence.
+- Update Manager shows installed model names first and file/quantization/source only when expanded. Projects keeps inventory and artifact history available in collapsible sections.
+
+### Validation status
+
+- Source-level regression contracts added for progressive disclosure and retained actions. They have **not been executed** in this environment.
+- Windows WinUI build, FlaUI interaction/regression tests and real-device acceptance have **not been executed** for these UX changes. This entry is not a new release or a performance claim.
+
 ## [2.0.0] — 2026-10-28
 
 Local media creation, Model Hub media area, automatic per-model optimization and speed work. Everything below ran on one machine (Windows 11, RTX 5080 16 GB, 27 GB RAM); other hardware is covered by automated tests only.
