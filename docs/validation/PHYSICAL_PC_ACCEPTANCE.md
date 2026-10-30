@@ -15,6 +15,9 @@ Manual procedures for the owner to run on a real Windows PC and phone. Every pro
 | NVIDIA 8–16 GB | CUDA if eligible, memory-fit estimate, ordinary chat and media capability checks |
 | AMD dedicated 8–16 GB | Vulkan eligibility and fit rather than assuming NVIDIA-only telemetry; no silent runtime installs |
 | Multi-GPU or eGPU | Separate VRAM pools, explicit split only when supported, hot-plug/unplug recovery, no fabricated combined VRAM |
+| eGPU disconnected while Settings is open | After cached hardware discovery expires, the selected backend and displayed VRAM reflect current hardware; a stale NVIDIA usage sample is not attributed to an AMD/Intel backend |
+| Core stopped or text backend missing | UI still reports physical GPU identity if independently measured, but model fit falls back to CPU/RAM or Unknown; no false promise of GPU acceleration |
+| NVIDIA plus AMD integrated GPU | Settings reports the Core-selected adapter, never assigns NVIDIA usage to Radeon or counts Radeon shared system memory as dedicated VRAM |
 | Low-memory / low-VRAM / no GPU telemetry | Honest Unknown/CPU warnings, safe download choices, no automatic large-model allocation |
 | Narrow / high-DPI laptop window (400–800 logical pixels) | Model Hub quantization picker and Gallery actions visible; navigation, Settings search and Create cancellation keyboard reachable |
 
