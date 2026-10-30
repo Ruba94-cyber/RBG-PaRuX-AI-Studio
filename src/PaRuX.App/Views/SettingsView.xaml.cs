@@ -196,6 +196,10 @@ namespace PaRuX.Views
             string query = sender.Text?.Trim() ?? string.Empty;
             IReadOnlyList<string> matches = MatchSettingsCategories(query);
             sender.ItemsSource = query.Length == 0 ? null : matches;
+            SettingsSearchFeedback.Visibility = query.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+            SettingsSearchFeedback.Text = matches.Count == 0
+                ? "No matching settings. Try a shorter term."
+                : matches.Count + (matches.Count == 1 ? " matching category." : " matching categories.");
             foreach (KeyValuePair<string, Button> entry in _categoryButtons)
                 entry.Value.Visibility = query.Length == 0 || matches.Contains(entry.Key)
                     ? Visibility.Visible : Visibility.Collapsed;
