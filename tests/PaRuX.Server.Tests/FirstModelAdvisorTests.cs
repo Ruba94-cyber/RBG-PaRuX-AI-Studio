@@ -60,6 +60,26 @@ public sealed class FirstModelAdvisorTests
     // ---- the advice a person is shown ----
 
     [Fact]
+    public void Production_cpu_only_eight_gib_advice_does_not_offer_four_gib_weights_as_a_fit()
+    {
+        var machine = new RuntimeManagerStatus { RamTotalBytes = 8 * Gb };
+        var inventory = new GpuInventoryStatus { Available = true, Source = "test-no-gpu" };
+        var localModels = new List<ManagedModelInfo>
+        {
+            new() { FileName = "synthetic-small.gguf", FilePath = "synthetic-small.gguf", SizeBytes = 2 * Gb },
+            new() { FileName = "synthetic-large.gguf", FilePath = "synthetic-large.gguf", SizeBytes = 4 * Gb }
+        };
+
+        FirstModelAdvice advice = FirstModelAdvisor.Advise(machine, inventory, localModels);
+
+        Assert.False(advice.GpuDetected);
+        Assert.Contains(advice.Candidates, item => item.Model.Id == "local:synthetic-small"
+            && item.Suitability == nameof(ModelSuitability.CpuOnly));
+        Assert.Contains(advice.Candidates, item => item.Model.Id == "local:synthetic-large"
+            && item.Suitability == nameof(ModelSuitability.TooLarge));
+    }
+
+    [Fact]
     public void A_strong_gpu_gets_a_flagship_recommendation_that_names_the_hardware()
     {
         FirstModelAdvice advice = FirstModelAdvisor.Advise(16 * Gb, 32 * Gb, "NVIDIA GeForce RTX 5080");
