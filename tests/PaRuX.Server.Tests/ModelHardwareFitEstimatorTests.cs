@@ -29,6 +29,20 @@ public sealed class ModelHardwareFitEstimatorTests
     }
 
     [Fact]
+    public void Explicit_context_without_gguf_header_falls_back_to_size_heuristic()
+    {
+        // Public catalogues may provide size + context before the model is downloaded,
+        // but they cannot supply a parsed local GGUF header.
+        ModelHardwareFitEstimate estimate = ModelHardwareFitEstimator.Estimate(
+            2 * GiB, Hardware(16, 8), model: null, contextLength: 32_768, cacheType: "q8_0");
+
+        Assert.Equal(ModelHardwareFitTier.ExcellentFullGpu, estimate.Tier);
+        Assert.Equal("file-size-heuristic", estimate.EstimateBasis);
+        Assert.Null(estimate.KvCacheBytes);
+        Assert.Null(estimate.AssumedContextLength);
+    }
+
+    [Fact]
     public void Small_variant_is_an_excellent_full_gpu_fit_on_16_gib_card()
     {
         ModelHardwareFitEstimate estimate = ModelHardwareFitEstimator.Estimate(6 * GiB, Hardware(32, 16));
