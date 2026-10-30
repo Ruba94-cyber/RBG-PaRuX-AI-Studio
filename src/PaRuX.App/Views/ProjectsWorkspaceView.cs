@@ -108,8 +108,8 @@ namespace PaRuX.Views
             };
             body.Children.Add(Section("MEDIA OUTPUT GALLERY · THUMBNAILS & ACTIONS", _mediaGallery));
             body.Children.Add(Section("ARTIFACTS IN ACTIVE PROJECT", _projectArtifacts));
-            body.Children.Add(Section("ALL ARTIFACTS · LINK EXPLICITLY", _allArtifacts));
-            body.Children.Add(Section("SELECTED ARTIFACT VERSION HISTORY", _versions));
+            body.Children.Add(CollapsibleSection("All artifacts · link explicitly", _allArtifacts, "Projects_AllArtifacts_Expander"));
+            body.Children.Add(CollapsibleSection("Selected artifact version history", _versions, "Projects_Versions_Expander"));
             return scroll;
         }
 
@@ -432,6 +432,13 @@ namespace PaRuX.Views
             var label = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap };
             Grid.SetColumn(label, 0); row.Children.Add(label);
             return row;
+        }
+
+        private static Expander CollapsibleSection(string title, UIElement content, string automationId)
+        {
+            var expander = new Expander { Header = title, Content = content, IsExpanded = false };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(expander, automationId);
+            return expander;
         }
 
         private static Border Section(string title, UIElement content)
