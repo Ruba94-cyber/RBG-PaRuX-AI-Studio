@@ -57,6 +57,7 @@ namespace PaRuX.Services
                     || !root.TryGetProperty("windows", out var windows)
                     || windows.ValueKind != System.Text.Json.JsonValueKind.Array)
                     return false;
+                int matches = 0;
                 foreach (var window in windows.EnumerateArray())
                 {
                     if (window.ValueKind != System.Text.Json.JsonValueKind.Object
@@ -67,9 +68,11 @@ namespace PaRuX.Services
                         && (!window.TryGetProperty("hwnd", out var observedHandle)
                             || !MatchesWindow(observedHandle, expectedHwnd)))
                         continue;
-                    if (ElementsContainSelector(elements, selector!)) return true;
+                    if (!CountMatchingSelectors(elements, selector!, ref matches))
+                        return false;
+                    if (matches > 1) return false;
                 }
-                return false;
+                return matches == 1;
             }
             catch (System.Text.Json.JsonException)
             {
@@ -85,23 +88,29 @@ namespace PaRuX.Services
             || handle.ValueKind == System.Text.Json.JsonValueKind.String
                 && long.TryParse(handle.GetString(), out long parsed) && parsed == expectedHwnd;
 
-        private static bool ElementsContainSelector(
-            System.Text.Json.JsonElement elements, string selector)
+        /// <summary>Require one exact selector within the scoped UIA window.
+        /// Ambiguous duplicates are unsafe to invoke, even when all look alike.</summary>
+        private static bool CountMatchingSelectors(
+            System.Text.Json.JsonElement elements, string selector, ref int matches, int depth = 0)
         {
+            if (depth > 24 || elements.ValueKind != System.Text.Json.JsonValueKind.Array)
+                return false;
             foreach (var element in elements.EnumerateArray())
             {
                 if (element.ValueKind != System.Text.Json.JsonValueKind.Object)
-                    continue;
+                    return false;
                 if (element.TryGetProperty("selector", out var value)
                     && value.ValueKind == System.Text.Json.JsonValueKind.String
                     && string.Equals(value.GetString(), selector, StringComparison.Ordinal))
-                    return true;
+                {
+                    matches++;
+                    if (matches > 1) return true;
+                }
                 if (element.TryGetProperty("children", out var children)
-                    && children.ValueKind == System.Text.Json.JsonValueKind.Array
-                    && ElementsContainSelector(children, selector))
-                    return true;
+                    && !CountMatchingSelectors(children, selector, ref matches, depth + 1))
+                    return false;
             }
-            return false;
+            return true;
         }
 
         internal static bool IsValidAction(
