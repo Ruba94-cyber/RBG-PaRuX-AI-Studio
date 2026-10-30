@@ -1,8 +1,7 @@
 using System;
 using System.Diagnostics;
-using System.Linq;
-using PaRuX.Contracts;
 using System.Runtime.InteropServices;
+using PaRuX.Contracts;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -46,6 +45,8 @@ namespace PaRuX.Services
         private static readonly SemaphoreSlim InventoryGate = new(1, 1);
         private static RuntimeManagerHardwareStatus? _cachedInventory;
         private static DateTime _cachedInventoryUtc = DateTime.MinValue;
+        private static DateTime _lastInventoryFailureUtc = DateTime.MinValue;
+        private static readonly TimeSpan FailureRetryDelay = TimeSpan.FromSeconds(8);
 
         public static async Task<ResourceSnapshot> GetSnapshotAsync(CancellationToken ct)
         {
@@ -82,14 +83,28 @@ namespace PaRuX.Services
             {
                 if (_cachedInventory != null && DateTime.UtcNow - _cachedInventoryUtc < InventoryTtl)
                     return _cachedInventory;
+                if (DateTime.UtcNow - _lastInventoryFailureUtc < FailureRetryDelay)
+                    return null;
 
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeout.CancelAfter(TimeSpan.FromSeconds(4));
-                RuntimeManagerHardwareStatus status =
-                    await RuntimeManagerClient.Current.GetStatusAsync(timeout.Token).ConfigureAwait(false);
-                _cachedInventory = status;
-                _cachedInventoryUtc = DateTime.UtcNow;
-                return status;
+                try
+                {
+                    RuntimeManagerHardwareStatus status =
+                        await RuntimeManagerClient.Current.GetStatusAsync(timeout.Token).ConfigureAwait(false);
+                    _cachedInventory = status;
+                    _cachedInventoryUtc = DateTime.UtcNow;
+                    _lastInventoryFailureUtc = DateTime.MinValue;
+                    return status;
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch
+                {
+                    // Avoid restarting/offline-probing Core on every Settings tick.
+                    // The short retry interval also permits eGPU/backend recovery.
+                    _lastInventoryFailureUtc = DateTime.UtcNow;
+                    throw;
+                }
             }
             finally { InventoryGate.Release(); }
         }
