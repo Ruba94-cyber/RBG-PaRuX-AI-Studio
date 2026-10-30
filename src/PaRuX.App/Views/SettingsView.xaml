@@ -42,6 +42,11 @@
                             TextChanged="SettingsSearchBox_TextChanged"
                             QuerySubmitted="SettingsSearchBox_QuerySubmitted"
                             SuggestionChosen="SettingsSearchBox_SuggestionChosen" />
+            <TextBlock x:Name="SettingsSearchFeedback"
+                       Visibility="Collapsed"
+                       TextWrapping="Wrap"
+                       Style="{StaticResource PaRuXCaptionTextStyle}"
+                       AutomationProperties.AutomationId="Settings_Search_Feedback" />
             <ComboBox x:Name="SettingsCompactCategoryPicker"
                       Visibility="Collapsed" HorizontalAlignment="Stretch"
                       AutomationProperties.AutomationId="Settings_CompactCategory_ComboBox"
