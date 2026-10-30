@@ -85,6 +85,21 @@ public sealed class ProgressiveDisclosureUiContractTests
     }
 
     [Fact]
+    public void Gallery_cards_stack_thumbnails_and_actions_at_compact_window_widths()
+    {
+        string gallery = ReadSource("MediaGalleryView.cs");
+        Assert.Contains("grid.SizeChanged +=", gallery, StringComparison.Ordinal);
+        Assert.Contains("args.NewSize.Width < 620", gallery, StringComparison.Ordinal);
+        Assert.Contains("Grid.SetRow(contentPanel, compact ? 1 : 0)", gallery, StringComparison.Ordinal);
+        Assert.Contains("Grid.SetColumn(contentPanel, compact ? 0 : 1)", gallery, StringComparison.Ordinal);
+        Assert.Contains("actions.Orientation = compact ? Orientation.Vertical : Orientation.Horizontal", gallery,
+            StringComparison.Ordinal);
+        Assert.Contains("MediaGallery_Open_", gallery, StringComparison.Ordinal);
+        Assert.Contains("MediaGallery_Delete_", gallery, StringComparison.Ordinal);
+        Assert.Contains("MediaGallery_ReuseEdit_", gallery, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Settings_search_finds_ui_labels_without_duplicating_settings_or_refreshing_all_categories()
     {
         string xamlPath = Path.Combine(FindRepositoryRoot(), "src", "PaRuX.App", "Views", "SettingsView.xaml");
