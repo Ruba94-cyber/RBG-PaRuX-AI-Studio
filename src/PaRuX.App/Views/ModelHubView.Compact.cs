@@ -78,7 +78,10 @@ namespace PaRuX.Views
             foreach (ModelHubSplitSetPresentation.QuantChoiceOption option in choices)
                 picker.Items.Add(new ComboBoxItem
                 {
-                    Content = option.Label + " · ~" + FormatBytes(option.Choice.SizeBytes),
+                    Content = option.Label
+                        + (option.Choice.SizeBytes > 0
+                            ? " · ~" + FormatBytes(option.Choice.SizeBytes)
+                            : " · size not published"),
                     Tag = option.Choice,
                     IsEnabled = option.CanDownload
                 });
@@ -117,6 +120,11 @@ namespace PaRuX.Views
                 ModelQuantChoice? selected = (picker.SelectedItem as ComboBoxItem)?.Tag as ModelQuantChoice;
                 dialog.IsPrimaryButtonEnabled = selected?.Complete == true;
                 if (selected == null) { hardwareText.Text = "No complete variant selected."; return; }
+                if (selected.SizeBytes <= 0)
+                {
+                    hardwareText.Text = "Hardware fit unknown until the repository provides an exact file size.";
+                    return;
+                }
                 ModelHardwareFitEstimate fit = ModelHardwareFitEstimator.Estimate(selected.SizeBytes, _hardware);
                 hardwareText.Text = "On this PC: " + ModelHubRowPresentation.HardwareFit(fit.Verdict, fit.Summary);
             };
