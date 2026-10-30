@@ -67,7 +67,7 @@ namespace PaRuX.Views
             body.Children.Add(titleRow);
             body.Children.Add(new TextBlock
             {
-                Text = "One place to see what PaRuX owns and may update. The Windows app uses explicit GitHub MSI major upgrades, USER_MANAGED software is never modified, and models are never silently replaced.",
+                Text = "Review application and runtime updates. PaRuX never modifies user-managed software or replaces models without approval.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.78
             });
@@ -461,21 +461,34 @@ namespace PaRuX.Views
             _models.Children.Clear();
             _models.Children.Add(new TextBlock
             {
-                Text = models.Count + " managed model file(s). Models are content, not executable runtime updates: PaRuX never replaces a quantization or revision silently. Choose any replacement explicitly in Model Hub.",
+                Text = models.Count + " installed model file(s). Select a model below to inspect its quantization and source.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.75
             });
             foreach (ManagedModelInfo model in models.Take(30))
             {
-                _models.Children.Add(new TextBlock
+                var detail = new TextBlock
                 {
-                    Text = (string.IsNullOrWhiteSpace(model.Alias) ? model.FileName : model.Alias + " · " + model.FileName)
-                        + " · " + model.Quantization
-                        + (string.IsNullOrWhiteSpace(model.RepoId) ? " · source unknown" : " · " + model.RepoId),
+                    Text = "File: " + model.FileName + "\n"
+                        + "Quantization: " + (string.IsNullOrWhiteSpace(model.Quantization) ? "unknown" : model.Quantization) + "\n"
+                        + "Source: " + (string.IsNullOrWhiteSpace(model.RepoId) ? "unknown" : model.RepoId),
                     TextWrapping = TextWrapping.Wrap,
-                    FontSize = 12
+                    FontSize = 12,
+                    Opacity = 0.76
+                };
+                _models.Children.Add(new Expander
+                {
+                    Header = ModelHubRowPresentation.CompactManualLabel(model.Alias, model.FileName),
+                    Content = detail,
+                    IsExpanded = false
                 });
             }
+            if (models.Count > 30)
+                _models.Children.Add(new TextBlock
+                {
+                    Text = "Showing the first 30 files. Open Model Hub to browse all installed models.",
+                    TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.72
+                });
         }
 
         private static string? Backend(string componentId) => componentId switch
