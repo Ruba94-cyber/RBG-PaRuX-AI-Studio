@@ -289,6 +289,8 @@ namespace PaRuX.Views
             var grid = new Grid { ColumnSpacing = 14 };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             // Thumbnail container
             var thumbBox = new Border
@@ -471,6 +473,30 @@ namespace PaRuX.Views
 
             Grid.SetColumn(contentPanel, 1);
             grid.Children.Add(contentPanel);
+
+            // Window sizes and DPI scaling vary by PC. At narrow widths, the
+            // thumbnail, metadata and action buttons stack instead of clipping
+            // behind the gallery edge or creating a horizontal scrollbar.
+            bool? compactLayout = null;
+            grid.SizeChanged += (_, args) =>
+            {
+                bool compact = args.NewSize.Width < 620;
+                if (compactLayout == compact) return;
+                compactLayout = compact;
+                grid.ColumnSpacing = compact ? 0 : 14;
+                grid.RowSpacing = compact ? 10 : 0;
+                grid.ColumnDefinitions[0].Width = compact
+                    ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
+                grid.ColumnDefinitions[1].Width = compact
+                    ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+                Grid.SetRow(contentPanel, compact ? 1 : 0);
+                Grid.SetColumn(contentPanel, compact ? 0 : 1);
+                actions.Orientation = compact ? Orientation.Vertical : Orientation.Horizontal;
+                foreach (UIElement child in actions.Children)
+                    if (child is Button button)
+                        button.HorizontalAlignment = compact
+                            ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+            };
 
             card.Child = grid;
             return card;
