@@ -18,6 +18,13 @@ This is the **one active operational roadmap** for PaRuX. Retained dated evidenc
 
 **PARTIAL — active software gaps; PHYSICAL_PC_ACCEPTANCE_REQUIRED**
 
+### 2026-10-30 desktop UI progressive-disclosure follow-up (PARTIAL; NOT Windows-accepted)
+- Direct commits on public `main` streamline Model Hub, Chat manual model selection, role routing, Runtime, Updates, Projects, Gallery, Tools & Automations and Observability, without changing model download ownership, runtime mutation safeguards or application configuration data.
+- Model Routing now keeps full capability evidence, quantization and scores behind a selectable candidate-details dialog instead of showing long evidence text in every row.
+- Settings search indexes labels already present in the UI and navigates to the matching category; compact navigation, empty results and suggestion keyboard behavior are covered by source contracts only.
+- Create shows its cancel button when an operation is in progress; automatic setup and media selection still use the existing server-owned flows.
+- Source-level xUnit contract cases were written and checked for expected symbols, but no .NET/WinUI build, xUnit run, FlaUI UI regression or physical Windows validation has been performed in this environment. All existing BIC/release and hardware gaps remain OPEN. This UI work must not be described as complete release acceptance.
+
 ### 2026-10-28 release 2.0.0 reconciliation (PARTIAL; published by owner decision)
 - Verified on one PC (RTX 5080 16 GB, 27 GB RAM): release gate PASS (Server 10606 passed / 0 failed / 9 skipped; Windows + Android builds); FlaUI Regression 233/236 then the 3 failures (Create status/cancel pushed below the fold by tall panels) fixed in `45ced67` and re-verified (26/26 Create/Inpaint/Responsive UI tests); the full Regression suite is re-run on the final commit before tagging.
 - Live in the real app: automatic post-download tuning for text (queued -> running -> honest result, cancel creates nothing), media tuning after enabling the setting, maintenance probe fixed (13 consecutive failures -> 0), generation with SDXL-turbo, Qwen-Image, FLUX.1-schnell, LTX-Video 2B, Chroma1-HD (about 15 min first image), mask inpaint with a really painted stroke, 3-slot LoRA stack with family refusal (409), character card import through the real file picker, Chat EN/IT region-edit routing.
