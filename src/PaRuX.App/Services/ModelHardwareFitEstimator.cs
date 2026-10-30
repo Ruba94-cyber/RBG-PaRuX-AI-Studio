@@ -346,8 +346,12 @@ namespace PaRuX.Services
         internal static long CalculateUsableSystemRam(long totalRamBytes)
         {
             if (totalRamBytes <= 0) return 0;
-            // Keep Windows/PaRuX/runtime breathing room: reserve the larger of 8 GiB or 25%.
-            long reserve = Math.Max(8 * GiB, totalRamBytes / 4);
+            // Mirror RuntimeHardwareProfileResolver exactly. Low-RAM CPU PCs
+            // need a bounded, nonzero budget for smaller models, without
+            // counting shared iGPU memory twice or relaxing live admission.
+            long reserve = totalRamBytes <= 12 * GiB
+                ? (totalRamBytes + 1) / 2
+                : Math.Max(8 * GiB, totalRamBytes / 4);
             return Math.Max(0, totalRamBytes - reserve);
         }
 
