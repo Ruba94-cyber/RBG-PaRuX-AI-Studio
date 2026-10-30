@@ -257,11 +257,15 @@ namespace PaRuX.Views
                 Child = BuildCodingSelectionUi()
             });
 
-            var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            controls.Children.Add(new TextBlock { Text = "Role", VerticalAlignment = VerticalAlignment.Center });
-            controls.Children.Add(_role);
-            controls.Children.Add(new TextBlock { Text = "Policy", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) });
-            controls.Children.Add(_mode);
+            var controls = new StackPanel { Spacing = 8 };
+            var roleRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            roleRow.Children.Add(new TextBlock { Text = "Role", Width = 56, VerticalAlignment = VerticalAlignment.Center });
+            roleRow.Children.Add(_role);
+            controls.Children.Add(roleRow);
+            var policyRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            policyRow.Children.Add(new TextBlock { Text = "Policy", Width = 56, VerticalAlignment = VerticalAlignment.Center });
+            policyRow.Children.Add(_mode);
+            controls.Children.Add(policyRow);
             var refresh = new Button { Content = "Refresh evidence" };
             refresh.Click += async (_, _) => await RefreshAsync();
             controls.Children.Add(refresh);
@@ -322,19 +326,23 @@ namespace PaRuX.Views
             body.Children.Add(_busy);
             body.Children.Add(_candidates);
 
-            var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var actions = new StackPanel { Spacing = 8 };
+            var immediateActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             var auto = new Button { Content = "Use selected policy now" };
             auto.Click += async (_, _) => await ApplyPolicyAsync();
-            actions.Children.Add(auto);
+            immediateActions.Children.Add(auto);
             var force = new Button { Content = "Force selected model now" };
             force.Click += async (_, _) => await ForceSelectedAsync();
-            actions.Children.Add(force);
+            immediateActions.Children.Add(force);
+            actions.Children.Add(immediateActions);
+            var defaultsActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             var makeDefault = new Button { Content = "Set as role default" };
             makeDefault.Click += async (_, _) => await SetSelectedAsRoleDefaultAsync();
-            actions.Children.Add(makeDefault);
+            defaultsActions.Children.Add(makeDefault);
             var resetDefault = new Button { Content = "Reset role default" };
             resetDefault.Click += async (_, _) => await ResetRoleDefaultAsync();
-            actions.Children.Add(resetDefault);
+            defaultsActions.Children.Add(resetDefault);
+            actions.Children.Add(defaultsActions);
             body.Children.Add(actions);
 
             var evidenceActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
