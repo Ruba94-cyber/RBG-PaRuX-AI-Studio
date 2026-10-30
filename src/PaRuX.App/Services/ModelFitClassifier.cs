@@ -91,7 +91,7 @@ namespace PaRuX.Services
             ResourceSnapshot resources, RuntimeAcceleratorProfile? normalizedProfile = null)
         {
             bool hasGpuCapacity = resources.GpuAvailable && resources.VramTotalMb > 0
-                && normalizedProfile == null;
+                && normalizedProfile == null && !resources.CoreHardwareProbeAttempted;
             return new RuntimeManagerHardwareStatus
             {
                 GpuDetected = hasGpuCapacity,
