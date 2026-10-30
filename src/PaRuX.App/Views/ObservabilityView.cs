@@ -128,30 +128,58 @@ namespace PaRuX.Views
             _benchmarks.Children.Clear();
             if (_dashboard == null) return;
 
+            int metricIndex = 0;
             foreach (ObservabilityMetric metric in _dashboard.Metrics)
             {
-                var card = new Border { Padding = new Thickness(12), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(9) };
-                var row = new Grid { ColumnSpacing = 12 };
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(210) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                row.Children.Add(new TextBlock { Text = metric.Label, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
-                var value = new TextBlock { Text = metric.Value, FontSize = 18, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
-                Grid.SetColumn(value, 1); row.Children.Add(value);
-                var detail = new TextBlock { Text = metric.Detail ?? string.Empty, TextWrapping = TextWrapping.Wrap, Opacity = 0.70, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
-                Grid.SetColumn(detail, 2); row.Children.Add(detail);
-                card.Child = row;
+                // Label and value are visible at a glance; explanatory diagnostics stay optional.
+                var header = new Grid { ColumnSpacing = 12 };
+                header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                header.Children.Add(new TextBlock
+                {
+                    Text = metric.Label,
+                    TextWrapping = TextWrapping.Wrap,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                var value = new TextBlock
+                {
+                    Text = metric.Value, FontSize = 18,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetColumn(value, 1);
+                header.Children.Add(value);
+                var card = new Expander
+                {
+                    Header = header,
+                    Content = new TextBlock
+                    {
+                        Text = string.IsNullOrWhiteSpace(metric.Detail) ? "No further details." : metric.Detail,
+                        TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.76
+                    },
+                    IsExpanded = false
+                };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(card,
+                    "Observability_Metric_" + metricIndex++ + "_Expander");
                 _metrics.Children.Add(card);
             }
 
             string taskStates = string.Join(" · ", _dashboard.TaskStatuses.Select(item => item.Name + " " + item.Count));
             string trainingStates = string.Join(" · ", _dashboard.TrainingStatuses.Select(item => item.Name + " " + item.Count));
-            _metrics.Children.Add(new TextBlock
+            var stateDetails = new Expander
             {
-                Text = "Task states: " + (taskStates.Length == 0 ? "none" : taskStates)
-                    + "\nTraining states: " + (trainingStates.Length == 0 ? "none" : trainingStates),
-                TextWrapping = TextWrapping.Wrap, Opacity = 0.70, FontSize = 12
-            });
+                Header = "Task and training states",
+                Content = new TextBlock
+                {
+                    Text = "Task states: " + (taskStates.Length == 0 ? "none" : taskStates)
+                        + "\nTraining states: " + (trainingStates.Length == 0 ? "none" : trainingStates),
+                    TextWrapping = TextWrapping.Wrap, FontSize = 12
+                },
+                IsExpanded = false
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(stateDetails, "Observability_TaskStates_Expander");
+            _metrics.Children.Add(stateDetails);
 
             if (_dashboard.ModelBenchmarks.Count == 0)
             {
@@ -162,33 +190,36 @@ namespace PaRuX.Views
             int rank = 1;
             foreach (ModelBenchmarkLeaderboardEntry benchmark in _dashboard.ModelBenchmarks)
             {
-                var card = new Border { Padding = new Thickness(10), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8) };
-                var grid = new Grid { ColumnSpacing = 10 };
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(44) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(130) });
-                grid.Children.Add(new TextBlock { Text = "#" + rank++, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
-                var detail = new StackPanel { Spacing = 2 };
-                detail.Children.Add(new TextBlock { Text = benchmark.Label, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
-                detail.Children.Add(new TextBlock
+                var header = new Grid { ColumnSpacing = 12 };
+                header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                header.Children.Add(new TextBlock
                 {
-                    Text = System.IO.Path.GetFileName(benchmark.ModelPath) + " · "
-                        + (benchmark.Backend.Length == 0 ? "unknown backend" : benchmark.Backend) + " · "
-                        + (benchmark.HardwareKey.Length == 0 ? "unknown hardware" : benchmark.HardwareKey)
-                        + " · " + benchmark.Repetitions + " repetition(s) · " + benchmark.MeasuredUtc.ToLocalTime().ToString("g"),
-                    TextWrapping = TextWrapping.Wrap, FontSize = 11, Opacity = 0.68
+                    Text = "#" + rank + " · " + benchmark.Label,
+                    TextWrapping = TextWrapping.Wrap,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center
                 });
-                Grid.SetColumn(detail, 1); grid.Children.Add(detail);
                 var speed = new TextBlock
                 {
                     Text = benchmark.TokensPerSecond.ToString("0.0") + " tok/s",
                     FontSize = 17,
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Center
                 };
-                Grid.SetColumn(speed, 2); grid.Children.Add(speed);
-                card.Child = grid;
+                Grid.SetColumn(speed, 1);
+                header.Children.Add(speed);
+                var detail = new TextBlock
+                {
+                    Text = System.IO.Path.GetFileName(benchmark.ModelPath) + " · "
+                        + (benchmark.Backend.Length == 0 ? "unknown backend" : benchmark.Backend) + " · "
+                        + (benchmark.HardwareKey.Length == 0 ? "unknown hardware" : benchmark.HardwareKey)
+                        + " · " + benchmark.Repetitions + " repetition(s) · " + benchmark.MeasuredUtc.ToLocalTime().ToString("g"),
+                    TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.74
+                };
+                var card = new Expander { Header = header, Content = detail, IsExpanded = false };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(card,
+                    "Observability_Benchmark_" + rank++ + "_Expander");
                 _benchmarks.Children.Add(card);
             }
         }
@@ -251,7 +282,7 @@ namespace PaRuX.Views
                 _entries.Children.Add(card);
             }
 
-            var counts = _snapshot.GroupBy(e => e.Category, StringComparer.OrdinalIgnoreCase)
+            var counts = visible.GroupBy(e => e.Category, StringComparer.OrdinalIgnoreCase)
                 .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(g => Friendly(g.Key) + ": " + g.Count());
             _summary.Text = visible.Count + " visible event(s) · " + string.Join(" · ", counts);
