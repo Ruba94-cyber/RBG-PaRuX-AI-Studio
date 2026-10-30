@@ -134,6 +134,18 @@ public sealed class WindowsUiAssertionPolicyTests
             ComputerUseSensitiveActionPolicy.Evaluate("ui_assert", "Status text", null, null).Disposition);
     }
 
+    [Theory]
+    [InlineData("Password input")]
+    [InlineData("OTP code")]
+    [InlineData("PIN field")]
+    [InlineData(null)]
+    public void Gui_assert_cannot_probe_secrets_or_unlabelled_controls(string? label)
+    {
+        ComputerUseSensitiveActionPolicy.Decision decision =
+            ComputerUseSensitiveActionPolicy.Evaluate("ui_assert", label, null, "TestApp");
+        Assert.Equal(ComputerUseSensitiveActionPolicy.Disposition.Deny, decision.Disposition);
+    }
+
     [Fact]
     public void Different_expectations_do_not_collapse_into_the_same_repeat_key()
     {
