@@ -239,13 +239,13 @@ namespace PaRuX.Views
             scroll.Content = body;
             body.Children.Add(new TextBlock
             {
-                Text = "Model Intelligence & Routing",
+                Text = "Model Routing",
                 FontSize = 28,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
             });
             body.Children.Add(new TextBlock
             {
-                Text = "Choose which models PaRuX uses for each task. Keep automatic routing or customize individual roles.",
+                Text = "Automatic routing is the default. Pick a role or override it when needed.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.76
             });
@@ -275,21 +275,23 @@ namespace PaRuX.Views
                 Child = BuildCapabilityOverrideUi()
             });
 
-            body.Children.Add(new Border
+            var capabilities = new Expander
             {
-                Padding = new Thickness(16),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
-                Child = new CapabilityModesSection()
-            });
+                Header = "Advanced capability modes",
+                Content = new CapabilityModesSection(),
+                IsExpanded = false
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(capabilities, "ModelRouting_Capabilities_Expander");
+            body.Children.Add(capabilities);
 
-            body.Children.Add(new Border
+            var arena = new Expander
             {
-                Padding = new Thickness(16),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
-                Child = new ModelArenaSection()
-            });
+                Header = "Compare models (Arena)",
+                Content = new ModelArenaSection(),
+                IsExpanded = false
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(arena, "ModelRouting_Arena_Expander");
+            body.Children.Add(arena);
 
             var registration = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             registration.Children.Add(_installed);
@@ -299,15 +301,23 @@ namespace PaRuX.Views
             var remove = new Button { Content = "Remove selected candidate" };
             remove.Click += async (_, _) => await RemoveSelectedCandidateAsync();
             registration.Children.Add(remove);
-            body.Children.Add(registration);
-            body.Children.Add(_installedStatus);
-            body.Children.Add(new TextBlock
+            var candidateEditor = new StackPanel { Spacing = 8 };
+            candidateEditor.Children.Add(registration);
+            candidateEditor.Children.Add(_installedStatus);
+            candidateEditor.Children.Add(new TextBlock
             {
-                Text = "Candidate registration is explicit. Downloading a model does not silently change routing; add it to one or more roles here when you actually want PaRuX to consider it.",
+                Text = "Only registered models are considered for the selected role. Downloads never change routing automatically.",
                 TextWrapping = TextWrapping.Wrap,
-                FontSize = 12,
-                Opacity = 0.68
+                FontSize = 12, Opacity = 0.70
             });
+            var candidateExpander = new Expander
+            {
+                Header = "Manage role candidates",
+                Content = candidateEditor,
+                IsExpanded = false
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(candidateExpander, "ModelRouting_Candidates_Expander");
+            body.Children.Add(candidateExpander);
 
             body.Children.Add(_busy);
             body.Children.Add(_candidates);
@@ -334,21 +344,21 @@ namespace PaRuX.Views
             body.Children.Add(evidenceActions);
             body.Children.Add(new TextBlock
             {
-                Text = "Force is one-shot and never substitutes on failure. Set as role default is persistent until reset; for the standard role this also controls ordinary interactive Chat. Profile selected model runs the fixed local correctness battery and replaces the size-only prior with empirical capability evidence.",
+                Text = "Force applies once. Role defaults remain until reset. Profiling collects local evidence.",
                 TextWrapping = TextWrapping.Wrap,
                 FontSize = 12,
                 Opacity = 0.70
             });
             body.Children.Add(_status);
 
-            body.Children.Add(new Border
+            var backendRace = new Expander
             {
-                Margin = new Thickness(0, 12, 0, 0),
-                Padding = new Thickness(16),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
-                Child = BuildBackendRaceUi()
-            });
+                Header = "Advanced: compare runtime backends",
+                Content = BuildBackendRaceUi(),
+                IsExpanded = false
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(backendRace, "ModelRouting_BackendRace_Expander");
+            body.Children.Add(backendRace);
             return scroll;
         }
 
