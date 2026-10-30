@@ -241,6 +241,9 @@ public sealed class ModelHardwareFitEstimatorTests
     }
 
     [Theory]
+    [InlineData(4, 2)]
+    [InlineData(8, 4)]
+    [InlineData(12, 6)]
     [InlineData(16, 8)]
     [InlineData(32, 24)]
     [InlineData(64, 48)]
