@@ -94,7 +94,10 @@ namespace PaRuX.Services
 
             string kind = string.Join("_", actionWords);
             bool writesText = kind is "type" or "ui_set_value";
-            if ((CanActivateTarget(kind) && IsPasswordLikeTarget(targetLabelOrRole))
+            // Read-only equality checks can still probe password/OTP controls.
+            // A UI test must not turn into a credential oracle.
+            if (((CanActivateTarget(kind) || kind == "ui_assert")
+                    && IsPasswordLikeTarget(targetLabelOrRole))
                 || (writesText && IsPasswordLikeTarget(appName)))
                 return new Decision(Disposition.Deny, PasswordTargetReason);
 
@@ -105,7 +108,8 @@ namespace PaRuX.Services
                 && (HasSensitiveActionLabel(targetLabelOrRole) || HasSensitiveActionLabel(appName)))
                 return new Decision(Disposition.ConfirmRequired, SensitiveActionReason);
 
-            if (CanActivateTarget(kind) && string.IsNullOrWhiteSpace(targetLabelOrRole))
+            if ((CanActivateTarget(kind) || kind == "ui_assert")
+                && string.IsNullOrWhiteSpace(targetLabelOrRole))
                 return new Decision(Disposition.Deny, TargetUnavailableReason);
 
             return new Decision(Disposition.Allow, null);
