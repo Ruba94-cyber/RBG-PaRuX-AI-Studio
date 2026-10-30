@@ -72,7 +72,7 @@ public sealed class AdaptiveWorkspaceUiContractTests
     public void Media_model_picker_keeps_real_model_identity_and_hides_technical_lane_settings()
     {
         string code = File.ReadAllText(SourcePath("MediaModelRow.cs"));
-        Assert.Contains("CompactModelLabel(item.Label)", code, StringComparison.Ordinal);
+        Assert.Contains("MediaModelPickerPresenter.CompactDisplayLabel(item.Label)", code, StringComparison.Ordinal);
         Assert.Contains("ToolTipService.SetToolTip(option, item.Label)", code, StringComparison.Ordinal);
         Assert.Contains("idPrefix + \"_ModelDetails_Button\"", code, StringComparison.Ordinal);
         Assert.Contains("_idPrefix + \"_FullModelIdentity_TextBox\"", code, StringComparison.Ordinal);
