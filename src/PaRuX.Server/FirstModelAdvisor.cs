@@ -89,7 +89,7 @@ public static class FirstModelAdvisor
                 ramBytes,
                 accelerator.AdapterName ?? string.Empty,
                 sharedMemoryPrimary,
-                sharedMemoryProfile ? usableRamBytes : null,
+                usableRamBytes,
                 accelerator.GpuPresent,
                 accelerator.AcceleratorEligible);
         }
@@ -117,7 +117,12 @@ public static class FirstModelAdvisor
             gpuName = string.Empty;
         }
 
-        return Advise(vram, hardware?.RamTotalBytes ?? 0, gpuName);
+        long hostRam = Math.Max(0, hardware?.RamTotalBytes ?? 0);
+        return Advise(vram, hostRam, gpuName,
+            sharedMemoryPrimary: false,
+            usableSystemRamOverride: RuntimeHardwareProfileResolver.ConservativeUsableSystemRamBytes(hostRam),
+            physicalGpuPresent: vram > 0,
+            acceleratorEligible: true);
     }
 
     /// <summary>Production onboarding path: use the same inventory/backend resolver as runtime
@@ -139,7 +144,7 @@ public static class FirstModelAdvisor
             Math.Max(0, status.RamTotalBytes),
             profile.AdapterName ?? string.Empty,
             profile.AcceleratorEligible && profile.SharedMemoryPrimary,
-            profile.SharedMemoryPrimary ? profile.UsableSystemRamBytes : null,
+            profile.UsableSystemRamBytes,
             profile.GpuPresent,
             profile.AcceleratorEligible,
             availableLocalModels,
