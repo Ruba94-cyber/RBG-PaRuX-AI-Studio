@@ -32,7 +32,7 @@ namespace PaRuX.Views
             });
             body.Children.Add(new TextBlock
             {
-                Text = "Based on your hardware and the runtimes installed. Suggestions are never applied automatically; user-managed runtimes are only reported.",
+                Text = "Optional changes for this PC. Nothing is installed without your approval.",
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.78
             });
@@ -81,17 +81,24 @@ namespace PaRuX.Views
             var title = new TextBlock { Text = suggestion.Title, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
             AutomationProperties.SetAutomationId(title, "RuntimeManager_Suggestion_" + key + "_Title_Text");
             stack.Children.Add(title);
-            stack.Children.Add(new TextBlock { Text = suggestion.Why, TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.84 });
+            stack.Children.Add(new TextBlock
+            {
+                Text = suggestion.Why,
+                TextWrapping = TextWrapping.Wrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxLines = 2,
+                FontSize = 12,
+                Opacity = 0.84
+            });
 
             var badge = new TextBlock { Text = MaintenancePresenter.EvidenceLabel(suggestion), FontSize = 11, Opacity = 0.72 };
             AutomationProperties.SetAutomationId(badge, "RuntimeManager_Suggestion_" + key + "_Evidence_Text");
             stack.Children.Add(badge);
-            if (suggestion.Evidence.Count > 0)
-                stack.Children.Add(new TextBlock { Text = string.Join(" · ", suggestion.Evidence), TextWrapping = TextWrapping.Wrap, FontSize = 11, Opacity = 0.66 });
-            if (suggestion.Informational && suggestion.Action == "none")
-                stack.Children.Add(new TextBlock { Text = "Informational - PaRuX will not change this.", FontSize = 11, Opacity = 0.66 });
+            // The full hardware evidence is available on demand rather than repeated in each card.
 
             var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7 };
+            actions.Children.Add(ActionButton("Details", () => ShowSuggestionDetailsAsync(suggestion),
+                "RuntimeManager_Suggestion_" + key + "_Details_Button"));
             string? installLabel = MaintenancePresenter.PrimaryActionLabel(suggestion);
             if (installLabel != null)
                 actions.Children.Add(ActionButton(installLabel, () => InstallSuggestionAsync(suggestion), "RuntimeManager_Suggestion_" + key + "_Install_Button"));
@@ -104,6 +111,39 @@ namespace PaRuX.Views
             }, "RuntimeManager_Suggestion_" + key + "_Dismiss_Button"));
             stack.Children.Add(actions);
             return item;
+        }
+
+        private async Task ShowSuggestionDetailsAsync(RuntimeBackendSuggestion suggestion)
+        {
+            var details = new StackPanel { Spacing = 10 };
+            details.Children.Add(new TextBlock { Text = suggestion.Why, TextWrapping = TextWrapping.Wrap });
+            details.Children.Add(SuggestionNote("RuntimeManager_Suggestion_Detail_Evidence_Label",
+                MaintenancePresenter.EvidenceLabel(suggestion)));
+            if (suggestion.Evidence.Count > 0)
+            {
+                details.Children.Add(new TextBlock
+                {
+                    Text = "Evidence",
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                });
+                foreach (string evidence in suggestion.Evidence)
+                    details.Children.Add(new TextBlock { Text = "• " + evidence, TextWrapping = TextWrapping.Wrap });
+            }
+            if (suggestion.Informational && suggestion.Action == "none")
+                details.Children.Add(new TextBlock
+                {
+                    Text = "Informational only: PaRuX will not change this runtime.",
+                    TextWrapping = TextWrapping.Wrap
+                });
+            var dialog = new ContentDialog
+            {
+                Title = suggestion.Title,
+                Content = new ScrollViewer { Content = details, MaxHeight = 380 },
+                CloseButtonText = "Close",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = XamlRoot
+            };
+            await dialog.ShowAsync();
         }
 
         private async Task InstallSuggestionAsync(RuntimeBackendSuggestion suggestion)
