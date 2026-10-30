@@ -159,20 +159,20 @@ namespace PaRuX.Views
                 case TextBlock text when !string.IsNullOrWhiteSpace(text.Text):
                     labels.Add(text.Text);
                     break;
-                case ToggleSwitch toggle when toggle.Header is string header:
-                    labels.Add(header);
+                case ToggleSwitch toggle when toggle.Header is string toggleHeader:
+                    labels.Add(toggleHeader);
                     break;
-                case TextBox box when box.Header is string header:
-                    labels.Add(header);
+                case TextBox box when box.Header is string boxHeader:
+                    labels.Add(boxHeader);
                     break;
-                case ComboBox combo when combo.Header is string header:
-                    labels.Add(header);
+                case ComboBox combo when combo.Header is string comboHeader:
+                    labels.Add(comboHeader);
                     break;
-                case NumberBox number when number.Header is string header:
-                    labels.Add(header);
+                case NumberBox number when number.Header is string numberHeader:
+                    labels.Add(numberHeader);
                     break;
-                case Expander expander when expander.Header is string header:
-                    labels.Add(header);
+                case Expander expander when expander.Header is string expanderHeader:
+                    labels.Add(expanderHeader);
                     break;
                 case Button button when button.Content is string name:
                     labels.Add(name);
