@@ -2,6 +2,26 @@
 
 Manual procedures for the owner to run on a real Windows PC and phone. Every procedure ends with a status line that stays NOT RUN until a person records a result. Drafted from the repository by a local model; each section must be checked by a human before use.
 
+## Hardware diversity and small-screen acceptance (NOT RUN)
+
+**Scope:** PaRuX desktop currently targets Windows 10/11 x64. "All PCs" means no hard-coded NVIDIA/16 GB VRAM assumptions across supported Windows hardware; it does not mean Linux, macOS, x86 or every model family will run on every machine. No row below is physically accepted merely because a unit test exists.
+
+| Physical test PC | Minimum required evidence |
+| --- | --- |
+| CPU-only, 8 GB RAM | Small GGUF fits conservative RAM budget; no CUDA or Vulkan requirement; CPU-only speed warning; successful chat and clean stop |
+| CPU-only, 16 GB RAM | Model selection and runtime detection without a dedicated GPU; download, load, chat and cancellation |
+| AMD integrated/UMA (8–16 GB system RAM) | Shared GPU aperture is not added to RAM; Vulkan eligibility checked; correct smaller-model fallback and memory-pressure rejection |
+| Intel integrated/Arc | Hardware discovery, Vulkan backend selection only if installed/eligible, fallback to CPU if not available |
+| NVIDIA 8–16 GB | CUDA if eligible, memory-fit estimate, ordinary chat and media capability checks |
+| AMD dedicated 8–16 GB | Vulkan eligibility and fit rather than assuming NVIDIA-only telemetry; no silent runtime installs |
+| Multi-GPU or eGPU | Separate VRAM pools, explicit split only when supported, hot-plug/unplug recovery, no fabricated combined VRAM |
+| Low-memory / low-VRAM / no GPU telemetry | Honest Unknown/CPU warnings, safe download choices, no automatic large-model allocation |
+| Narrow / high-DPI laptop window (400–800 logical pixels) | Model Hub quantization picker and Gallery actions visible; navigation, Settings search and Create cancellation keyboard reachable |
+
+For **each** platform: record OS build, memory, GPU identity/backend and *actual* detected capacity (not just model name), selected quantization, Core status, real inference success or refusal, cancellation, app restart and logs. Use a temporary test profile and redact paths, identifiers, access tokens and user data from any public issue. Test the same model at a normal and a constrained context length. Record `PASS`, `FAIL`, `SKIP` or `NOT RUN` per machine; do not infer hardware support from test fixtures.
+
+Source-only regressions cover CPU/RAM fit, context-only metadata, shared UMA budgets and narrow layout. WinUI build, xUnit execution, FlaUI and physical hardware runs remain **NOT RUN** for these changes.
+
 ## 1. Clean-PC MSI installation and uninstall
 
 ### Purpose
