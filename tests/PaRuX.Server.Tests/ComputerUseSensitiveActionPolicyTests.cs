@@ -170,4 +170,26 @@ public sealed class ComputerUseSensitiveActionPolicyTests
         Assert.Null(ComputerUseSensitiveActionPolicy.ResolveObservedTargetLabelOrRole(unlabeledTree, "btn-unknown"));
         Assert.Null(ComputerUseSensitiveActionPolicy.ResolveObservedTargetLabelOrRole("not json", "btn-send"));
     }
+    [Fact]
+    public void Sensitive_target_labels_must_come_from_the_authorized_foreground_window()
+    {
+        const string tree = """
+        {"windows":[
+          {"hwnd":1234,"elements":[{"selector":"btn-submit","name":"Save draft","controlType":"Button"}]},
+          {"hwnd":5678,"elements":[{"selector":"btn-submit","name":"Send payment","controlType":"Button"}]}
+        ]}
+        """;
+
+        string? foreground = ComputerUseSensitiveActionPolicy.ResolveObservedTargetLabelOrRole(
+            tree, "btn-submit", 1234);
+        Assert.Equal("Save draft Button", foreground);
+        string? anotherWindow = ComputerUseSensitiveActionPolicy.ResolveObservedTargetLabelOrRole(
+            tree, "btn-submit", 5678);
+        Assert.Equal("Send payment Button", anotherWindow);
+        Assert.Null(ComputerUseSensitiveActionPolicy.ResolveObservedTargetLabelOrRole(
+            tree, "btn-submit", 9999));
+        Assert.Equal(ComputerUseSensitiveActionPolicy.Disposition.ConfirmRequired,
+            ComputerUseSensitiveActionPolicy.Evaluate("ui_invoke", anotherWindow, null, null).Disposition);
+    }
+
 }
