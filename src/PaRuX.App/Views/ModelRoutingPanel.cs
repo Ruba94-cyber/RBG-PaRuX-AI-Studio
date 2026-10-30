@@ -169,9 +169,10 @@ namespace PaRuX.Views
                 _codingSelectionLoading = false;
                 _codingDetailsText = DescribeCodingSelection(decision);
                 _codingDetailsButton.IsEnabled = true;
-                _codingSelection.Text = "In use for /code: " + (decision.SelectedFileName ?? "No coding model assigned")
+                _codingSelection.Text = "In use for /code: " + (decision.SelectedFileName ?? "(no coding model assigned)")
                     + (decision.EffectiveSource == CodingModelSelectionMode.Auto
-                        ? " · automatic measured choice" : " · assigned model");
+                        ? " · automatic measured choice" : " · assigned model")
+                    + "\n" + ModelHubRowPresentation.CompactDescription(decision.Reason, 150);
             }
             catch (Exception ex)
             {
