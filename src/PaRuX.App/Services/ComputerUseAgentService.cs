@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -588,10 +589,15 @@ namespace PaRuX.Services
                 {
                     // Reported as done only when a window matched and Windows brought it forward. A title that matched nothing
                     // used to be logged as focused, and the run went on acting in whatever window happened to be in front.
-                    DesktopWindowInfo? match = DesktopAutomationService.ListWindows()
-                        .Find(w => w.Title.IndexOf(action.Title ?? string.Empty, StringComparison.OrdinalIgnoreCase) >= 0);
-                    bool focused = match != null && DesktopAutomationService.FocusWindow(match.Handle);
-                    return ComputerUseActionParser.FocusRefusal(match != null, focused);
+                    List<DesktopWindowInfo> windows = DesktopAutomationService.ListWindows();
+                    int targetIndex = ComputerUseWindowSelectionPolicy.FindUniqueIndex(
+                        windows.Select(w => w.Title).ToList(), action.Title);
+                    if (targetIndex == ComputerUseWindowSelectionPolicy.Ambiguous)
+                        return "Several windows match that title, so none was focused. Provide a more specific window title.";
+                    if (targetIndex == ComputerUseWindowSelectionPolicy.NotFound)
+                        return ComputerUseActionParser.FocusRefusal(false, false);
+                    bool focused = DesktopAutomationService.FocusWindow(windows[targetIndex].Handle);
+                    return ComputerUseActionParser.FocusRefusal(true, focused);
                 }
                 case "wait":
                 {
