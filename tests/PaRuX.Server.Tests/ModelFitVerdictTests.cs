@@ -54,6 +54,22 @@ public sealed class ModelFitVerdictTests
     }
 
     [Fact]
+    public void A_small_model_is_not_rejected_just_because_the_host_has_eight_gib_ram()
+    {
+        var model = new GgufModelInfo { SizeBytes = 2 * Gib };
+        var resources = new ResourceSnapshot
+        {
+            GpuAvailable = false,
+            RamAvailable = true,
+            RamTotalMb = 8 * 1024
+        };
+        ModelHardwareFitEstimate hub = ModelHardwareFitEstimator.Estimate(
+            model.SizeBytes, Hardware(0, 8));
+        Assert.Equal(ModelFitVerdict.Fits, hub.Verdict);
+        Assert.Equal(ModelFit.CpuRamOnly, ModelFitClassifier.Classify(model, resources));
+    }
+
+    [Fact]
     public void Settings_and_hub_agree_on_cpu_only_pc_with_known_ram()
     {
         var resources = new ResourceSnapshot
