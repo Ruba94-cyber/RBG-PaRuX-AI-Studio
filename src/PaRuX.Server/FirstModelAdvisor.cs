@@ -76,7 +76,6 @@ public static class FirstModelAdvisor
         {
             long ramBytes = Math.Max(0, hardware?.RamTotalBytes ?? accelerator.SystemRamBytes);
             bool sharedMemoryPrimary = accelerator.AcceleratorEligible && accelerator.SharedMemoryPrimary;
-            bool sharedMemoryProfile = accelerator.SharedMemoryPrimary;
             long usableRamBytes = Math.Max(0, accelerator.UsableSystemRamBytes
                 ?? RuntimeHardwareProfileResolver.ConservativeUsableSystemRamBytes(ramBytes));
             long acceleratorMemoryBytes = !accelerator.AcceleratorEligible
