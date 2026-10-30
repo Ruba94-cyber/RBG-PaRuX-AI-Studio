@@ -165,6 +165,7 @@ namespace PaRuX.Services
                 ModelFit.ExcellentFit => " (fits in GPU)",
                 ModelFit.GoodFit => " (tight GPU fit)",
                 ModelFit.WorksWithOffload => " (uses CPU offload)",
+                ModelFit.CpuRamOnly => " (runs on CPU/RAM; performance may be slow)",
                 _ => string.Empty
             };
 
