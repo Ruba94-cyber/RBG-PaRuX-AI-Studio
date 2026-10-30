@@ -100,6 +100,33 @@ public sealed class WindowsUiActionServiceTests
     }
 
     [Fact]
+    public void Multiple_windows_cannot_spoof_target_selector_when_action_is_bound_to_foreground_handle()
+    {
+        const string json = """
+        {"windows":[
+          {"hwnd":1234,"elements":[{"selector":"btn-safe","name":"Save"}]},
+          {"hwnd":5678,"elements":[{"selector":"btn-danger","name":"Dangerous"}]}
+        ]}
+        """;
+
+        Assert.True(WindowsUiActionService.IsSelectorObserved(json, "btn-safe", 1234));
+        Assert.False(WindowsUiActionService.IsSelectorObserved(json, "btn-danger", 1234));
+        Assert.False(WindowsUiActionService.IsSelectorObserved(json, "btn-safe", 5678));
+        Assert.True(WindowsUiActionService.IsSelectorObserved(json, "btn-danger", 5678));
+        Assert.False(WindowsUiActionService.IsSelectorObserved(json, "btn-danger", 9999));
+    }
+
+    [Fact]
+    public void String_hwnd_is_supported_but_unverified_handle_does_not_authorize_actions()
+    {
+        const string json = """
+        {"windows":[{"hwnd":"1234","elements":[{"selector":"btn-save"}]}]}
+        """;
+        Assert.True(WindowsUiActionService.IsSelectorObserved(json, "btn-save", 1234));
+        Assert.False(WindowsUiActionService.IsSelectorObserved(json, "btn-save", 4321));
+    }
+
+    [Fact]
     public void Excessive_or_binary_text_does_not_reach_input_api()
     {
         Assert.False(WindowsUiActionService.IsValidAction(
