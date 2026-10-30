@@ -1632,13 +1632,14 @@ namespace PaRuX.Views
                 card.Children.Add(chips);
                 card.Children.Add(new TextBlock
                 {
-                    Text = cardModel.CapabilityText + " · " + cardModel.SizeText + " · " + cardModel.LicenceText,
+                    Text = cardModel.CapabilityText + " · " + cardModel.SizeText + " · publisher data unverified",
                     TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.78
                 });
-                card.Children.Add(new TextBlock { Text = cardModel.ReasonText, TextWrapping = TextWrapping.Wrap });
-                if (cardModel.LaneEvidenceText != null)
-                    card.Children.Add(new TextBlock { Text = cardModel.LaneEvidenceText, TextWrapping = TextWrapping.Wrap, FontSize = 12, Opacity = 0.85 });
-                card.Children.Add(new TextBlock { Text = cardModel.ProvenanceText, TextWrapping = TextWrapping.Wrap, FontSize = 11, Opacity = 0.65 });
+                card.Children.Add(new TextBlock
+                {
+                    Text = ModelHubRowPresentation.CompactDescription(cardModel.ReasonText),
+                    TextWrapping = TextWrapping.Wrap, MaxLines = 2, Opacity = 0.84
+                });
                 if (cardModel.RuntimeNoticeText != null)
                 {
                     var notice = new TextBlock { Text = cardModel.RuntimeNoticeText, TextWrapping = TextWrapping.Wrap };
@@ -1646,6 +1647,25 @@ namespace PaRuX.Views
                     card.Children.Add(notice);
                 }
                 var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var details = new Button { Content = "Details", IsEnabled = !anyBusy };
+                AutomationProperties.SetAutomationId(details,
+                    ModelSuggestionPresenter.CardAutomationId(cardModel.Key, "Details"));
+                details.Click += async (_, _) => await ShowModelDetailsAsync(cardModel.Title,
+                    new (string Label, string? Value)[]
+                    {
+                        ("Status", "Unverified Candidate; not an evaluated recommendation"),
+                        ("Reason", cardModel.ReasonText),
+                        ("Hardware estimate", cardModel.FitText),
+                        ("Capability", cardModel.CapabilityText),
+                        ("Download estimate", cardModel.SizeText),
+                        ("Licence", cardModel.LicenceText),
+                        ("Discovery cohort", string.Join(", ", cardModel.CohortChips)),
+                        ("Evidence", cardModel.LaneEvidenceText),
+                        ("Provenance", cardModel.ProvenanceText),
+                        ("Runtime requirement", cardModel.RuntimeNoticeText),
+                        ("Repository", cardModel.Repo)
+                    });
+                actions.Children.Add(details);
                 if (cardModel.CanReviewAndDownload)
                 {
                     var review = new Button { Content = "Review & download", IsEnabled = !anyBusy };
