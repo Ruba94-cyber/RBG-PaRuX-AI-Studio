@@ -117,6 +117,113 @@ namespace PaRuX.Views
             SelectSettingsCategory(_selectedSettingsCategory);
         }
 
+        // Search the labels that the existing settings UI actually displays. Keeping the
+        // index derived from XAML avoids a second, stale list of setting names or paths.
+        private readonly Dictionary<string, string> _settingsSearchIndex = new(StringComparer.Ordinal);
+
+        private IReadOnlyList<string> MatchSettingsCategories(string? query)
+        {
+            string[] terms = (query ?? string.Empty)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (terms.Length == 0) return SettingsCategories;
+            if (_settingsSearchIndex.Count == 0 && SettingsContentPanel != null)
+            {
+                foreach (object child in SettingsContentPanel.Children)
+                {
+                    if (child is not FrameworkElement section || section.Tag is not string category)
+                        continue;
+                    var labels = new List<string> { category };
+                    AppendSearchLabels(section, labels, 0);
+                    if (_settingsSearchIndex.TryGetValue(category, out string? existing))
+                        _settingsSearchIndex[category] = existing + " " + string.Join(" ", labels);
+                    else
+                        _settingsSearchIndex[category] = string.Join(" ", labels);
+                }
+            }
+
+            return SettingsCategories
+                .Where(category =>
+                {
+                    string searchable = category + " "
+                        + (_settingsSearchIndex.TryGetValue(category, out string? labels) ? labels : string.Empty);
+                    return terms.All(term => searchable.Contains(term, StringComparison.OrdinalIgnoreCase));
+                })
+                .ToArray();
+        }
+
+        private static void AppendSearchLabels(UIElement element, List<string> labels, int depth)
+        {
+            if (depth > 24) return;
+            switch (element)
+            {
+                case TextBlock text when !string.IsNullOrWhiteSpace(text.Text):
+                    labels.Add(text.Text);
+                    break;
+                case ToggleSwitch toggle when toggle.Header is string header:
+                    labels.Add(header);
+                    break;
+                case TextBox box when box.Header is string header:
+                    labels.Add(header);
+                    break;
+                case ComboBox combo when combo.Header is string header:
+                    labels.Add(header);
+                    break;
+                case NumberBox number when number.Header is string header:
+                    labels.Add(header);
+                    break;
+                case Expander expander when expander.Header is string header:
+                    labels.Add(header);
+                    break;
+                case Button button when button.Content is string name:
+                    labels.Add(name);
+                    break;
+            }
+            if (element is Panel panel)
+            {
+                foreach (UIElement child in panel.Children)
+                    AppendSearchLabels(child, labels, depth + 1);
+            }
+            else if (element is Border border && border.Child is UIElement borderChild)
+                AppendSearchLabels(borderChild, labels, depth + 1);
+            else if (element is ContentControl content && content.Content is UIElement child)
+                AppendSearchLabels(child, labels, depth + 1);
+            else if (element is ScrollViewer scroll && scroll.Content is UIElement scrollChild)
+                AppendSearchLabels(scrollChild, labels, depth + 1);
+        }
+
+        private void SettingsSearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+        {
+            string query = sender.Text?.Trim() ?? string.Empty;
+            IReadOnlyList<string> matches = MatchSettingsCategories(query);
+            sender.ItemsSource = query.Length == 0 ? null : matches;
+            foreach (KeyValuePair<string, Button> entry in _categoryButtons)
+                entry.Value.Visibility = query.Length == 0 || matches.Contains(entry.Key)
+                    ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void SettingsSearchBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
+        {
+            string? selected = args.ChosenSuggestion as string
+                ?? MatchSettingsCategories(sender.Text).FirstOrDefault();
+            if (selected != null) OpenSettingsSearchResult(selected);
+        }
+
+        private void SettingsSearchBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
+        {
+            if (args.SelectedItem is string selected)
+                OpenSettingsSearchResult(selected);
+        }
+
+        private void OpenSettingsSearchResult(string category)
+        {
+            if (!SettingsCategories.Contains(category, StringComparer.Ordinal)) return;
+            SettingsSearchBox.Text = string.Empty;
+            SettingsSearchBox.ItemsSource = null;
+            foreach (Button button in _categoryButtons.Values)
+                button.Visibility = Visibility.Visible;
+            SelectSettingsCategory(category);
+        }
+
         private void SelectSettingsCategory(string category)
         {
             if (!SettingsCategories.Contains(category, StringComparer.Ordinal)) return;
