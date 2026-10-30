@@ -290,7 +290,7 @@ namespace PaRuX.Services
                     // so only an exact semantic label from the observed UIA tree can authorize input.
                     string? targetLabelOrRole = action.Action.StartsWith("ui_", StringComparison.OrdinalIgnoreCase)
                         ? ComputerUseSensitiveActionPolicy.ResolveObservedTargetLabelOrRole(
-                            uia.Tree, action.Selector)
+                            uia.Tree, action.Selector, uia.WindowHandle)
                         : null;
                     string? observedAppName = GetObservedAppName(uia.ProcessId);
                     ComputerUseSensitiveActionPolicy.Decision sensitiveDecision =
@@ -379,7 +379,7 @@ namespace PaRuX.Services
                         // in the originally observed window, then obtain an independent
                         // fresh readback tied to exactly the same foreground identity.
                         if (!uia.HasEvidence || !WindowsUiActionService.IsSelectorObserved(
-                                uia.Tree, action.Selector))
+                                uia.Tree, action.Selector, uia.WindowHandle))
                             return new ComputerUseAgentResult
                             {
                                 StepsTaken = step,
@@ -430,7 +430,7 @@ namespace PaRuX.Services
                         string typed = action.Action ?? string.Empty; // already canonical: TryCanonicalize ran above
                         if (!uia.HasEvidence ||
                             !WindowsUiActionService.IsSelectorObserved(
-                                uia.Tree, action.Selector) ||
+                                uia.Tree, action.Selector, uia.WindowHandle) ||
                             !WindowsUiActionService.IsValidAction(
                                 typed, action.Selector, action.Text, uia.ProcessId))
                         {
