@@ -36,7 +36,8 @@ namespace PaRuX.Services
             // installed eligible backend. Raw nvidia-smi VRAM must not count
             // as runnable GPU capacity in that case.
             bool hasGpuCapacity = profile == null
-                ? resources.GpuAvailable && resources.VramTotalMb > 0
+                ? !resources.CoreHardwareProbeAttempted
+                    && resources.GpuAvailable && resources.VramTotalMb > 0
                 : profile.AcceleratorEligible
                     && (profile.SharedMemoryPrimary
                         ? profile.SharedSystemMemoryLimitBytes > 0
