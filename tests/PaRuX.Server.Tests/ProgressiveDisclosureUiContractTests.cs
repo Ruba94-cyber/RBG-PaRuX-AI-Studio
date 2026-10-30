@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Xunit;
+using System.Xml.Linq;
 
 namespace PaRuX.Server.Tests;
 
@@ -83,7 +84,60 @@ public sealed class ProgressiveDisclosureUiContractTests
         Assert.Contains("RuntimeManager_ContextOptions_Expander", runtime, StringComparison.Ordinal);
     }
 
-    private static string ReadSource(string name)
+    [Fact]
+    public void Settings_search_finds_ui_labels_without_duplicating_settings_or_refreshing_all_categories()
+    {
+        string xamlPath = Path.Combine(FindRepositoryRoot(), "src", "PaRuX.App", "Views", "SettingsView.xaml");
+        XDocument document = XDocument.Load(xamlPath);
+        XNamespace ui = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        XElement search = Assert.Single(document.Descendants(ui + "AutoSuggestBox")
+            .Where(item => (string?)item.Attribute(x + "Name") == "SettingsSearchBox"));
+        Assert.Equal("SettingsSearchBox_TextChanged", (string?)search.Attribute("TextChanged"));
+        Assert.Equal("SettingsSearchBox_QuerySubmitted", (string?)search.Attribute("QuerySubmitted"));
+        Assert.Equal("SettingsSearchBox_SuggestionChosen", (string?)search.Attribute("SuggestionChosen"));
+
+        string code = ReadSource("SettingsView.xaml.cs");
+        Assert.Contains("AppendSearchLabels(section, labels, 0)", code, StringComparison.Ordinal);
+        Assert.Contains("SettingsCategories", code, StringComparison.Ordinal);
+        Assert.Contains("SettingsSearchBox.ItemsSource = null", code, StringComparison.Ordinal);
+        Assert.Contains("SelectSettingsCategory(category)", code, StringComparison.Ordinal);
+        Assert.Contains("RefreshVisibleSettingsCategory()", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Create_cancellation_is_visible_only_for_an_active_job()
+    {
+        string code = ReadSource("CreateWorkspaceView.cs");
+        Assert.Contains("Visibility = Visibility.Collapsed", code, StringComparison.Ordinal);
+        Assert.Contains("private void UpdateCancelJobVisibility()", code, StringComparison.Ordinal);
+        Assert.Contains("_operations.IsBusy ? Visibility.Visible : Visibility.Collapsed", code, StringComparison.Ordinal);
+        Assert.Contains("Create_Cancel_Active_Job_Button", code, StringComparison.Ordinal);
+        Assert.Contains("_cancelActiveJobButton.Click += (_, _) => CancelActive()", code, StringComparison.Ordinal);
+        Assert.Contains("UpdateCancelJobVisibility();", code, StringComparison.Ordinal);
+        Assert.Contains("SetRunButtonsEnabled(false)", code, StringComparison.Ordinal);
+        Assert.Contains("SetRunButtonsEnabled(true)", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Routing_model_details_keep_quantization_and_evidence_without_cluttering_candidate_rows()
+    {
+        string code = ReadSource("ModelRoutingPanel.cs");
+        Assert.Contains("ModelRouting_CandidateDetails_Button", code, StringComparison.Ordinal);
+        Assert.Contains("ModelRouting_CandidateDetails_Dialog", code, StringComparison.Ordinal);
+        Assert.Contains("ShowSelectedCandidateDetailsAsync()", code, StringComparison.Ordinal);
+        Assert.Contains("AddDetail(\"Quantization\"", code, StringComparison.Ordinal);
+        Assert.Contains("AddDetail(\"Capability evidence\"", code, StringComparison.Ordinal);
+        Assert.Contains("ModelHubRowPresentation.CompactManualLabel", code, StringComparison.Ordinal);
+        string rows = code.Split("private void RenderCandidates()", StringSplitOptions.None)[1]
+            .Split("private async Task ShowSelectedCandidateDetailsAsync()", StringSplitOptions.None)[0];
+        Assert.DoesNotContain("candidate.IntelligenceEvidence", rows, StringComparison.Ordinal);
+    }
+
+    private static string ReadSource(string name) =>
+        File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "PaRuX.App", "Views", name));
+
+    private static string FindRepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);
         while (directory != null && !File.Exists(Path.Combine(directory.FullName, "PaRuX.sln")))
@@ -96,6 +150,6 @@ public sealed class ProgressiveDisclosureUiContractTests
         }
         if (directory == null)
             throw new DirectoryNotFoundException("Could not locate PaRuX.sln.");
-        return File.ReadAllText(Path.Combine(directory.FullName, "src", "PaRuX.App", "Views", name));
+        return directory.FullName;
     }
 }
