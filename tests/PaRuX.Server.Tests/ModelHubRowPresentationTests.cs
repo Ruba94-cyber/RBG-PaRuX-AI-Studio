@@ -31,6 +31,32 @@ public sealed class ModelHubRowPresentationTests
     }
 
     [Fact]
+    public void Compact_description_keeps_short_text_and_normalizes_whitespace()
+    {
+        Assert.Equal("Good local coding model.", ModelHubRowPresentation.CompactDescription("  Good   local\n coding model. "));
+    }
+
+    [Fact]
+    public void Compact_description_shortens_long_catalogue_copy_without_losing_the_full_source()
+    {
+        string description = "Fast enough for chat, designed for coding tasks and extended context on local hardware.";
+        string preview = ModelHubRowPresentation.CompactDescription(description, maxLength: 42);
+        Assert.True(preview.Length <= 43);
+        Assert.EndsWith("…", preview);
+        Assert.StartsWith("Fast enough for chat", preview);
+        Assert.Equal(description, ModelHubRowPresentation.CompactDescription(description, maxLength: 120));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Compact_description_handles_missing_metadata(string? text)
+    {
+        Assert.Equal("Open Details to learn more.", ModelHubRowPresentation.CompactDescription(text));
+    }
+
+    [Fact]
     public void Quantization_returns_explicit_unknown_for_unrecognised_names()
     {
         Assert.Equal("unknown", ModelHubRowPresentation.Quantization("plain-model.gguf", metadataQuantization: null));
