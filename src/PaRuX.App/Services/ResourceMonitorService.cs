@@ -49,7 +49,7 @@ namespace PaRuX.Services
 
         public static async Task<ResourceSnapshot> GetSnapshotAsync(CancellationToken ct)
         {
-            var snapshot = new ResourceSnapshot();
+            var snapshot = new ResourceSnapshot { CoreHardwareProbeAttempted = true };
             PopulateRam(snapshot);
             // Run the OS telemetry probe and Core profile discovery concurrently.
             // Neither source waits for the other: slow NVIDIA tooling must not
