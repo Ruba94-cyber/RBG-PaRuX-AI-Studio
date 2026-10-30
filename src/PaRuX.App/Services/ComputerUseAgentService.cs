@@ -373,7 +373,59 @@ namespace PaRuX.Services
                         }
                     }
 
-                    if ((action.Action ?? string.Empty).StartsWith("ui_", StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(action.Action, "ui_assert", StringComparison.Ordinal))
+                    {
+                        // A model's visual guess is not a GUI test. Require a selector
+                        // in the originally observed window, then obtain an independent
+                        // fresh readback tied to exactly the same foreground identity.
+                        if (!uia.HasEvidence || !WindowsUiActionService.IsSelectorObserved(
+                                uia.Tree, action.Selector))
+                            return new ComputerUseAgentResult
+                            {
+                                StepsTaken = step,
+                                Summary = "UI assertion refused: control not observed in target window."
+                            };
+
+                        string? initialRefusal = pin.RefusalForUiaObservation(
+                            uia.ProcessId, uia.WindowHandle);
+                        if (initialRefusal != null)
+                            return new ComputerUseAgentResult
+                            {
+                                StepsTaken = step,
+                                Summary = "UI assertion refused: " + initialRefusal
+                            };
+
+                        WindowsUiTreeObservationService.Observation fresh =
+                            await WindowsUiTreeObservationService.CaptureForegroundAsync(ct)
+                                .ConfigureAwait(false);
+                        string? newRefusal = fresh.HasEvidence
+                            ? pin.RefusalForUiaObservation(fresh.ProcessId, fresh.WindowHandle)
+                            : "No fresh UI Automation observation is available.";
+                        if (newRefusal != null)
+                            return new ComputerUseAgentResult
+                            {
+                                StepsTaken = step,
+                                Summary = "UI assertion cannot verify target: " + newRefusal
+                            };
+
+                        WindowsUiAssertionPolicy.Verdict verdict = WindowsUiAssertionPolicy.AssertExact(
+                            fresh.Tree, fresh.WindowHandle,
+                            action.Selector, action.Property, action.Expected);
+                        // The expected/observed text can be private; never log it.
+                        string status = verdict == WindowsUiAssertionPolicy.Verdict.Verified
+                            ? "verified" : verdict.ToString();
+                        onStep?.Invoke("Step " + step + ": UIA assertion " + status + ".");
+                        actionLog.Add("UIA assertion: " + status);
+                        if (verdict != WindowsUiAssertionPolicy.Verdict.Verified)
+                            return new ComputerUseAgentResult
+                            {
+                                StepsTaken = step,
+                                Summary = "UI test failed: fresh foreground control did not match expected state ("
+                                    + status + "). No successful assertion was recorded."
+                            };
+                        // This read-only assertion does not imply the entire task passed.
+                    }
+                    else if ((action.Action ?? string.Empty).StartsWith("ui_", StringComparison.OrdinalIgnoreCase))
                     {
                         string typed = action.Action ?? string.Empty; // already canonical: TryCanonicalize ran above
                         if (!uia.HasEvidence ||
@@ -640,9 +692,12 @@ namespace PaRuX.Services
           + "{\"action\":\"ui_invoke\",\"selector\":\"btn-save-a1b2\"}\n"
           + "{\"action\":\"ui_set_value\",\"selector\":\"txt-input-a1b2\",\"text\":\"new value\"}\n"
           + "{\"action\":\"ui_wait_for\",\"selector\":\"btn-done-a1b2\"}\n"
+          + "{\"action\":\"ui_assert\",\"selector\":\"txt-result-a1b2\",\"property\":\"value\",\"expected\":\"Passed\"}\n"
           + "{\"action\":\"done\",\"summary\":\"what was accomplished, or why it could not be\"}\n\n"
           + "Only choose UIA actions if a read-only UIA control tree with the actual selector is included in this turn. "
           + "UIA invokes/sets are constrained to that observed foreground process; do not guess selectors. "
+          + "Use ui_assert to verify exact name, value or text after an app action, especially while testing a GUI. "
+          + "It obtains a fresh foreground UIA observation; never claim PASS if the assertion fails. "
           + "Look at the attached screenshot before choosing. Take the most direct path toward the goal. "
           + "Use \"done\" as soon as the goal is met, or if it cannot be completed — explain why in summary either way. "
           + "Never invent a coordinate you have not actually seen in the screenshot.";
