@@ -19,6 +19,23 @@ namespace PaRuX.Services
     public static class MediaModelPickerPresenter
     {
         public const string AutomaticLabel = "Automatic (recommended)";
+
+        /// <summary>
+        /// Compact visual-only label for narrow model pickers. Routing still uses the unmodified
+        /// MediaModelPickerItem.FileName; callers must expose the complete identity on demand.
+        /// Keeping both ends preserves model family and most quantization / pin suffixes.
+        /// </summary>
+        public static string CompactDisplayLabel(string? label, int maxLength = 60)
+        {
+            string value = label?.Trim() ?? string.Empty;
+            if (value.Length == 0) return "Unknown model";
+            int max = Math.Clamp(maxLength, 24, 120);
+            if (value.Length <= max) return value;
+            int prefixLength = (max - 1) * 3 / 5;
+            int suffixLength = max - 1 - prefixLength;
+            return value.Substring(0, prefixLength).TrimEnd()
+                + "…" + value.Substring(value.Length - suffixLength);
+        }
         public static readonly IReadOnlyList<string> Lanes = new[] { "Standard", "Uncensored", "Automatic" };
 
         public static MediaModelPickerState Build(string? currentFile, bool isOverridden, IEnumerable<string>? compatibleFiles,
