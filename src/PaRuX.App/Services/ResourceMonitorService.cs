@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
+using PaRuX.Contracts;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -39,10 +40,11 @@ namespace PaRuX.Services
 
         /// <summary>Installed adapters do not change between two polls, and the Settings
         /// diagnostics panel refreshes every few seconds, so the vendor-agnostic inventory is
-        /// cached rather than re-requested from the Core on every tick.</summary>
-        private static readonly TimeSpan InventoryTtl = TimeSpan.FromMinutes(5);
+        /// cached briefly rather than re-requested from Core on every tick. A short
+        /// TTL is important for eGPU unplug/replug and backend install changes.</summary>
+        private static readonly TimeSpan InventoryTtl = TimeSpan.FromSeconds(10);
         private static readonly SemaphoreSlim InventoryGate = new(1, 1);
-        private static (string Name, long VramMb)? _cachedInventory;
+        private static RuntimeManagerHardwareStatus? _cachedInventory;
         private static DateTime _cachedInventoryUtc = DateTime.MinValue;
 
         public static async Task<ResourceSnapshot> GetSnapshotAsync(CancellationToken ct)
@@ -57,57 +59,52 @@ namespace PaRuX.Services
             // System32 with the NVIDIA App, runs, and exits with code 4 ("you do not have
             // sufficient permissions"). Hanging the fallback off the end of that method left it
             // unreachable on the one machine that needs it.
-            if (!snapshot.GpuAvailable) await PopulateGpuFromInventoryAsync(snapshot, ct).ConfigureAwait(false);
+            // Always reconcile the physical telemetry with the Core's backend choice.
+            // A visible NVIDIA adapter is not necessarily the GPU selected for text,
+            // and an AMD/Intel shared aperture must never be presented as dedicated VRAM.
+            await PopulateGpuFromInventoryAsync(snapshot, ct).ConfigureAwait(false);
             return snapshot;
         }
 
-        /// <summary>
-        /// The Core's DXGI-based inventory: vendor-agnostic, so it sees the AMD/Intel adapters
-        /// nvidia-smi cannot. It reports the adapter and its installed memory but not live usage,
-        /// so GpuUsageMeasured deliberately stays false and callers must not present a usage number.
-        /// </summary>
+        /// <summary>Use the Core's normalized GPU/backend decision when reachable.
+        /// A bounded request must not freeze Settings if Core is offline or starting.</summary>
         private static async Task PopulateGpuFromInventoryAsync(ResourceSnapshot snapshot, CancellationToken ct)
         {
             try
             {
-                (string Name, long VramMb)? inventory = await GetInventoryAsync(ct).ConfigureAwait(false);
-                if (inventory == null || inventory.Value.VramMb <= 0) return;
-
-                snapshot.GpuAvailable = true;
-                snapshot.GpuUsageMeasured = false;
-                snapshot.GpuName = inventory.Value.Name;
-                snapshot.VramTotalMb = inventory.Value.VramMb;
+                RuntimeManagerHardwareStatus? inventory = await GetInventoryAsync(ct).ConfigureAwait(false);
+                if (inventory != null)
+                    ResourceHardwareSnapshotMapper.Apply(snapshot, inventory);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // Timeout: retain local RAM/NVIDIA telemetry without inventing a Core profile.
             }
             catch (OperationCanceledException) { throw; }
             catch
             {
-                // Core unreachable: leave GpuAvailable false rather than guess at hardware.
+                // Core unavailable: leave source telemetry intact, with unknown backend eligibility.
             }
         }
 
-        private static async Task<(string Name, long VramMb)?> GetInventoryAsync(CancellationToken ct)
+        private static async Task<RuntimeManagerHardwareStatus?> GetInventoryAsync(CancellationToken ct)
         {
-            if (_cachedInventory != null && DateTime.UtcNow - _cachedInventoryUtc < InventoryTtl) return _cachedInventory;
+            if (_cachedInventory != null && DateTime.UtcNow - _cachedInventoryUtc < InventoryTtl)
+                return _cachedInventory;
 
             await InventoryGate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                if (_cachedInventory != null && DateTime.UtcNow - _cachedInventoryUtc < InventoryTtl) return _cachedInventory;
+                if (_cachedInventory != null && DateTime.UtcNow - _cachedInventoryUtc < InventoryTtl)
+                    return _cachedInventory;
 
-                PaRuX.Contracts.RuntimeManagerHardwareStatus status =
-                    await RuntimeManagerClient.Current.GetStatusAsync(ct).ConfigureAwait(false);
-
-                long vramMb = status.GpuLargestDedicatedVideoMemoryBytes / 1024 / 1024;
-                string name = status.GpuAdapters is { Count: > 0 }
-                    ? status.GpuAdapters
-                        .OrderByDescending(adapter => adapter.DedicatedVideoMemoryBytes)
-                        .First().Name
-                    : string.Empty;
-                if (vramMb <= 0) return null;
-
-                _cachedInventory = (string.IsNullOrWhiteSpace(name) ? "GPU" : name, vramMb);
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeout.CancelAfter(TimeSpan.FromSeconds(4));
+                RuntimeManagerHardwareStatus status =
+                    await RuntimeManagerClient.Current.GetStatusAsync(timeout.Token).ConfigureAwait(false);
+                _cachedInventory = status;
                 _cachedInventoryUtc = DateTime.UtcNow;
-                return _cachedInventory;
+                return status;
             }
             finally { InventoryGate.Release(); }
         }
@@ -145,7 +142,16 @@ namespace PaRuX.Services
                 using var process = new Process { StartInfo = psi };
                 process.Start();
                 Task<string> outTask = process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync(ct).ConfigureAwait(false);
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeout.CancelAfter(TimeSpan.FromSeconds(4));
+                try { await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false); }
+                catch (OperationCanceledException)
+                {
+                    try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+                    catch { /* The process already exited or Windows refused termination. */ }
+                    if (ct.IsCancellationRequested) throw;
+                    return; // Telemetry is optional and may be blocked on some PCs.
+                }
                 string output = await outTask.ConfigureAwait(false);
                 if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(output)) return;
 
