@@ -234,7 +234,8 @@ namespace PaRuX.Services
             "type" => "type (text: " + (a.Text?.Length ?? 0) + " chars, redacted)",
             "key" => "press " + a.Combo,
             "scroll" => "scroll " + a.Lines + " lines at (" + a.X + "," + a.Y + ")",
-            "focus_window" => "focus window \"" + a.Title + "\"",
+            // A window title may contain a document name or private account details.
+            "focus_window" => "focus window (title: " + (a.Title?.Length ?? 0) + " chars, redacted)",
             "wait" => "wait " + a.Ms + " ms",
             "ui_invoke" => "invoke UIA control " + Truncate(a.Selector),
             "ui_set_value" => "set UIA value on " + Truncate(a.Selector),
