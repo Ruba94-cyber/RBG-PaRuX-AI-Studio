@@ -2,6 +2,10 @@
 
 Last executive refresh: **2026-10-30**.
 
+### 2026-10-30 desktop GPU/Core reconciliation (PARTIAL — Windows acceptance outstanding)
+
+The read-only Settings hardware monitor now obtains Core's normalized adapter and installed-backend eligibility, rather than treating NVIDIA VRAM or the largest DXGI adapter as evidence that local inference can use it. AMD/Intel UMA reports shared RAM separately from dedicated VRAM. A pure mapper guards cross-adapter telemetry attribution and still distinguishes an externally measured GPU from a verified executable backend when Core is offline; Settings model fit fails conservatively to CPU/RAM or Unknown on a failed Core probe. Core inventory is refreshed on a short TTL for eGPU changes; vendor telemetry and Core status are sampled concurrently with bounded timeouts and failed-probe backoff. Focused deterministic unit tests were added for mixed/eGPU, Intel/AMD UMA, unsupported runtimes, missing Core and Windows software adapters; **none has been executed**. WinUI builds, xUnit, FlaUI, real unplug/replug and inference on non-NVIDIA hardware remain pending. This is not a release acceptance claim.
+
 ### 2026-10-30 cross-PC compatibility continuation (PARTIAL — physical acceptance outstanding)
 
 The public `main` branch now treats CPU-only Windows x64 PCs as first-class model-fit candidates when measured system RAM exists, instead of requiring GPU VRAM to produce a verdict. The Settings fit label distinguishes CPU/RAM-only compatibility from GPU offload and warns of reduced speed. No GPU memory is fabricated when DXGI or vendor telemetry is unavailable. Model-fit previews with explicit context but no parsed GGUF header take the marked size-heuristic path. The desktop fit estimator and Core hardware profile resolver both use a conservative half-RAM budget through 16 GiB, retaining the older 8 GiB/25% reserve for larger PCs; live admission remains independently constrained by current free-memory evidence. Narrow/high-DPI Gallery cards now stack their controls, and Model Hub's quantization dialog no longer requires a 330px-wide picker.
