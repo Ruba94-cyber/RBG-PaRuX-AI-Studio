@@ -210,8 +210,10 @@ namespace PaRuX.Views
 
         private void SettingsSearchBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
         {
+            // Keyboard arrows only preview suggestions. Navigate on QuerySubmitted,
+            // otherwise merely highlighting a result unexpectedly changes pages.
             if (args.SelectedItem is string selected)
-                OpenSettingsSearchResult(selected);
+                sender.Text = selected;
         }
 
         private void OpenSettingsSearchResult(string category)
