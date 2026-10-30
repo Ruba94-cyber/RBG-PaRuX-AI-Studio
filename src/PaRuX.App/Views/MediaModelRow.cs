@@ -106,13 +106,16 @@ namespace PaRuX.Views
             _model.SelectionChanged += async (_, _) => await OnModelChangedAsync();
             _lane = new MediaLaneControl(idPrefix);
 
-            var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var controls = new Grid { ColumnSpacing = 8 };
+            controls.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            controls.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             _model.MinWidth = 0;
-            _model.Width = 340;
+            _model.HorizontalAlignment = HorizontalAlignment.Stretch;
             controls.Children.Add(_model);
             AutomationProperties.SetAutomationId(_detailsButton, idPrefix + "_ModelDetails_Button");
             AutomationProperties.SetName(_detailsButton, "View selected model details");
             _detailsButton.Click += async (_, _) => await ShowDetailsAsync();
+            Grid.SetColumn(_detailsButton, 1);
             controls.Children.Add(_detailsButton);
             Children.Add(new TextBlock { Text = "Model", FontSize = 11, Opacity = 0.68 });
             Children.Add(controls);
