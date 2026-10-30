@@ -158,7 +158,7 @@ namespace PaRuX.Views
                     _model.Items.Clear();
                     foreach (MediaModelPickerItem item in state.Items)
                     {
-                        var option = new ComboBoxItem { Content = CompactModelLabel(item.Label) };
+                        var option = new ComboBoxItem { Content = MediaModelPickerPresenter.CompactDisplayLabel(item.Label) };
                         ToolTipService.SetToolTip(option, item.Label);
                         AutomationProperties.SetName(option, item.Label);
                         _model.Items.Add(option);
@@ -172,13 +172,6 @@ namespace PaRuX.Views
             {
                 _hint.Text = "The installed models could not be listed: " + ex.Message;
             }
-        }
-
-        private static string CompactModelLabel(string label)
-        {
-            if (string.IsNullOrEmpty(label) || label.Length <= 60) return label;
-            // Retain both the family prefix and distinguishing quantization or pin suffix.
-            return label.Substring(0, 35).TrimEnd() + "…" + label.Substring(label.Length - 20);
         }
 
         private async Task ShowDetailsAsync()
