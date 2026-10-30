@@ -2,6 +2,19 @@
 
 Manual procedures for the owner to run on a real Windows PC and phone. Every procedure ends with a status line that stays NOT RUN until a person records a result. Drafted from the repository by a local model; each section must be checked by a human before use.
 
+## Computer Use across Windows applications (NOT RUN)
+
+**Objective:** prove a user-approved local AI agent can *actually test* one or more disposable Windows applications, not merely press keys, produce screenshots or claim a successful result.
+
+1. On a clean Windows x64 development install with **WinApp CLI explicitly configured by the operator**, launch a disposable WinUI test app and Notepad. Confirm per-task Computer Use approval, then collect the actual foreground HWND/PID and UIA control selectors.
+2. Invoke and set one authorized test control, then use `ui_assert` on its exact `value`, `name` or `text`. Require a fresh matching foreground observation after inference; record real success with expected data redacted.
+3. Deliberately change the control value: `ui_assert` must report failure, never `GoalReported` success. Place a duplicate selector in the same window, and an identically named control in another window: both the selector authorization and sensitive-action label lookup must refuse inappropriate matches.
+4. Switch foreground process/window between screenshot and action, place a modal/overlay on top, disconnect UIA CLI, cancel/STOP, enable Gaming Mode, and close the target app: no unintended keystrokes, clicks or false verification. Test a second display with nonzero/negative screen coordinates.
+5. Repeat on user-approved versions of Outlook, Excel, Teams and a browser **with test data and no real recipients** after their app-specific integration is implemented. Observe protected login/MFA/DLP/UAC and enterprise restrictions without bypass.
+6. Run xUnit `WindowsUiAssertionPolicyTests`, `WindowsUiActionServiceTests`, `ComputerUseSensitiveActionPolicyTests`, `ComputerUseActionParserTests`, then app build and relevant FlaUI/real GUI assertions. Record PASS/FAIL/NOT RUN independently. A unit-test pass alone does not prove live Computer Use.
+
+Status for the 2026-10-30 assertion/foreground-binding slice: **SOURCE IMPLEMENTED; all real Windows, WinUI/xUnit execution, FlaUI and physical-app checks NOT RUN**.
+
 ## Hardware diversity and small-screen acceptance (NOT RUN)
 
 **Scope:** PaRuX desktop currently targets Windows 10/11 x64. "All PCs" means no hard-coded NVIDIA/16 GB VRAM assumptions across supported Windows hardware; it does not mean Linux, macOS, x86 or every model family will run on every machine. No row below is physically accepted merely because a unit test exists.
