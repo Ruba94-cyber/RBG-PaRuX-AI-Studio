@@ -30,6 +30,7 @@ public sealed class ComputerUseGuiRunTraceTests
         Assert.Equal(2, receipt.ActionsDelivered);
         Assert.Equal(1, receipt.UiAssertionsPassed);
         Assert.Equal(1, receipt.FinalReadbackChecks);
+        Assert.Equal(1, receipt.FinalDistinctControlsVerified);
         Assert.Equal(0, receipt.FinalReadbackFailures);
         Assert.Equal("executor-reported-not-independently-attested", receipt.Assurance);
     }
@@ -141,4 +142,23 @@ public sealed class ComputerUseGuiRunTraceTests
         Assert.Equal(100, receipt.UiAssertionsPassed);
         Assert.Equal(15, receipt.StepsTaken);
     }
+    [Fact]
+    public void Fresh_multi_control_count_is_redacted_and_cleared_after_readback_failure()
+    {
+        var trace = new ComputerUseGuiRunTrace();
+        trace.RecordActionAttempt();
+        trace.RecordAssertion(true);
+        trace.RecordActionAttempt();
+        trace.RecordAssertion(true);
+        trace.RecordFinalReadback(true, 2);
+        var receipt = trace.Build(true, false, true, false, true, true, 2, 3);
+        Assert.True(receipt.ReadyForIndependentVerifier);
+        Assert.Equal(2, receipt.FinalDistinctControlsVerified);
+
+        trace.RecordFinalReadback(false, 2);
+        var stale = trace.Build(true, false, true, false, true, true, 2, 3);
+        Assert.Equal(0, stale.FinalDistinctControlsVerified);
+        Assert.False(stale.ReadyForIndependentVerifier);
+    }
+
 }
