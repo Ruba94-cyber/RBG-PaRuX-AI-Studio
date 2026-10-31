@@ -30,6 +30,10 @@ namespace PaRuX.Services
         public bool GuiTestProofRequired { get; set; }
         public bool GuiTestProofSatisfied { get; set; }
         public int VerifiedUiAssertions { get; set; }
+        /// <summary>True only after a second independent same-HWND/PID exact
+        /// UIA readback at completion. This is a local control-level proof,
+        /// not evidence that the entire user's goal succeeded.</summary>
+        public bool GuiFinalReadbackVerified { get; set; }
     }
 
     /// <summary>
@@ -95,6 +99,7 @@ namespace PaRuX.Services
             // requirement. Delegated context, browser content and predecessor
             // transcripts are untrusted and may contain arbitrary test wording.
             var guiTestGate = new ComputerUseGuiTestEvidenceGate(originalGoal ?? goal);
+            ComputerUseGuiFinalProof? lastGuiProof = null;
             // Scoped to this invocation; no user-wide permissions are inferred from a process launch.
             var appLease = new ComputerUseTaskAppLease();
             string? lastRepeatKey = null;
@@ -390,14 +395,65 @@ namespace PaRuX.Services
 
                     if (string.Equals(action.Action, "done", StringComparison.OrdinalIgnoreCase))
                     {
+                        bool finalReadbackVerified = false;
+                        if (guiTestGate.RequiresAssertion)
+                        {
+                            // A successful ui_assert one or more steps earlier
+                            // may be stale: another process, user action or async
+                            // application update could change the value before done.
+                            // The new observation is independent of the model's
+                            // answer and never prints private expected values.
+                            if (lastGuiProof == null || !guiTestGate.CanReportDone)
+                            {
+                                actionLog.Add(ComputerUseGuiTestEvidenceGate.MissingProofReason);
+                                continue;
+                            }
+                            string? stopBeforeRead = stopReason();
+                            if (stopBeforeRead != null)
+                                return new ComputerUseAgentResult
+                                {
+                                    StepsTaken = step,
+                                    Summary = "Stopped before final UI verification: " + stopBeforeRead
+                                };
+                            if (pin.RefusalIfChanged() != null)
+                                return new ComputerUseAgentResult
+                                {
+                                    StepsTaken = step,
+                                    Summary = "GUI verification refused: the foreground window changed."
+                                };
+
+                            WindowsUiTreeObservationService.Observation finalReadback =
+                                await WindowsUiTreeObservationService.CaptureForegroundAsync(ct)
+                                    .ConfigureAwait(false);
+                            finalReadbackVerified = finalReadback.HasEvidence
+                                && pin.RefusalForUiaObservation(
+                                    finalReadback.ProcessId, finalReadback.WindowHandle) == null
+                                && lastGuiProof.Recheck(finalReadback)
+                                && stopReason() == null;
+                            if (!finalReadbackVerified)
+                            {
+                                // No model assertion or historical UIA result can
+                                // rescue an unavailable/changed final observation.
+                                onStep?.Invoke("Step " + step
+                                    + ": final GUI readback changed or is unavailable; task is not verified.");
+                                return new ComputerUseAgentResult
+                                {
+                                    StepsTaken = step,
+                                    Summary = "GUI verification failed: the final control state was not independently confirmed."
+                                };
+                            }
+                        }
                         return new ComputerUseAgentResult
                         {
                             GoalReported = true,
                             GuiTestProofRequired = guiTestGate.RequiresAssertion,
-                            GuiTestProofSatisfied = guiTestGate.RequiresAssertion && guiTestGate.CanReportDone,
+                            GuiTestProofSatisfied = guiTestGate.RequiresAssertion
+                                && guiTestGate.CanReportDone && finalReadbackVerified,
+                            GuiFinalReadbackVerified = finalReadbackVerified,
                             VerifiedUiAssertions = guiTestGate.VerifiedAssertions,
                             StepsTaken = step,
-                            Summary = string.IsNullOrWhiteSpace(action.Summary) ? "PaRuX reported the task complete." : action.Summary
+                            Summary = string.IsNullOrWhiteSpace(action.Summary)
+                                ? "PaRuX reported the task complete." : action.Summary
                         };
                     }
 
@@ -478,6 +534,9 @@ namespace PaRuX.Services
                                     + status + "). No successful assertion was recorded."
                             };
                         guiTestGate.RecordVerifiedAssertion();
+                        lastGuiProof = ComputerUseGuiFinalProof.FromVerifiedAssertion(
+                            fresh.ProcessId, fresh.WindowHandle,
+                            action.Selector, action.Property, action.Expected, verdict);
                         // An exact control assertion is a prerequisite for an
                         // app-test completion claim, not the independent goal verdict.
                     }
@@ -588,6 +647,8 @@ namespace PaRuX.Services
                         }
                     }
                     guiTestGate.RecordDeliveredAction(action.Action);
+                    if (!guiTestGate.VerifiedAfterLatestMutation)
+                        lastGuiProof = null;
                     if (visualSnapshot != null)
                     {
                         pendingBeforeSnapshotId = visualSnapshot.Id;
