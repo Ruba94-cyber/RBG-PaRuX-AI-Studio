@@ -4,6 +4,32 @@ Manual procedures for the owner to run on a real Windows PC and phone. Every pro
 
 ## Computer Use across Windows applications (NOT RUN)
 
+### 2026-10-31 multi-control GUI proof and recheck regression (NOT RUN)
+
+The app's GUI-testing path now supports **up to eight independent, exact UIA control postconditions in one foreground window state epoch**; it no longer allows a final `done` based on the last of several previously verified controls while an earlier control is stale. It is a control-state proof for ONE OS-observed PID/HWND per epoch, not a cross-window verification contract. All controls must be asserted **AFTER** the last mutating action or explicit focus. Another mutation/focus clears the entire set. A successful `done` requires a fresh separate WinApp UIA readback verifying **all** distinct control selectors/expected values against the same window. A mismatch, missing/ambiguous control, changed PID/HWND, conflicting expectation, exceeding 8 controls or withdrawn task/app authorization must withhold completion. No private selectors or values enter the final receipt; `finalDistinctControlsVerified` is a fixed integer 0–8.
+
+**On the Windows development PC:** First run the local source/xUnit/syntax gates:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1
+```
+
+The xUnit suite includes `ComputerUseGuiProofLedgerTests`, `ComputerUseGuiRecoveryContractTests`, `ComputerUseGuiRunTraceTests`, `ComputerUseGuiReceiptPresenterTests` and `ComputerUseResultVerifierGateTests`. Passing these pure policies does not establish native Windows behavior.
+
+**Explicit real-agent acceptance:** Build the matching PaRuX CLI, launch PaRuX Windows with a working local model, configure WinApp CLI, approve ONLY the disposable test EXE and the individual task. Keep Full Computer Use disabled and use the established opt-in command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunLiveComputerUseE2E -CliPath "artifacts\validation\cli\parux.exe" -WinAppCli winapp
+```
+
+The scenario now requires the agent to invoke Run and, after that last mutation, independently `ui_assert` both the **Input** `value=ready` and the **Result** `value=ACCEPTED-<nonce>`, then report `done` with neither another mutation nor another focus. The worker's typed receipt must show at least two successful UIA assertions, `finalDistinctControlsVerified >= 2`, a successful final reread and an independently admitted Core verifier result. Finally, the harness performs new external WinApp readbacks for **both** controls from the original task-owned process/window. The worker's numeric count and the model's narrative do not replace this external readback.
+
+**Negative cases to record:** Deliberately mutate Input between its initial assertion and final `done`; alter Result while Input remains correct; insert a second UI mutation after both assertions; force an ambiguous selector; attempt a ninth distinct assertion; switch to a new foreground HWND or another PID; withdraw app approval during the test. None may yield a green `liveComputerUseAgent` with a stale control. Any cross-window task still requires separate phases and currently has **no multi-window aggregate proof**. Do not mark physical acceptance PASS without actual observed results and the commit SHA.
+
+**Status:** source and scripts only; PowerShell, .NET, xUnit, WinApp, FlaUI and Windows agent runs **NOT EXECUTED** in this environment. UAI-07 is PARTIAL.
+
+
+
 ### 2026-10-31 modal dialog and live executable-permission revocation (NOT RUN)
 
 **Mandatory negative safety acceptance:** With one user-approved disposable GUI app and a task-scoped Computer Use grant, explicitly focus the unique app window, then remove the app's EXE from Computer Use Settings before its next click, typed character, UIA invoke, final assertion, or focus_window. Every subsequent action must be refused, including a modal dialog in the same process. Repeat during a long synthetic text entry and a bounded wait: the existing STOP callback must see the revoked app list and stop at its next checkpoint. Re-add the app only through the ordinary user settings flow and explicitly reselect the correct window. Repeat with an approved helper executable, then revoke the helper while leaving the parent approved: helper input remains forbidden. These checks are **not** proof that a native WinApp subprocess can be interrupted between every OS instruction; this remains an acceptance limitation.
