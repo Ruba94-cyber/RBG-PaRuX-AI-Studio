@@ -681,19 +681,40 @@ namespace PaRuX.Services
                     }
                     else if (string.Equals(action.Action, "focus_window", StringComparison.Ordinal))
                     {
+                        // focus_window has already re-checked OS identity before
+                        // and after SetForegroundWindow. Bind the PROCESS INSTANCE
+                        // only after a third fresh HWND/PID/exe check. The old
+                        // path-only binding silently trusted another running copy
+                        // of an approved exe without an explicit focus transition.
                         ForegroundWindowSnapshot focused = DesktopAutomationService.CaptureForegroundWindow();
                         ComputerUseWindowFocusPolicy.Candidate? actual =
                             DesktopAutomationService.CaptureWindowFocusIdentity(
                                 new IntPtr(focused.WindowHandle));
-                        if (actual != null && actual.ProcessId == focused.ProcessId
-                            && actual.WindowHandle == focused.WindowHandle
-                            && (SettingsStore.Current.Data.ComputerApps
-                                ?? new List<ComputerAppShortcut>()).Any(a =>
-                                ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(a.ExecutablePath)
-                                && string.Equals(a.ExecutablePath, actual.ExecutablePath,
-                                    StringComparison.OrdinalIgnoreCase)))
+                        if (actual == null || focused.IsEmpty
+                            || actual.ProcessId != focused.ProcessId
+                            || actual.WindowHandle != focused.WindowHandle)
                         {
-                            appLease.BindApprovedExecutable(actual.ExecutablePath);
+                            return new ComputerUseAgentResult
+                            {
+                                StepsTaken = step,
+                                Summary = "Stopped: the target window changed before its process identity could be bound."
+                            };
+                        }
+                        bool explicitlyApproved = (SettingsStore.Current.Data.ComputerApps
+                            ?? new List<ComputerAppShortcut>()).Any(a =>
+                            ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(a.ExecutablePath)
+                            && string.Equals(a.ExecutablePath, actual.ExecutablePath,
+                                StringComparison.OrdinalIgnoreCase));
+                        if (appLease.IsActive || explicitlyApproved)
+                        {
+                            if (!appLease.BindVerifiedFocus(actual, explicitlyApproved))
+                            {
+                                return new ComputerUseAgentResult
+                                {
+                                    StepsTaken = step,
+                                    Summary = "Stopped: a secondary process requires separate application approval. No further input was sent."
+                                };
+                            }
                         }
                     }
                     trace.RecordActionDelivered();
@@ -964,6 +985,9 @@ namespace PaRuX.Services
           + "{\"action\":\"ui_assert\",\"selector\":\"txt-result-a1b2\",\"property\":\"value\",\"expected\":\"Passed\"}\n"
           + "{\"action\":\"done\",\"summary\":\"what was accomplished, or why it could not be\"}\n\n"
           + "Use open_app only for an exact app name from the approved list. Never invent executable paths or shell commands. "
+          + "After open_app, use focus_window with the exact observed unique title to bind the actual Windows process before entering data or reporting done. "
+          + "A second window of the same verified process may be focused; another process, even with the same app executable, needs an explicit user-approved focus_window. "
+          + "Do not assume a new dialog or helper process inherits the parent app's permission. "
           + "Only choose UIA actions if a read-only UIA control tree with the actual selector is included in this turn. "
           + "UIA invokes/sets are constrained to that observed foreground process; do not guess selectors. "
           + "Use ui_assert to verify exact name, value or text after an app action, especially while testing a GUI. "
