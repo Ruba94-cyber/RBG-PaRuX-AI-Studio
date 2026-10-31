@@ -6,9 +6,13 @@ All notable changes to RBG PaRuX AI Studio are recorded here. The canonical engi
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — UI/UX refinement (2026-10-30)
+## [Unreleased] — AI agent & Windows UI/UX refinements (2026-10-31)
 
 ### Changed
+
+- The multi-step Computer Use agent can request `open_app` to launch a built-in or explicitly user-approved Settings app **by unique exact name only**, reusing the existing allowlist. The language model cannot supply executable paths, command-line arguments or unapproved apps. Approved display names are shown to the agent without exposing configured paths.
+- For explicit GUI/application testing goals, a `done` completion claim is now withheld until an exact, fresh `ui_assert` succeeded after the latest UI mutation or app/window switch. This is a cautious English/Italian goal heuristic, not a full formal app QA contract or proof of whole-task success. Existing independent task verification still applies.
+- Computer Use no longer instructs agents to click/type through screenshot-only actions when its current sensitive-target policy would deny them; UIA capability limits are stated honestly. Added hermetic tests and the local agent runner selection for app names, schema, unauthorized commands and stale GUI proof. **Not compiled or executed on Windows in this session.**
 
 - Computer Use now has a typed, read-only `ui_assert` action for testing a real Windows UIA control's exact name/value/text after a fresh, foreground-PID/HWND-verified observation. The test result is not inferred from the model's claim, and failed or ambiguous assertions are reported as failures. UIA target selectors, sensitive control labels and action delivery now respect the exact intended window; duplicated selectors are refused. The focus-window action refuses ambiguous title matches and redacts private window titles from task logs. Source regression tests added; **Windows build, xUnit/FlaUI and real app execution have NOT RUN for this slice**.
 
