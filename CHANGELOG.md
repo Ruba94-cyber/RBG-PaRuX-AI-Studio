@@ -1,5 +1,12 @@
 # Changelog
 
+### 2026-10-31 — Core verification gate and GUI evidence in Agents (source only)
+
+- PaRuX Core now rejects missing, contradictory, unbounded or forged-looking v1 Computer Use results **before** asking an independent verifier model. GUI-test intent comes from one shared Contracts classifier applied to the original user goal, preventing a desktop worker from silently opting out of the requirement.
+- Settings → Agents displays a safe summary of executor-reported GUI evidence without UI values, selectors or model text. It distinguishes pending verification, independent verifier-reported PASS (only after Core marks the task completed/pass), and failed tests.
+- Added hermetic regression tests and Windows physical-acceptance cases. This guards metadata consistency only: it does not independently attest the UI interaction, does not prove general Windows app support, and has **NOT** undergone .NET/xUnit/WinUI/FlaUI execution here. Old Computer Use results without the v1 receipt will need re-execution for Core review.
+
+
 ### 2026-10-31 — Redacted Computer Use GUI run receipts (source only)
 
 - Added a bounded per-run executor trace for attempted versus delivered actions, exact UIA assertion passes/failures, final readback attempts/failures and verified recovery. The resulting `guiRunReceipt` is versioned and contains only fixed status/reason fields, counts and booleans; no selectors, UI values, paths, window titles or model text.
