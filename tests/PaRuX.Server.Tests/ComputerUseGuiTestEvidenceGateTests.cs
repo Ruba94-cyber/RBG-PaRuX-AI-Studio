@@ -75,6 +75,22 @@ public sealed class ComputerUseGuiTestEvidenceGateTests
     }
 
     [Fact]
+    public void Multiple_successful_checks_are_counted_but_later_mutation_requires_a_new_check()
+    {
+        var gate = new ComputerUseGuiTestEvidenceGate("Test the app UI");
+        gate.RecordVerifiedAssertion();
+        gate.RecordVerifiedAssertion();
+        Assert.Equal(2, gate.VerifiedAssertions);
+        Assert.True(gate.CanReportDone);
+        gate.RecordDeliveredAction("open_app");
+        Assert.Equal(2, gate.VerifiedAssertions);
+        Assert.False(gate.CanReportDone);
+        gate.RecordVerifiedAssertion();
+        Assert.Equal(3, gate.VerifiedAssertions);
+        Assert.True(gate.CanReportDone);
+    }
+
+    [Fact]
     public void A_test_that_cannot_access_ui_automation_must_not_claim_success()
     {
         var gate = new ComputerUseGuiTestEvidenceGate("Test application GUI");
