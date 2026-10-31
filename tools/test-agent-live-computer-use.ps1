@@ -338,6 +338,7 @@ try {
         -or $receipt.uiAssertionsPassed -lt 2
         -or $null -eq $receipt.finalDistinctControlsVerified
         -or $receipt.finalDistinctControlsVerified -lt 2
+        -or ($RunCrossWindowScenario -and $receipt.finalDistinctWindowsVerified -lt 2)
         -or $receipt.finalReadbackChecks -lt 1
         -or $receipt.actionsDelivered -lt 1
         -or $receipt.actionsDelivered -gt $receipt.actionsAttempted
