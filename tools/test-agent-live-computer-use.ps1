@@ -283,6 +283,8 @@ try {
         -or $receipt.readyForIndependentVerifier -cne $true
         -or $receipt.finalControlReadbackVerified -cne $true
         -or $receipt.uiAssertionsPassed -lt 2
+        -or $null -eq $receipt.finalDistinctControlsVerified
+        -or $receipt.finalDistinctControlsVerified -lt 2
         -or $receipt.finalReadbackChecks -lt 1
         -or $receipt.actionsDelivered -lt 1
         -or $receipt.actionsDelivered -gt $receipt.actionsAttempted
