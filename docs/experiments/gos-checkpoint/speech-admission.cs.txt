@@ -1,0 +1,53 @@
+namespace PaRuX.Server;
+
+/// <summary>
+/// Standalone revocable admission tickets for design experiments. Not wired to speech or Gaming.
+/// Validation is a snapshot only: it must not be used as authorization to start or publish a
+/// process, because revocation can occur immediately after validation.
+/// </summary>
+internal sealed class SpeechAdmissionEpoch
+{
+    internal sealed class Lease { }
+
+    private readonly object _gate = new();
+    private readonly HashSet<Lease> _issued = new();
+    private bool _open = true;
+
+    internal bool TryEnter(out Lease? lease)
+    {
+        lock (_gate)
+        {
+            if (!_open) { lease = null; return false; }
+            lease = new Lease();
+            _issued.Add(lease);
+            return true;
+        }
+    }
+
+    internal bool IsCurrent(Lease? lease)
+    {
+        lock (_gate) return _open && lease != null && _issued.Contains(lease);
+    }
+
+    /// <summary>Releases the ticket when its operation ends; safe to call more than once.</summary>
+    internal void Release(Lease? lease)
+    {
+        if (lease == null) return;
+        lock (_gate) _issued.Remove(lease);
+    }
+
+    /// <summary>Revokes all tickets; no integer generation or counter can wrap around.</summary>
+    internal void Close()
+    {
+        lock (_gate)
+        {
+            _open = false;
+            _issued.Clear();
+        }
+    }
+
+    internal void Open()
+    {
+        lock (_gate) _open = true;
+    }
+}

@@ -1,0 +1,98 @@
+using PaRuX.Contracts;
+using PaRuX.Server;
+using PaRuX.Server.Orchestration.Gaming;
+using PaRuX.Server.Orchestration.Gaming.Providers;
+using Xunit;
+
+namespace PaRuX.Server.Tests;
+
+public sealed class GamingTransitionConcurrencyTests
+{
+    private sealed class BlockingInput : IInputProvider
+    {
+        internal readonly TaskCompletionSource Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal readonly TaskCompletionSource Release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal int Starts;
+        internal int Stops;
+        public string Id => "blocking";
+        public string Name => "Blocking";
+        public bool IsInstalled => true;
+        public string? ExecutablePath => null;
+        public async Task<bool> StartAsync(GamingProfileDto profile, CancellationToken ct)
+        {
+            Interlocked.Increment(ref Starts);
+            Started.TrySetResult();
+            await Release.Task.WaitAsync(ct);
+            return true;
+        }
+        public Task<bool> StopAsync(GamingProfileDto profile, CancellationToken ct)
+        {
+            Interlocked.Increment(ref Stops);
+            return Task.FromResult(true);
+        }
+    }
+
+    private static WorkloadOrchestrator Create(string root, BlockingInput input)
+    {
+        var process = new LocalAiProcessManager();
+        var runtime = new LocalRuntimeService(new TestHostEnvironment(), process, new ExternalTextProviderService());
+        var profiles = new GamingProfileStore(Path.Combine(root, "profiles.json"));
+        profiles.Save(new GamingProfileDto { Name = "Gate test", InputProvider = "blocking", LauncherProvider = "none", QuickResumePolicy = "off", SuspendProvider = "none", SessionType = "local" });
+        return new WorkloadOrchestrator(runtime, process, new MediaJobService(null!), new SpeechService(runtime), profiles,
+            inputProviders: new[] { input }, runtimeHealthCheck: _ => Task.FromResult(true), restoreRuntimeToReady: _ => Task.CompletedTask);
+    }
+
+    [Fact]
+    public async Task Exit_waits_for_in_progress_entry_before_restoring()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "parux-gate-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        using var scope = LocalAiPaths.UseStateDirForTests(root);
+        try
+        {
+            var input = new BlockingInput();
+            var orchestrator = Create(root, input);
+            Task<bool> enter = orchestrator.EnterGamingSessionAsync("Gate test");
+            await input.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Task<bool> exit = orchestrator.ExitGamingSessionAsync();
+            Assert.False(exit.IsCompleted);
+            Assert.Equal("EnteringGaming", orchestrator.CurrentState);
+            Assert.Equal(0, input.Stops);
+            input.Release.TrySetResult();
+            Assert.True(await enter.WaitAsync(TimeSpan.FromSeconds(10)));
+            Assert.True(await exit.WaitAsync(TimeSpan.FromSeconds(10)));
+            Assert.Equal("AiReady", orchestrator.CurrentState);
+            Assert.Equal(1, input.Stops);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task Concurrent_entry_waits_and_cancelled_waiter_does_not_change_session()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "parux-gate-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        using var scope = LocalAiPaths.UseStateDirForTests(root);
+        try
+        {
+            var input = new BlockingInput();
+            var orchestrator = Create(root, input);
+            Task<bool> first = orchestrator.EnterGamingSessionAsync("Gate test");
+            await input.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Task<bool> second = orchestrator.EnterGamingSessionAsync("Gate test");
+            using var cancel = new CancellationTokenSource();
+            Task<bool> cancelled = orchestrator.ExitGamingSessionAsync(cancel.Token);
+            Assert.False(second.IsCompleted);
+            cancel.Cancel();
+            Assert.False(await cancelled.WaitAsync(TimeSpan.FromSeconds(10)));
+            Assert.Equal("EnteringGaming", orchestrator.CurrentState);
+            input.Release.TrySetResult();
+            Assert.True(await first.WaitAsync(TimeSpan.FromSeconds(10)));
+            Assert.True(await second.WaitAsync(TimeSpan.FromSeconds(10)));
+            Assert.Equal(1, input.Starts);
+            Assert.Equal("GamingLocal", orchestrator.CurrentState);
+            Assert.True(await orchestrator.ExitGamingSessionAsync());
+        }
+        finally { Directory.Delete(root, true); }
+    }
+}

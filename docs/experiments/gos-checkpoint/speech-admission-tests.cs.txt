@@ -1,0 +1,59 @@
+using PaRuX.Server;
+using Xunit;
+
+namespace PaRuX.Server.Tests;
+
+public sealed class SpeechAdmissionEpochTests
+{
+    [Fact]
+    public void Close_rejects_new_tickets_and_reopen_does_not_revalidate_old_ticket()
+    {
+        var admission = new SpeechAdmissionEpoch();
+        Assert.True(admission.TryEnter(out var old));
+        Assert.True(admission.IsCurrent(old));
+        admission.Close();
+        admission.Close();
+        Assert.False(admission.TryEnter(out var rejected));
+        Assert.Null(rejected);
+        admission.Open();
+        Assert.False(admission.IsCurrent(old));
+        Assert.True(admission.TryEnter(out var current));
+        Assert.True(admission.IsCurrent(current));
+        admission.Release(current);
+        admission.Release(current);
+        Assert.False(admission.IsCurrent(current));
+    }
+
+    [Fact]
+    public void Missing_forged_and_cross_instance_tickets_are_rejected()
+    {
+        var first = new SpeechAdmissionEpoch();
+        var second = new SpeechAdmissionEpoch();
+        Assert.True(first.TryEnter(out var ticket));
+        Assert.False(first.IsCurrent(null));
+        Assert.False(first.IsCurrent(new SpeechAdmissionEpoch.Lease()));
+        Assert.False(second.IsCurrent(ticket));
+    }
+
+    [Fact]
+    public async Task Close_revokes_ticket_issued_on_another_thread()
+    {
+        var admission = new SpeechAdmissionEpoch();
+        var entered = new TaskCompletionSource<SpeechAdmissionEpoch.Lease>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<bool> worker = Task.Run(async () =>
+        {
+            Assert.True(admission.TryEnter(out var ticket));
+            entered.SetResult(ticket!);
+            await release.Task;
+            return admission.IsCurrent(ticket);
+        });
+        var lease = await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.True(admission.IsCurrent(lease));
+        admission.Close();
+        release.SetResult();
+        Assert.False(await worker.WaitAsync(TimeSpan.FromSeconds(10)));
+        admission.Open();
+        Assert.False(admission.IsCurrent(lease));
+    }
+}

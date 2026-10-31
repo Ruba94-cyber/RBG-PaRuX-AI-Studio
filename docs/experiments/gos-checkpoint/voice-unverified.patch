@@ -1,0 +1,253 @@
+diff --git a/src/PaRuX.App/Views/ChatView.xaml.cs b/src/PaRuX.App/Views/ChatView.xaml.cs
+index 2e93271..d408dee 100644
+--- a/src/PaRuX.App/Views/ChatView.xaml.cs
++++ b/src/PaRuX.App/Views/ChatView.xaml.cs
+@@ -177,6 +177,9 @@ namespace PaRuX.Views
+             Unloaded += OnChatUnloadedStopGameMarkerTimer;
+             Unloaded -= OnChatUnloadedStopVoice;
+             Unloaded += OnChatUnloadedStopVoice;
++            GamingManager.Current.StateChanged -= OnVoiceGamingStateChanged;
++            GamingManager.Current.StateChanged += OnVoiceGamingStateChanged;
++            if (GamingManager.Current.IsActive) StopVoiceForGaming();
+             PreviewKeyDown -= OnChatPreviewKeyDownVoice;
+             PreviewKeyDown += OnChatPreviewKeyDownVoice;
+             _ = LoadSkillsAsync();
+@@ -1953,6 +1956,8 @@ namespace PaRuX.Views
+         private MicrophoneRecorder? _recorder;
+         private DispatcherQueueTimer? _voiceTimer;
+         private bool _voiceStarting;
++        private int _voiceGeneration;
++        private CancellationTokenSource? _voiceTranscriptionCts;
+ 
+         private readonly WavPlayer _wavPlayer = new WavPlayer();
+         private CancellationTokenSource? _readAloudCts;
+@@ -1976,6 +1981,7 @@ namespace PaRuX.Views
+             if (GamingManager.Current.IsActive) { ShowTransientStatus(VoiceMessages.GamingMode("voice input")); return; }
+ 
+             _voiceStarting = true;
++            int generation = _voiceGeneration;
+             try
+             {
+                 try
+@@ -1990,10 +1996,16 @@ namespace PaRuX.Views
+                     return;
+                 }
+ 
++                if (generation != _voiceGeneration || GamingManager.Current.IsActive) return;
+                 var recorder = new MicrophoneRecorder();
+                 try { await recorder.StartAsync(); }
+                 catch (VoiceCaptureException ex) { ShowTransientStatus(ex.Message); return; }
+ 
++                if (generation != _voiceGeneration || GamingManager.Current.IsActive)
++                {
++                    await recorder.CancelAsync();
++                    return;
++                }
+                 _recorder = recorder;
+                 WarmSpeechEngineOnce();
+                 _voice.TryStart(DateTime.UtcNow);
+@@ -2004,26 +2016,43 @@ namespace PaRuX.Views
+             finally { _voiceStarting = false; }
+         }
+ 
++        private static readonly object _sttWarmGate = new();
+         private static bool _sttWarmed;
+         private static Task? _sttWarmTask;
++        private static CancellationTokenSource? _sttWarmCts;
+ 
+         /// <summary>Loads the speech model while the user is still talking, so the first transcription is not a cold start.</summary>
+         private static void WarmSpeechEngineOnce()
+         {
+-            if (_sttWarmed) return;
+-            _sttWarmed = true;
+-            _sttWarmTask = Task.Run(async () =>
++            lock (_sttWarmGate)
+             {
+-                try
++                if (_sttWarmed) return;
++                _sttWarmed = true;
++                var warmCts = new CancellationTokenSource(TimeSpan.FromMinutes(4));
++                _sttWarmCts = warmCts;
++                _sttWarmTask = Task.Run(async () =>
+                 {
+-                    var sw = System.Diagnostics.Stopwatch.StartNew();
+-                    using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(4));
+-                    await SpeechClient.Current.TranscribeAsync(
+-                        Convert.ToBase64String(WavSilenceDetector.BuildSilence(500)), "warmup.wav", cts.Token);
+-                    Log.Write("Voice: speech engine warmed in " + sw.ElapsedMilliseconds + " ms");
+-                }
+-                catch (Exception ex) { _sttWarmed = false; Log.Write("Voice: warm-up skipped: " + ex.Message); }
+-            });
++                    try
++                    {
++                        var sw = System.Diagnostics.Stopwatch.StartNew();
++                        await SpeechClient.Current.TranscribeAsync(
++                            Convert.ToBase64String(WavSilenceDetector.BuildSilence(500)), "warmup.wav", warmCts.Token);
++                        Log.Write("Voice: speech engine warmed in " + sw.ElapsedMilliseconds + " ms");
++                    }
++                    catch (Exception ex)
++                    {
++                        lock (_sttWarmGate)
++                            if (ReferenceEquals(_sttWarmCts, warmCts)) _sttWarmed = false;
++                        Log.Write("Voice: warm-up skipped: " + ex.Message);
++                    }
++                    finally
++                    {
++                        lock (_sttWarmGate)
++                            if (ReferenceEquals(_sttWarmCts, warmCts)) _sttWarmCts = null;
++                        warmCts.Dispose();
++                    }
++                });
++            }
+         }
+ 
+         private DispatcherQueueTimer CreateVoiceTimer()
+@@ -2074,10 +2103,13 @@ namespace PaRuX.Views
+                 return;
+             }
+ 
++            using var transcriptionCts = new CancellationTokenSource();
++            _voiceTranscriptionCts = transcriptionCts;
+             try
+             {
+                 if (limitReached) ShowTransientStatus(VoiceMessages.LimitReached());
+                 byte[] wav = await recorder.StopAsync();
++                transcriptionCts.Token.ThrowIfCancellationRequested();
+                 WavAnalysis analysis = WavSilenceDetector.Analyze(wav);
+                 if (!analysis.Valid) { ShowTransientStatus(VoiceMessages.InvalidAudio(analysis.Problem)); return; }
+                 if (analysis.IsSilent) { ShowTransientStatus(VoiceMessages.Silent()); return; }
+@@ -2093,25 +2125,29 @@ namespace PaRuX.Views
+                 if (warming != null && !warming.IsCompleted)
+                 {
+                     ShowPersistentVoiceStatus("Loading the local speech model (first use only, up to two minutes)…");
+-                    await Task.WhenAny(warming, Task.Delay(VoiceMessages.ModelLoadWait));
++                    await Task.WhenAny(warming, Task.Delay(VoiceMessages.ModelLoadWait, transcriptionCts.Token));
++                    transcriptionCts.Token.ThrowIfCancellationRequested();
+                     ShowPersistentVoiceStatus("Transcribing locally…");
+                 }
+                 var sw = System.Diagnostics.Stopwatch.StartNew();
+                 string text;
+                 try
+                 {
+-                    using var timeout = new CancellationTokenSource(VoiceMessages.TranscribeTimeout);
++                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(transcriptionCts.Token);
++                    timeout.CancelAfter(VoiceMessages.TranscribeTimeout);
+                     TranscribeResponse result = await SpeechClient.Current.TranscribeAsync(
+                         Convert.ToBase64String(wav), "voice-message.wav", timeout.Token);
+                     text = (result.Text ?? string.Empty).Trim();
+                     Log.Write("Voice transcription ok in " + sw.ElapsedMilliseconds + " ms: " + text.Length + " chars");
+                 }
++                catch (OperationCanceledException) when (transcriptionCts.IsCancellationRequested) { return; }
+                 catch (OperationCanceledException)
+                 {
+                     Log.Write("Voice transcription timed out after " + sw.ElapsedMilliseconds + " ms");
+                     ShowPersistentVoiceStatus(VoiceMessages.TranscribeTimedOut());
+                     return;
+                 }
++                transcriptionCts.Token.ThrowIfCancellationRequested();
+                 if (text.Length == 0) { ShowPersistentVoiceStatus(VoiceMessages.NoSpeechRecognized(analysis.LooksLikeSteadyNoise)); return; }
+ 
+                 string existing = InputBox.Text ?? string.Empty;
+@@ -2126,6 +2162,7 @@ namespace PaRuX.Views
+                 else
+                     ShowTransientStatus("Voice transcribed. Review the text and press Enter to send.");
+             }
++            catch (OperationCanceledException) when (transcriptionCts.IsCancellationRequested) { }
+             catch (Exception ex)
+             {
+                 Log.Write("Voice transcription failed: " + ex.GetType().Name + ": " + ex.Message);
+@@ -2134,7 +2171,11 @@ namespace PaRuX.Views
+                     ShowPersistentVoiceStatus(VoiceMessages.SttNotInstalled());
+                 else ShowPersistentVoiceStatus("Transcription failed: " + ex.Message);
+             }
+-            finally { _voice.Finish(); }
++            finally
++            {
++                if (ReferenceEquals(_voiceTranscriptionCts, transcriptionCts)) _voiceTranscriptionCts = null;
++                _voice.Finish();
++            }
+         }
+ 
+         /// <summary>Voice outcomes stay visible longer than the usual transient status so a failure is never missed.</summary>
+@@ -2156,8 +2197,12 @@ namespace PaRuX.Views
+             MicrophoneRecorder? recorder = _recorder;
+             _recorder = null;
+             SetVoiceUi(recording: false);
+-            if (recorder != null) await recorder.CancelAsync();
+-            ShowTransientStatus("Recording cancelled.");
++            try
++            {
++                if (recorder != null) await recorder.CancelAsync();
++                ShowTransientStatus("Recording cancelled.");
++            }
++            catch (Exception ex) { Log.Write("Voice recording cleanup failed: " + ex.Message); }
+         }
+ 
+         private void OnChatPreviewKeyDownVoice(object sender, KeyRoutedEventArgs e)
+@@ -2175,15 +2220,32 @@ namespace PaRuX.Views
+             }
+         }
+ 
+-        private void OnChatUnloadedStopVoice(object sender, RoutedEventArgs e)
++        private void OnVoiceGamingStateChanged(object? sender, EventArgs e)
+         {
+-            try
++            // GamingManager dispatches StateChanged on the UI thread.
++            if (GamingManager.Current.IsActive) StopVoiceForGaming();
++        }
++
++        private void StopVoiceForGaming()
++        {
++            ++_voiceGeneration;
++            lock (_sttWarmGate)
+             {
+-                _voiceConversation?.Stop();
+-                if (_voice.Phase == VoiceRecordingPhase.Recording) CancelVoiceRecording();
+-                StopReadAloud();
++                try { _sttWarmCts?.Cancel(); } catch (ObjectDisposedException) { }
++                _sttWarmCts = null;
++                _sttWarmed = false;
+             }
+-            catch (Exception ex) { Log.Write("Voice cleanup failed: " + ex.Message); }
++            try { _voiceTranscriptionCts?.Cancel(); } catch (ObjectDisposedException) { }
++            try { _voiceConversation?.Stop(); } catch (Exception ex) { Log.Write("Voice conversation cleanup failed: " + ex.Message); }
++            try { if (_voice.Phase == VoiceRecordingPhase.Recording) CancelVoiceRecording(); }
++            catch (Exception ex) { Log.Write("Voice recording cleanup failed: " + ex.Message); }
++            try { StopReadAloud(); } catch (Exception ex) { Log.Write("Read aloud cleanup failed: " + ex.Message); }
++        }
++
++        private void OnChatUnloadedStopVoice(object sender, RoutedEventArgs e)
++        {
++            GamingManager.Current.StateChanged -= OnVoiceGamingStateChanged;
++            StopVoiceForGaming();
+         }
+ 
+         // ------------------------------------------------------------------
+diff --git a/tests/PaRuX.Server.Tests/VoiceConversationControllerTests.cs b/tests/PaRuX.Server.Tests/VoiceConversationControllerTests.cs
+index 6fe884c..9615627 100644
+--- a/tests/PaRuX.Server.Tests/VoiceConversationControllerTests.cs
++++ b/tests/PaRuX.Server.Tests/VoiceConversationControllerTests.cs
+@@ -443,6 +443,23 @@ public class VoiceConversationControllerTests
+         Assert.Equal(1, r.Mic.Opens);
+     }
+ 
++    [Fact]
++    public async Task Stop_during_blocked_listen_aborts_and_disposes_capture_without_transcribing()
++    {
++        var r = new Rig();
++        r.Mic.Factory = (_, c) => new FakeCapture(c, _ => 0, stall: true);
++        Task<VoiceConversationEnd> run = r.Run();
++        Assert.Single(r.Mic.Captures);
++        r.C.Stop();
++        VoiceConversationEnd end = await run;
++        Assert.Equal(VoiceConversationEndReason.UserStopped, end.Reason);
++        Assert.True(r.Mic.Captures[0].Aborted);
++        Assert.True(r.Mic.Captures[0].Disposed);
++        Assert.Equal(0, r.Stt.Calls);
++        Assert.Empty(r.Chat.Sent);
++        Assert.Empty(r.Tts.Spoken);
++    }
++
+     [Fact]
+     public async Task Missing_speech_engines_end_the_mode_before_recording()
+     {

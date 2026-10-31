@@ -1,0 +1,44 @@
+diff --git a/src/PaRuX.Server/Orchestration/Gaming/WorkloadOrchestrator.cs b/src/PaRuX.Server/Orchestration/Gaming/WorkloadOrchestrator.cs
+index 13e3881..4ff0ff9 100644
+--- a/src/PaRuX.Server/Orchestration/Gaming/WorkloadOrchestrator.cs
++++ b/src/PaRuX.Server/Orchestration/Gaming/WorkloadOrchestrator.cs
+@@ -29,6 +29,9 @@ public sealed class WorkloadOrchestrator : BackgroundService
+     private readonly ILogger<WorkloadOrchestrator>? _logger;
+ 
+     private readonly object _stateGate = new();
++    // Transitions contain asynchronous provider and runtime operations. The state lock alone
++    // protects fields, not the interval between releasing and restoring resources.
++    private readonly SemaphoreSlim _transitionGate = new(1, 1);
+ 
+     private string _state = "AiReady";
+     private GamingProfileDto? _activeProfile;
+@@ -333,6 +336,14 @@ public sealed class WorkloadOrchestrator : BackgroundService
+     }
+ 
+     private async Task<bool> TransitionToGamingAsync(GamingProfileDto profile, string triggerId, CancellationToken ct)
++    {
++        try { await _transitionGate.WaitAsync(ct).ConfigureAwait(false); }
++        catch (OperationCanceledException) when (ct.IsCancellationRequested) { return false; }
++        try { return await TransitionToGamingCoreAsync(profile, triggerId, ct).ConfigureAwait(false); }
++        finally { _transitionGate.Release(); }
++    }
++
++    private async Task<bool> TransitionToGamingCoreAsync(GamingProfileDto profile, string triggerId, CancellationToken ct)
+     {
+         lock (_stateGate)
+         {
+@@ -438,6 +449,14 @@ public sealed class WorkloadOrchestrator : BackgroundService
+     }
+ 
+     private async Task<bool> TransitionToAiAsync(bool userInitiated, CancellationToken ct)
++    {
++        try { await _transitionGate.WaitAsync(ct).ConfigureAwait(false); }
++        catch (OperationCanceledException) when (ct.IsCancellationRequested) { return false; }
++        try { return await TransitionToAiCoreAsync(userInitiated, ct).ConfigureAwait(false); }
++        finally { _transitionGate.Release(); }
++    }
++
++    private async Task<bool> TransitionToAiCoreAsync(bool userInitiated, CancellationToken ct)
+     {
+         GamingProfileDto profile;
+         lock (_stateGate)
