@@ -15,8 +15,10 @@ namespace PaRuX.Services
         /// alone do not grant verifier handoff.</summary>
         public static bool MayRequestVerification(
             bool goalReported, bool cancelled,
-            bool guiTestProofRequired, bool guiTestProofSatisfied, int uiAssertionsPassed) =>
+            bool guiTestProofRequired, bool guiTestProofSatisfied, int uiAssertionsPassed,
+            bool finalReadbackVerified) =>
             MayRequestVerification(goalReported, cancelled)
-            && (!guiTestProofRequired || (guiTestProofSatisfied && uiAssertionsPassed > 0));
+            && (!guiTestProofRequired || (guiTestProofSatisfied
+                && uiAssertionsPassed > 0 && finalReadbackVerified));
     }
 }
