@@ -448,20 +448,76 @@ namespace PaRuX.Services
                                     Summary = "GUI verification refused: the foreground window changed."
                                 };
 
-                            WindowsUiTreeObservationService.Observation finalReadback =
-                                await WindowsUiTreeObservationService.CaptureForegroundAsync(ct)
-                                    .ConfigureAwait(false);
-                            string? stopAfterRead = stopReason();
-                            if (stopAfterRead != null)
-                                return new ComputerUseAgentResult
+                            if (guiProofs.WindowCount > 1)
+                            {
+                                // These windows were selected by explicit,
+                                // authorized focus_window actions, never by
+                                // a model-supplied PID, HWND or executable.
+                                // Read-only WinApp -w inspections do not
+                                // refocus a user window. ALL prior exact
+                                // controls must survive these fresh sequential
+                                // observations, each with an OS identity
+                                // recheck before and after the native read.
+                                var observations = new List<WindowsUiTreeObservationService.Observation>();
+                                foreach (ComputerUseWindowFocusPolicy.Candidate window in
+                                    guiProofs.VerifiedWindows)
                                 {
-                                    StepsTaken = step,
-                                    Summary = "Stopped during final UI verification: " + stopAfterRead
-                                };
-                            finalReadbackVerified = finalReadback.HasEvidence
-                                && pin.RefusalForUiaObservation(
-                                    finalReadback.ProcessId, finalReadback.WindowHandle) == null
-                                && guiProofs.RecheckAll(finalReadback);
+                                    ct.ThrowIfCancellationRequested();
+                                    if (stopReason() is { } readStopped)
+                                        return new ComputerUseAgentResult
+                                        {
+                                            StepsTaken = step,
+                                            Summary = "Stopped during cross-window verification: " + readStopped
+                                        };
+                                    string[] liveApps = (SettingsStore.Current.Data.ComputerApps
+                                        ?? new List<ComputerAppShortcut>())
+                                        .Select(a => a.ExecutablePath).ToArray();
+                                    if (!ComputerUseWindowFocusPolicy.IsInScope(window, 0, liveApps))
+                                        return new ComputerUseAgentResult
+                                        {
+                                            StepsTaken = step,
+                                            Summary = "Stopped: an earlier verified app is no longer approved."
+                                        };
+                                    if (pin.RefusalIfChanged() != null)
+                                        break;
+                                    WindowsUiTreeObservationService.Observation observed =
+                                        await WindowsUiTreeObservationService.CaptureVerifiedWindowAsync(
+                                            window, ct).ConfigureAwait(false);
+                                    string[] approvedAfterRead = (SettingsStore.Current.Data.ComputerApps
+                                        ?? new List<ComputerAppShortcut>())
+                                        .Select(a => a.ExecutablePath).ToArray();
+                                    if (!ComputerUseWindowFocusPolicy.IsInScope(window, 0, approvedAfterRead))
+                                        return new ComputerUseAgentResult
+                                        {
+                                            StepsTaken = step,
+                                            Summary = "Stopped: an earlier verified app was revoked during readback."
+                                        };
+                                    if (!observed.HasEvidence || pin.RefusalIfChanged() != null
+                                        || stopReason() != null)
+                                        break;
+                                    observations.Add(observed);
+                                }
+                                finalReadbackVerified = observations.Count == guiProofs.WindowCount
+                                    && guiProofs.RecheckAllWindows(observations)
+                                    && pin.RefusalIfChanged() == null;
+                            }
+                            else
+                            {
+                                WindowsUiTreeObservationService.Observation finalReadback =
+                                    await WindowsUiTreeObservationService.CaptureForegroundAsync(ct)
+                                        .ConfigureAwait(false);
+                                string? stopAfterRead = stopReason();
+                                if (stopAfterRead != null)
+                                    return new ComputerUseAgentResult
+                                    {
+                                        StepsTaken = step,
+                                        Summary = "Stopped during final UI verification: " + stopAfterRead
+                                    };
+                                finalReadbackVerified = finalReadback.HasEvidence
+                                    && pin.RefusalForUiaObservation(
+                                        finalReadback.ProcessId, finalReadback.WindowHandle) == null
+                                    && guiProofs.RecheckAll(finalReadback);
+                            }
                             trace.RecordFinalReadback(finalReadbackVerified, guiProofs.Count);
                             if (!finalReadbackVerified)
                             {
@@ -489,6 +545,28 @@ namespace PaRuX.Services
                                 StepsTaken = step,
                                 Summary = "Stopped before completion: " + finalStopReason
                             };
+                        if (guiTestGate.RequiresAssertion && guiProofs.WindowCount > 1)
+                        {
+                            // One last authorization and HWND/EXE identity
+                            // check after all sequential reads, before the
+                            // executor hands a claim to the Core verifier.
+                            string[] finalApproved = (SettingsStore.Current.Data.ComputerApps
+                                ?? new List<ComputerAppShortcut>())
+                                .Select(a => a.ExecutablePath).ToArray();
+                            foreach (ComputerUseWindowFocusPolicy.Candidate window in
+                                guiProofs.VerifiedWindows)
+                            {
+                                if (!ComputerUseWindowFocusPolicy.IsInScope(window, 0, finalApproved)
+                                    || !ComputerUseWindowFocusPolicy.IsUnchanged(window,
+                                        DesktopAutomationService.CaptureWindowFocusIdentity(
+                                            new IntPtr(window.WindowHandle))))
+                                    return new ComputerUseAgentResult
+                                    {
+                                        StepsTaken = step,
+                                        Summary = "GUI test stopped: a prior app approval or window identity changed before completion."
+                                    };
+                            }
+                        }
                         if (guiTestGate.RequiresAssertion && pin.RefusalIfChanged() != null)
                             return new ComputerUseAgentResult
                             {
