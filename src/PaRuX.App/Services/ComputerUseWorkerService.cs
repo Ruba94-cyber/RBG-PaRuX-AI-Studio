@@ -215,7 +215,7 @@ namespace PaRuX.Services
                 if (!ComputerUseCompletionGate.MayRequestVerification(
                     result.GoalReported, result.Cancelled,
                     result.GuiTestProofRequired, result.GuiTestProofSatisfied,
-                    result.VerifiedUiAssertions))
+                    result.VerifiedUiAssertions, result.GuiFinalReadbackVerified))
                 {
                     await AgentOrchestratorClient.Current.AppendLogAsync(task.Id,
                         "Computer Use did not report its goal complete: " + result.Summary,
@@ -237,6 +237,7 @@ namespace PaRuX.Services
                     result.StepsTaken,
                     guiTestProofRequired = result.GuiTestProofRequired,
                     guiTestProofSatisfied = result.GuiTestProofSatisfied,
+                    guiFinalReadbackVerified = result.GuiFinalReadbackVerified,
                     uiAssertionsPassed = result.VerifiedUiAssertions,
                     executor = "windows-computer-use",
                     authorization = remoteTaskApproval ? "task-scoped-remote-approval" : "windows-full-computer-use",
