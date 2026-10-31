@@ -272,6 +272,16 @@ try {
         'second selector ' + $selector + ' with property value, expected ' + $expected +
         '. Both must be verified before done; do not modify or switch windows between assertions and done. ' +
         'Do not open apps, use browser or shell, or interact with unrelated windows and private content.'
+    if ($RunCrossWindowScenario) {
+        $goal = 'Test ONLY the two already running disposable Windows windows. FIRST focus_window exact title PaRuX Disposable UI Acceptance ' +
+            $nonce + ' and invoke Run. SECOND focus_window exact title PaRuX Disposable UI Acceptance ' +
+            $secondNonce + ' and invoke Run. AFTER BOTH Run actions, no further data mutation: ' +
+            'focus_window the FIRST title again, ui_assert selector ' + $selector +
+            ' property value equals ACCEPTED-' + $nonce +
+            '; focus_window the SECOND title again, ui_assert selector ' + $secondResultSelector +
+            ' property value equals ACCEPTED-' + $secondNonce +
+            '. Report done only after both exact assertions. Do not open other apps, use browser or shell.'
+    }
     $global:LASTEXITCODE = 0
     $createLines = @(& $cli agent run $goal --role computer-use --max-repair 0 --detach 2>&1)
     if ($LASTEXITCODE -ne 0) { throw 'PaRuX CLI failed to create a real Computer Use task.' }
