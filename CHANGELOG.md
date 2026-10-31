@@ -4,7 +4,7 @@
 
 - Computer Use GUI tests can now recover from up to two real `DifferentValue`, `MissingTarget` or `MissingProperty` UIA assertion failures with remaining steps, but each additional recovery requires a successfully delivered UI mutation. Ambiguous, invalid or fabricated observations still stop the task, and old proof is discarded.
 - The disposable native WinForms UIA fixture now has a Reset control. A new opt-in `-RunNativeUiRecovery` runner gate can exercise first-pass UIA, deliberate regression to PENDING, independently observed failure, a fresh correction, and final exact value readback. It maintains its own separate result and explicitly records `realAgentOrchestration=NOT_RUN`.
-- Fixed a serious corrupted/duplicated tail in `tools/test-agent-platform-v2.ps1` that had broken its Git commit parsing. Added PowerShell syntax/structure validation as a required local runner gate, plus xUnit tests for bounded GUI repair.
+- Fixed a serious corrupted/duplicated tail in `tools/test-agent-platform-v2.ps1` that had broken its Git commit parsing. Added PowerShell syntax/structure validation as a required local runner gate, plus xUnit tests for bounded GUI repair and a hermetic cross-component repair-to-final-proof scenario.
 - **No Windows PowerShell AST parsing, .NET build, xUnit, WinApp CLI or FlaUI run was executed in this GitHub-only turn.** Native fixture success must not be confused with an LLM-driven PaRuX agent successfully testing an application.
 
 
