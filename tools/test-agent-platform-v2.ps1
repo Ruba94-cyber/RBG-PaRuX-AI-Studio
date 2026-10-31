@@ -152,6 +152,9 @@ try {
     }
     if ($RunLiveComputerUseE2E) {
         Invoke-Gate -Name liveComputerUseAgent -LogName 'live-computer-use-agent.log' -Action {
+            if ($results.scriptSyntax -ne 'PASS') {
+                throw 'Real agent E2E is refused because the required PowerShell syntax gate did not pass.'
+            }
             if ([string]::IsNullOrWhiteSpace($CliPath)) {
                 throw '-RunLiveComputerUseE2E requires -CliPath pointing to parux.exe.'
             }
