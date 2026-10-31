@@ -125,7 +125,8 @@ namespace PaRuX
         {
             try
             {
-                IntPtr hwnd = FindWindow(null, "RBG PaRuX AI Studio");
+                IntPtr hwnd = FindWindow(null, "PaRuX AI & Gaming OS");
+                if (hwnd == IntPtr.Zero) hwnd = FindWindow(null, "RBG PaRuX AI Studio");
                 if (hwnd == IntPtr.Zero) return;
                 if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
                 SetForegroundWindow(hwnd);

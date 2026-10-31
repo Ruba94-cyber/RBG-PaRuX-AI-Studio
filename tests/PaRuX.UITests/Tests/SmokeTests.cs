@@ -35,7 +35,7 @@ public sealed class SmokeTests
 
     [Fact, Trait("Category", "Smoke"), Trait("Category", "Navigation")]
     public void Starts_with_the_real_main_window() => Run(nameof(Starts_with_the_real_main_window), app =>
-        Assert.Equal("RBG PaRuX AI Studio", app.MainWindow.Title));
+        Assert.Equal("PaRuX AI & Gaming OS", app.MainWindow.Title));
 
     [Fact, Trait("Category", "Smoke"), Trait("Category", "Chat")]
     public void Chat_composer_accepts_a_prompt() => Run(nameof(Chat_composer_accepts_a_prompt), app =>

@@ -8,7 +8,7 @@
     mc:Ignorable="d"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    Title="RBG PaRuX AI Studio"
+    Title="PaRuX AI &amp; Gaming OS"
     AutomationProperties.AutomationId="MainWindow">
 
     <Window.SystemBackdrop>
@@ -18,7 +18,7 @@
     <Grid x:Name="RootGrid" SizeChanged="RootGrid_SizeChanged">
         <tb:TaskbarIcon
             x:Name="TrayIcon"
-            ToolTipText="RBG PaRuX AI Studio"
+            ToolTipText="PaRuX AI &amp; Gaming OS"
             IconSource="Assets/prx-orbit-tray.ico">
             <tb:TaskbarIcon.ContextFlyout>
                 <MenuFlyout>
@@ -59,6 +59,9 @@
                 </NavigationViewItem>
                 <NavigationViewItem x:Name="ProjectsNavItem" AutomationProperties.AutomationId="Navigation_Projects_Item" Content="Projects" Tag="__projects__" SelectsOnInvoked="True">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE8F1;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="GameLibraryNavItem" AutomationProperties.AutomationId="Navigation_GameLibrary_Item" Content="Games" Tag="__games__" SelectsOnInvoked="True">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE7FC;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem x:Name="ModelHubNavItem" AutomationProperties.AutomationId="Navigation_ModelHub_Item" Content="Model Hub" Tag="__modelhub__" SelectsOnInvoked="True">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE8B7;" /></NavigationViewItem.Icon>
@@ -226,6 +229,7 @@
                         <views:ObservabilityView x:Name="ObservabilityPage" Visibility="Collapsed" />
                         <views:UpdateManagerView x:Name="UpdateManagerPage" Visibility="Collapsed" />
                         <views:RuntimeManagerView x:Name="RuntimeManagerPage" Visibility="Collapsed" />
+                        <views:ManualGameLibraryView x:Name="GameLibraryPage" Visibility="Collapsed" />
                         <views:ChatView x:Name="ChatPage" />
                         <views:SettingsView x:Name="SettingsPage" Visibility="Collapsed" />
                         <views:OnboardingView x:Name="OnboardingPage" Visibility="Collapsed" />

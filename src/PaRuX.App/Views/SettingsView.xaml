@@ -2136,7 +2136,7 @@
                         ContentTemplate="{StaticResource PrxOrbitMarkTemplate}"
                         IsHitTestVisible="False" />
                     <StackPanel Spacing="{StaticResource PaRuXSpaceXS}" VerticalAlignment="Center">
-                        <TextBlock Text="RBG PaRuX AI Studio" Style="{StaticResource PaRuXSubtitleTextStyle}" />
+                        <TextBlock Text="PaRuX AI &amp; Gaming OS" Style="{StaticResource PaRuXSubtitleTextStyle}" />
                         <TextBlock x:Name="AboutVersion" Style="{StaticResource PaRuXCaptionTextStyle}" />
                         <TextBlock Text="A local-first assistant for your own machine. Phase 1."
                                    Style="{StaticResource PaRuXCaptionTextStyle}" />

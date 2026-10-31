@@ -57,7 +57,7 @@ public sealed class UpdateManagerCoverageTests
             AutomationElement? install = FindButton(app, "Download & install verified MSI");
             Assert.True(install == null || !install.Properties.IsEnabled.ValueOrDefault,
                 "An unverified release must not make an application installer actionable during automatic refresh.");
-            Assert.Equal("RBG PaRuX AI Studio", app.MainWindow.Title);
+            Assert.Equal("PaRuX AI & Gaming OS", app.MainWindow.Title);
         });
     }
 

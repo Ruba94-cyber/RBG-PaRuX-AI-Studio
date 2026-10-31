@@ -1,4 +1,4 @@
-# RBG PaRuX AI Studio
+# PaRuX AI & Gaming OS
 
 <p align="center">
   <img src="src/PaRuX.App/Assets/prx-orbit-approved.png" alt="PaRuX AI Studio" width="160">
@@ -17,7 +17,7 @@
 
 ## What is PaRuX?
 
-**PaRuX is a local-first AI studio for Windows.** It brings different AI models and workflows together without making you manage a separate app for every task. Your own PC handles local inference; external AI services are **optional and disabled by default**.
+**PaRuX is a local-first AI workspace for Windows**, evolving toward an integrated AI and gaming experience. It brings different AI models and workflows together without making you manage a separate app for every task. Your own PC handles local inference; external AI services are **optional and disabled by default**. “OS” describes the intended integrated experience; PaRuX runs on Windows and does not replace it. The console shell and universal game library are planned, not yet available.
 
 ## What can you do?
 

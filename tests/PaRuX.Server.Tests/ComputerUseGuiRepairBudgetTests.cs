@@ -6,12 +6,13 @@ namespace PaRuX.Server.Tests;
 public sealed class ComputerUseGuiRepairBudgetTests
 {
     [Theory]
-    [InlineData(WindowsUiAssertionPolicy.Verdict.DifferentValue)]
-    [InlineData(WindowsUiAssertionPolicy.Verdict.MissingTarget)]
-    [InlineData(WindowsUiAssertionPolicy.Verdict.MissingProperty)]
+    [InlineData((int)WindowsUiAssertionPolicy.Verdict.DifferentValue)]
+    [InlineData((int)WindowsUiAssertionPolicy.Verdict.MissingTarget)]
+    [InlineData((int)WindowsUiAssertionPolicy.Verdict.MissingProperty)]
     public void Real_gui_mismatches_may_request_one_bounded_repair(
-        WindowsUiAssertionPolicy.Verdict verdict)
+        int verdictValue)
     {
+        var verdict = (WindowsUiAssertionPolicy.Verdict)verdictValue;
         var budget = new ComputerUseGuiRepairBudget();
         Assert.True(budget.TryReserve(verdict, 3, 15, true));
         Assert.Equal(1, budget.RecoveriesUsed);
@@ -28,13 +29,14 @@ public sealed class ComputerUseGuiRepairBudgetTests
     }
 
     [Theory]
-    [InlineData(WindowsUiAssertionPolicy.Verdict.AmbiguousTarget)]
-    [InlineData(WindowsUiAssertionPolicy.Verdict.InvalidObservation)]
-    [InlineData(WindowsUiAssertionPolicy.Verdict.InvalidRequest)]
-    [InlineData(WindowsUiAssertionPolicy.Verdict.Verified)]
+    [InlineData((int)WindowsUiAssertionPolicy.Verdict.AmbiguousTarget)]
+    [InlineData((int)WindowsUiAssertionPolicy.Verdict.InvalidObservation)]
+    [InlineData((int)WindowsUiAssertionPolicy.Verdict.InvalidRequest)]
+    [InlineData((int)WindowsUiAssertionPolicy.Verdict.Verified)]
     public void Invalid_ambiguous_or_already_verified_ui_evidence_never_gets_repair_permission(
-        WindowsUiAssertionPolicy.Verdict verdict)
+        int verdictValue)
     {
+        var verdict = (WindowsUiAssertionPolicy.Verdict)verdictValue;
         var budget = new ComputerUseGuiRepairBudget();
         Assert.False(budget.TryReserve(verdict, 1, 15, true));
     }
