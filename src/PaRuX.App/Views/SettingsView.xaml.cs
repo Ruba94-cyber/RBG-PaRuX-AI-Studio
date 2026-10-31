@@ -2482,6 +2482,100 @@ namespace PaRuX.Views
             VideoFolderPath.Text = string.IsNullOrWhiteSpace(configured) ? "PaRuX managed local folder" : configured;
         }
 
+        private async void ChooseRunningComputerApp_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // The user initiates this read-only scan in Settings.
+                // No agent-invoked discovery is treated as authorization.
+                IReadOnlyList<ComputerUseRunningAppDiscovery.DiscoveredApp> found =
+                    await Task.Run(ComputerUseRunningAppDiscovery.ScanOpenApplications);
+
+                if (found.Count == 0)
+                {
+                    await new ContentDialog
+                    {
+                        Title = "No eligible open apps found",
+                        Content = "Open a desktop app and try again, or select Browse EXE. Protected and packaged app hosts may be unavailable.",
+                        CloseButtonText = "OK",
+                        XamlRoot = XamlRoot
+                    }.ShowAsync();
+                    return;
+                }
+
+                var chooser = new ComboBox
+                {
+                    Header = "Open desktop application",
+                    PlaceholderText = "Choose the application to allow",
+                    HorizontalAlignment = HorizontalAlignment.Stretch
+                };
+                foreach (ComputerUseRunningAppDiscovery.DiscoveredApp app in found)
+                    chooser.Items.Add(new ComboBoxItem { Content = app.Name, Tag = app });
+
+                var executable = new TextBlock
+                {
+                    Text = "Select an application to review its executable path.",
+                    TextWrapping = TextWrapping.Wrap
+                };
+                chooser.SelectionChanged += (s, args) =>
+                {
+                    executable.Text = (chooser.SelectedItem as ComboBoxItem)?.Tag is
+                        ComputerUseRunningAppDiscovery.DiscoveredApp selected
+                        ? "Executable: " + selected.ExecutablePath
+                        : "Select an application to review its executable path.";
+                };
+
+                var panel = new StackPanel { Spacing = 10 };
+                panel.Children.Add(new TextBlock
+                {
+                    Text = "Only the executable you approve is added to your Computer Use allowlist. No application is started or controlled during discovery.",
+                    TextWrapping = TextWrapping.Wrap
+                });
+                panel.Children.Add(chooser);
+                panel.Children.Add(executable);
+                var dialog = new ContentDialog
+                {
+                    Title = "Approve desktop app",
+                    Content = panel,
+                    PrimaryButtonText = "Allow selected app",
+                    CloseButtonText = "Cancel",
+                    DefaultButton = ContentDialogButton.Close,
+                    XamlRoot = XamlRoot
+                };
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary
+                    || (chooser.SelectedItem as ComboBoxItem)?.Tag is not
+                        ComputerUseRunningAppDiscovery.DiscoveredApp chosen)
+                    return;
+
+                if (!ComputerUseRunningAppDiscovery.IsEligibleCandidate(
+                        chosen.Name, chosen.ExecutablePath, true)
+                    || !File.Exists(chosen.ExecutablePath))
+                    return;
+
+                List<ComputerAppShortcut> allowed =
+                    SettingsStore.Current.Data.ComputerApps ??= new List<ComputerAppShortcut>();
+                // Avoid duplicate executable grants or ambiguous display names.
+                if (allowed.Any(a => string.Equals(a.ExecutablePath, chosen.ExecutablePath,
+                        StringComparison.OrdinalIgnoreCase))
+                    || ComputerUseService.GetAllowedAppNames().Any(n =>
+                        string.Equals(n, chosen.Name, StringComparison.OrdinalIgnoreCase)))
+                    return;
+
+                allowed.Add(new ComputerAppShortcut
+                {
+                    Name = chosen.Name,
+                    ExecutablePath = chosen.ExecutablePath,
+                    Arguments = string.Empty
+                });
+                SettingsStore.Current.Save();
+                RefreshComputerApps();
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Computer Use app inventory failed: " + ex.GetType().Name);
+            }
+        }
+
         private async void ChooseComputerApp_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -2509,6 +2603,15 @@ namespace PaRuX.Views
                 if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
                 string displayName = string.IsNullOrWhiteSpace(name.Text)
                     ? Path.GetFileNameWithoutExtension(file.Name) : name.Text.Trim();
+                // Manual selection obeys the same executable policy as open_app;
+                // an EXE picker result is not sufficient to authorize a shell runner.
+                if (!ComputerUseAppSelectionPolicy.IsValidName(displayName)
+                    || !ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(file.Path)
+                    || ComputerUseService.GetAllowedAppNames().Any(n =>
+                        string.Equals(n, displayName, StringComparison.OrdinalIgnoreCase))
+                    || (SettingsStore.Current.Data.ComputerApps?.Any(a =>
+                        string.Equals(a.ExecutablePath, file.Path, StringComparison.OrdinalIgnoreCase)) ?? false))
+                    return;
                 SettingsStore.Current.Data.ComputerApps ??= new List<ComputerAppShortcut>();
                 SettingsStore.Current.Data.ComputerApps.Add(new ComputerAppShortcut
                 {
