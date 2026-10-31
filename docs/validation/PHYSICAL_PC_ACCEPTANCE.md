@@ -4,6 +4,39 @@ Manual procedures for the owner to run on a real Windows PC and phone. Every pro
 
 ## Computer Use across Windows applications (NOT RUN)
 
+### 2026-10-31 bounded GUI self-repair and native Windows UIA recovery (NOT RUN)
+
+This is **two distinct tests**. The native fixture CLI test is deterministic but is NOT a live PaRuX agent/autonomous Core acceptance. Do not combine their PASS statuses.
+
+**Source syntax first:** From the repository root on Windows PowerShell, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\test-agent-validation-syntax.ps1
+```
+
+This parses five local validation scripts and fails if the main runner has duplicated structural blocks. It is a syntax check, not functionality. The old duplicated runner was repaired on 2026-10-31.
+
+**Opt-in real WinApp fixture regression:** On an interactive disposable Windows x64 development PC with .NET 8 SDK and an already installed WinApp CLI executable:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunNativeUiRecovery -WinAppCli winapp
+```
+
+The runner also performs its normal xUnit and Node.js browser test gates; they must pass independently. The new `nativeUiRecovery` gate must remain NOT_RUN when the switch is absent and FAIL when any step cannot be executed. The fixture must be compiled, started with a per-run nonce, bound to its native PID/HWND, and reveal distinct Run/Reset/Result selectors in a fresh inspect tree. Required physical observations:
+
+1. `initialNegative`: a wait-for ACCEPTED times out with structured found:false/timedOut:true; errors or non-JSON are never a valid negative.
+2. `firstPositive`: a real Run UIA invoke updates the result and an independent wait-for proves ACCEPTED.
+3. `resetPositive`: a separately observed Reset UIA invoke changes the result back to PENDING; a new assertion proves it.
+4. `postResetNegative`: another independent negative probe proves ACCEPTED was invalidated by the reset, not carried over.
+5. `recoveryPositive`: a new Run UIA invoke and new assertion prove recovery; no previous successful readback may be reused.
+6. `finalReadback`: a final independent wait-for still confirms ACCEPTED on the original HWND/PID. Fixture is then stopped by the test script. Review the ignored local `artifacts/validation/.../native-ui-recovery/native-recovery-status.json` status file. `realAgentOrchestration` stays NOT_RUN by design.
+
+**Actual PaRuX GUI agent acceptance is separate:** Enable Computer Use only on a disposable test profile, explicitly approve the fixture app, then ask a supported local model to test it. Make the first control assertion fail, permit a safe corrective UI action, require another exact assertion and a separate completion-time readback, and inspect the redacted receipt. Confirm at most two mismatches may consume recovery slots; repeated checks without delivered mutations, ambiguous selectors, invalid observation, STOP, revoked approval and step exhaustion must not produce a false PASS. Record the exact commit and real WinApp/FlaUI results, not a simulated/model-reported PASS.
+
+**Current status:** all executable code and scripts committed; PowerShell AST parsing, .NET/xUnit, native UIA recovery and full agent-on-PC acceptance **NOT RUN** in this environment. UAI-07 remains PARTIAL.
+
+
+
 ### 2026-10-31 Core-side Computer Use receipt gate and Agents task card (NOT RUN)
 
 1. Create a disposable, user-approved GUI test task and make its desktop worker submit a valid v1 receipt. Verify `VerifierService` admits it for **independent** evaluation, but the task remains `Verifying` until the actual verifier responds.
