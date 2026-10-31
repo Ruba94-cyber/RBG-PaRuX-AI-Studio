@@ -22,7 +22,7 @@ This parses five local validation scripts and fails if the main runner has dupli
 powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunNativeUiRecovery -WinAppCli winapp
 ```
 
-The runner also performs its normal xUnit and Node.js browser test gates; they must pass independently. The new `nativeUiRecovery` gate must remain NOT_RUN when the switch is absent and FAIL when any step cannot be executed. The fixture must be compiled, started with a per-run nonce, bound to its native PID/HWND, and reveal distinct Run/Reset/Result selectors in a fresh inspect tree. Required physical observations:
+The runner also performs its normal xUnit and Node.js browser test gates; they must pass independently. The xUnit selection includes the hermetic `ComputerUseGuiRecoveryContractTests` linking repair budget, UIA verdict, GUI proof and redacted receipt, which does not run native UI. The new `nativeUiRecovery` gate must remain NOT_RUN when the switch is absent and FAIL when any step cannot be executed. The fixture must be compiled, started with a per-run nonce, bound to its native PID/HWND, and reveal distinct Run/Reset/Result selectors in a fresh inspect tree. Required physical observations:
 
 1. `initialNegative`: a wait-for ACCEPTED times out with structured found:false/timedOut:true; errors or non-JSON are never a valid negative.
 2. `firstPositive`: a real Run UIA invoke updates the result and an independent wait-for proves ACCEPTED.
