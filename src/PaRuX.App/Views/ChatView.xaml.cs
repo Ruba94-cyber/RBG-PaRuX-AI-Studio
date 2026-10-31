@@ -2004,26 +2004,26 @@ namespace PaRuX.Views
             finally { _voiceStarting = false; }
         }
 
-        private static bool _sttWarmed;
-        private static Task? _sttWarmTask;
+        private static readonly SpeechWarmupCoordinator _speechWarmup = new();
 
-        /// <summary>Loads the speech model while the user is still talking, so the first transcription is not a cold start.</summary>
+        /// <summary>Loads the speech model while the user is still talking.</summary>
         private static void WarmSpeechEngineOnce()
         {
-            if (_sttWarmed) return;
-            _sttWarmed = true;
-            _sttWarmTask = Task.Run(async () =>
+            _speechWarmup.Start(async ct =>
             {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
-                    var sw = System.Diagnostics.Stopwatch.StartNew();
-                    using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(4));
                     await SpeechClient.Current.TranscribeAsync(
-                        Convert.ToBase64String(WavSilenceDetector.BuildSilence(500)), "warmup.wav", cts.Token);
+                        Convert.ToBase64String(WavSilenceDetector.BuildSilence(500)), "warmup.wav", ct);
                     Log.Write("Voice: speech engine warmed in " + sw.ElapsedMilliseconds + " ms");
                 }
-                catch (Exception ex) { _sttWarmed = false; Log.Write("Voice: warm-up skipped: " + ex.Message); }
-            });
+                catch (Exception ex)
+                {
+                    Log.Write("Voice: warm-up skipped: " + ex.Message);
+                    throw;
+                }
+            }, TimeSpan.FromMinutes(4));
         }
 
         private DispatcherQueueTimer CreateVoiceTimer()
@@ -2089,7 +2089,7 @@ namespace PaRuX.Views
                     + ", variation " + analysis.Variation.ToString("0.0") + ", steadyNoise " + analysis.LooksLikeSteadyNoise + ", header " + header);
                 // Cold start: the model load (about 100 s while the LLM also loads) is a separate, bounded phase,
                 // so the transcription itself keeps its own 75 s limit.
-                Task? warming = _sttWarmTask;
+                Task? warming = _speechWarmup.CurrentTask;
                 if (warming != null && !warming.IsCompleted)
                 {
                     ShowPersistentVoiceStatus("Loading the local speech model (first use only, up to two minutes)…");
