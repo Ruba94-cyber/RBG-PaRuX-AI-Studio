@@ -16,6 +16,9 @@ namespace PaRuX.Services
         public IntPtr Handle { get; set; }
         public string Title { get; set; } = string.Empty;
         public string ProcessName { get; set; } = string.Empty;
+        // Read by Windows, not by the model or the untrusted window title.
+        public int ProcessId { get; set; }
+        public string ExecutablePath { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -325,18 +328,59 @@ namespace PaRuX.Services
                 if (string.IsNullOrWhiteSpace(title)) return true;
 
                 string processName = "unknown";
+                string executablePath = string.Empty;
+                int processId = 0;
                 try
                 {
                     GetWindowThreadProcessId(hWnd, out uint pid);
-                    using Process process = Process.GetProcessById((int)pid);
-                    processName = process.ProcessName;
+                    if (pid > 0 && pid <= int.MaxValue)
+                    {
+                        processId = (int)pid;
+                        using Process process = Process.GetProcessById(processId);
+                        processName = process.ProcessName;
+                        executablePath = process.MainModule?.FileName ?? string.Empty;
+                    }
                 }
-                catch { /* process may have exited between enumeration and lookup */ }
+                catch
+                {
+                    // A process may be protected or have exited; it cannot be
+                    // selected as a trusted cross-application focus target.
+                    executablePath = string.Empty;
+                }
 
-                results.Add(new DesktopWindowInfo { Handle = hWnd, Title = title, ProcessName = processName });
+                results.Add(new DesktopWindowInfo
+                {
+                    Handle = hWnd, Title = title, ProcessName = processName,
+                    ProcessId = processId, ExecutablePath = executablePath
+                });
                 return true;
             }, IntPtr.Zero);
             return results;
+        }
+
+        /// <summary>
+        /// Re-read the actual Windows PID and executable before focusing a target.
+        /// A screenshot title, stale enumeration or model claim cannot authorize a switch.
+        /// </summary>
+        internal static ComputerUseWindowFocusPolicy.Candidate? CaptureWindowFocusIdentity(IntPtr handle)
+        {
+            if (handle == IntPtr.Zero) return null;
+            try
+            {
+                GetWindowThreadProcessId(handle, out uint pid);
+                if (pid == 0 || pid > int.MaxValue) return null;
+                using Process process = Process.GetProcessById((int)pid);
+                string? executable = process.MainModule?.FileName;
+                if (!ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(executable))
+                    return null;
+                return new ComputerUseWindowFocusPolicy.Candidate(
+                    string.Empty, (int)pid, handle.ToInt64(), executable);
+            }
+            catch (Exception)
+            {
+                // Protected/replaced/exited windows fail closed, without elevation.
+                return null;
+            }
         }
 
         public static bool FocusWindow(IntPtr handle)
