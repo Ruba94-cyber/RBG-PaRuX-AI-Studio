@@ -176,6 +176,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\WindowsUiActionService.cs" Link="ComputerUse\WindowsUiActionService.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\WindowsUiAssertionPolicy.cs" Link="ComputerUse\WindowsUiAssertionPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseWindowSelectionPolicy.cs" Link="ComputerUse\ComputerUseWindowSelectionPolicy.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseWindowFocusPolicy.cs" Link="ComputerUse\ComputerUseWindowFocusPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\WindowsUiActionResultPolicy.cs" Link="ComputerUse\WindowsUiActionResultPolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\UiCaptureProvenancePolicy.cs" Link="ComputerUse\UiCaptureProvenancePolicy.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\BrowserNavigationPlanner.cs" Link="ComputerUse\BrowserNavigationPlanner.cs" />
