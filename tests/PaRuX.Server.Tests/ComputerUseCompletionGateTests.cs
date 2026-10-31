@@ -15,4 +15,21 @@ public sealed class ComputerUseCompletionGateTests
     {
         Assert.Equal(eligible, ComputerUseCompletionGate.MayRequestVerification(goalReported, cancelled));
     }
+    [Theory]
+    [InlineData(true, false, true, false, 0, false)]
+    [InlineData(true, false, true, true, 0, false)]
+    [InlineData(true, false, true, false, 3, false)]
+    [InlineData(true, false, true, true, 1, true)]
+    [InlineData(true, false, true, true, 4, true)]
+    [InlineData(true, true, true, true, 2, false)]
+    [InlineData(false, false, true, true, 2, false)]
+    [InlineData(true, false, false, false, 0, true)]
+    public void Gui_test_tasks_require_structured_postcondition_proof_before_verifier_handoff(
+        bool goalReported, bool cancelled, bool proofRequired,
+        bool proofSatisfied, int assertions, bool allowed)
+    {
+        Assert.Equal(allowed, ComputerUseCompletionGate.MayRequestVerification(
+            goalReported, cancelled, proofRequired, proofSatisfied, assertions));
+    }
+
 }
