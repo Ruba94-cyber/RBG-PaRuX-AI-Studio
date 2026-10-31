@@ -298,9 +298,17 @@ try {
     if ($fixture.HasExited -or $fixture.MainWindowHandle.ToInt64() -ne $window) {
         throw 'Disposable test process/window changed before independent postcondition readback.'
     }
-    if ((Read-OneResultValue -Hwnd $window -AutomationId 'parux-fixture-result' -Selector $selector) -cne $expected
-        -or (Read-OneResultValue -Hwnd $window -AutomationId 'parux-fixture-input' -Selector $inputSelector) -cne 'ready') {
-        throw 'Independent WinApp CLI readback did not confirm the result in the original fixture window.'
+    # Both values must be read from one fresh external WinApp tree; two
+    # sequential snapshots might describe different UI states.
+    $finalOwner = Read-BoundedWinAppTree -Hwnd $window
+    $finalResult = @(Find-ControlsByAutomationId -Elements $finalOwner.elements -AutomationId 'parux-fixture-result')
+    $finalInput = @(Find-ControlsByAutomationId -Elements $finalOwner.elements -AutomationId 'parux-fixture-input')
+    if ($finalResult.Count -ne 1 -or $finalInput.Count -ne 1
+        -or [string]$finalResult[0].selector -cne $selector
+        -or [string]$finalInput[0].selector -cne $inputSelector
+        -or [string]$finalResult[0].value -cne $expected
+        -or [string]$finalInput[0].value -cne 'ready') {
+        throw 'One independent native WinApp observation did not confirm both controls.'
     }
     $report.nativePostcondition = 'PASS'
     $report.outcome = 'PASS'
