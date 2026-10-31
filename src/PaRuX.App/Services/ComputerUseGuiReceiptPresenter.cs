@@ -13,7 +13,9 @@ namespace PaRuX.Services
     {
         private const int MaxResultCharacters = 32_768;
 
-        internal static string? BuildLine(string? role, string? resultJson)
+        internal static string? BuildLine(
+            string? role, string? resultJson,
+            string? taskStatus = null, string? verificationStatus = null)
         {
             if (!string.Equals(role, "computer-use", StringComparison.OrdinalIgnoreCase)
                 || string.IsNullOrWhiteSpace(resultJson)
@@ -55,6 +57,17 @@ namespace PaRuX.Services
                     _ => string.Empty
                 };
                 if (status.Length == 0) return null;
+                // The receipt alone never says PASS. A later PASS may be
+                // shown only when supplied by the orchestrator's separate,
+                // authoritative terminal status and verifier result.
+                if (ready && string.Equals(taskStatus, "completed",
+                        StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(verificationStatus, "pass",
+                        StringComparison.OrdinalIgnoreCase))
+                    status = "GUI evidence recorded; goal verifier reports PASS";
+                else if (ready && string.Equals(taskStatus, "failed",
+                        StringComparison.OrdinalIgnoreCase))
+                    status = "GUI evidence recorded; goal verification did not pass";
                 if (!guiTest)
                     status = ready ? "Computer Use reported completion; goal verification required"
                         : "Computer Use did not complete";
