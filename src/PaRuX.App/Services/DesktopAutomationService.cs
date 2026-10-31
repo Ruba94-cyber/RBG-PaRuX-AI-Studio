@@ -383,6 +383,19 @@ namespace PaRuX.Services
             }
         }
 
+        /// <summary>
+        /// Identity-bound focus for the autonomous agent. Repeat the OS process
+        /// check at dispatch, reducing the stale-window race before Win32 focus.
+        /// This is defense-in-depth, not an atomic OS window lock.
+        /// </summary>
+        internal static bool FocusWindowIfSameIdentity(ComputerUseWindowFocusPolicy.Candidate expected)
+        {
+            if (!ComputerUseWindowFocusPolicy.IsUnchanged(
+                    expected, CaptureWindowFocusIdentity(new IntPtr(expected.WindowHandle))))
+                return false;
+            return FocusWindow(new IntPtr(expected.WindowHandle));
+        }
+
         public static bool FocusWindow(IntPtr handle)
         {
             try
