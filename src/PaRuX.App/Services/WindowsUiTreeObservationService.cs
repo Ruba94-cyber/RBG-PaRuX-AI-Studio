@@ -179,6 +179,94 @@ namespace PaRuX.Services
             }
         }
 
+        /// <summary>
+        /// Read-only final QA inspection of a window ALREADY observed and
+        /// authorized through focus_window/ui_assert. This method does not
+        /// focus a window or accept target identifiers from a model. It
+        /// reattests the HWND/PID/executable before AND after WinApp inspect;
+        /// the caller must separately check the live app allowlist, current
+        /// task authority, STOP/Gaming Mode, and all expected controls.
+        /// An inaccessible or replaced background window fails closed.
+        /// </summary>
+        internal static async Task<Observation> CaptureVerifiedWindowAsync(
+            ComputerUseWindowFocusPolicy.Candidate? original,
+            CancellationToken cancellationToken)
+        {
+            if (!OperatingSystem.IsWindows())
+                return new Observation("not_windows", string.Empty);
+            if (original == null
+                || !ComputerUseWindowFocusPolicy.IsUnchanged(original,
+                    DesktopAutomationService.CaptureWindowFocusIdentity(
+                        new IntPtr(original.WindowHandle))))
+                return new Observation("window_identity_changed", string.Empty);
+
+            string? executable = Environment.GetEnvironmentVariable("PARUX_WINAPP_CLI");
+            if (!IsConfiguredExecutable(executable))
+                return new Observation("winapp_not_configured", string.Empty);
+
+            var start = new ProcessStartInfo(executable!)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                WorkingDirectory = Path.GetTempPath()
+            };
+            foreach (string argument in new[] {
+                "ui", "inspect", "-w",
+                original.WindowHandle.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "--interactive", "--json"
+            })
+                start.ArgumentList.Add(argument);
+
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            linked.CancelAfter(MaxDuration);
+            using var process = new Process { StartInfo = start };
+            bool started = false;
+            try
+            {
+                if (!process.Start()) return new Observation("winapp_start_failed", string.Empty);
+                started = true;
+                Task<string> output = ReadBoundedAsync(process.StandardOutput, linked.Token);
+                Task stderr = DrainBoundedAsync(process.StandardError, linked.Token);
+                await Task.WhenAll(output, stderr, process.WaitForExitAsync(linked.Token))
+                    .ConfigureAwait(false);
+                if (process.ExitCode != 0)
+                    return new Observation("winapp_failed", string.Empty);
+                if (!ComputerUseWindowFocusPolicy.IsUnchanged(original,
+                    DesktopAutomationService.CaptureWindowFocusIdentity(
+                        new IntPtr(original.WindowHandle))))
+                    return new Observation("window_identity_changed", string.Empty);
+
+                return ValidateJsonEvidence(await output.ConfigureAwait(false),
+                    original.WindowHandle) with {
+                        ProcessId = original.ProcessId,
+                        WindowHandle = original.WindowHandle
+                    };
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return new Observation("winapp_timeout", string.Empty);
+            }
+            catch (IOException)
+            {
+                return new Observation("winapp_io_error", string.Empty);
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                return new Observation("winapp_start_failed", string.Empty);
+            }
+            finally
+            {
+                if (started)
+                {
+                    try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+                    catch (InvalidOperationException) { }
+                    catch (System.ComponentModel.Win32Exception) { }
+                }
+            }
+        }
+
         private static async Task<string> ReadBoundedAsync(
             StreamReader reader, CancellationToken cancellationToken)
         {
