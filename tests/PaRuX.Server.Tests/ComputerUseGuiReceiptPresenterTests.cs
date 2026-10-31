@@ -20,6 +20,7 @@ public sealed class ComputerUseGuiReceiptPresenterTests
                 outcome,
                 assurance = "executor-reported-not-independently-attested",
                 guiTestRequired = guiTest,
+                finalControlReadbackVerified = guiTest,
                 actionsAttempted = 5,
                 actionsDelivered = 3,
                 uiAssertionsPassed = 2,
@@ -133,6 +134,16 @@ public sealed class ComputerUseGuiReceiptPresenterTests
             "computer-use", original.Replace("\"actionsDelivered\":3", "\"actionsDelivered\":999")));
         Assert.Null(ComputerUseGuiReceiptPresenter.BuildLine(
             "computer-use", new string('x', 32769)));
+    }
+
+    [Fact]
+    public void A_gui_ready_claim_without_fresh_final_control_readback_is_hidden()
+    {
+        string original = Receipt();
+        Assert.Null(ComputerUseGuiReceiptPresenter.BuildLine(
+            "computer-use", original.Replace(
+                "\"finalControlReadbackVerified\":true",
+                "\"finalControlReadbackVerified\":false")));
     }
 
     [Fact]
