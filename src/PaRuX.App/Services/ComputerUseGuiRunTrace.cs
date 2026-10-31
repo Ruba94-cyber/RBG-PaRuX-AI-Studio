@@ -18,6 +18,7 @@ namespace PaRuX.Services
         internal int FinalReadbackChecks { get; private set; }
         internal int FinalReadbackFailures { get; private set; }
         internal bool LastFinalReadbackPassed { get; private set; }
+        internal int LastDistinctControlsVerified { get; private set; }
 
         internal void RecordActionAttempt()
         {
@@ -38,9 +39,13 @@ namespace PaRuX.Services
             else if (UiAssertionsFailed < MaxEvents) UiAssertionsFailed++;
         }
 
-        internal void RecordFinalReadback(bool verified)
+        internal void RecordFinalReadback(bool verified, int distinctControlsVerified = 1)
         {
             LastFinalReadbackPassed = verified;
+            // This is executor-reported control count, not an assertion from
+            // the language model. Never retain selectors or expected values.
+            LastDistinctControlsVerified = verified
+                ? Math.Clamp(distinctControlsVerified, 1, ComputerUseGuiProofLedger.MaxControls) : 0;
             if (FinalReadbackChecks < MaxEvents) FinalReadbackChecks++;
             if (!verified && FinalReadbackFailures < MaxEvents) FinalReadbackFailures++;
         }
@@ -58,7 +63,7 @@ namespace PaRuX.Services
             bool verified = !guiTestRequired || (guiProofSatisfied
                 && finalReadbackVerified && consistentAssertionCount
                 && UiAssertionsPassed > 0 && FinalReadbackChecks > 0
-                && LastFinalReadbackPassed);
+                && LastFinalReadbackPassed && LastDistinctControlsVerified > 0);
             string outcome = notStarted ? "not_started"
                 : cancelled ? "cancelled"
                 : !goalReported ? "incomplete"
@@ -88,6 +93,7 @@ namespace PaRuX.Services
                 UiAssertionsFailed = UiAssertionsFailed,
                 FinalReadbackChecks = FinalReadbackChecks,
                 FinalReadbackFailures = FinalReadbackFailures,
+                FinalDistinctControlsVerified = LastDistinctControlsVerified,
                 StepsTaken = boundedSteps,
                 FinalControlReadbackVerified = finalReadbackVerified,
                 ReadyForIndependentVerifier = outcome == "ready_for_independent_verifier"
@@ -113,6 +119,7 @@ namespace PaRuX.Services
         public int UiAssertionsFailed { get; init; }
         public int FinalReadbackChecks { get; init; }
         public int FinalReadbackFailures { get; init; }
+        public int FinalDistinctControlsVerified { get; init; }
         public int StepsTaken { get; init; }
         public bool FinalControlReadbackVerified { get; init; }
         public bool ReadyForIndependentVerifier { get; init; }
