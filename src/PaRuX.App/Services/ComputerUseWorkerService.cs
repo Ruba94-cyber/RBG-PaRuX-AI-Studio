@@ -214,7 +214,8 @@ namespace PaRuX.Services
                 // independent verifier, which must decide whether the claim is true.
                 if (!ComputerUseCompletionGate.MayRequestVerification(
                     result.GoalReported, result.Cancelled,
-                    result.GuiTestProofRequired, result.GuiTestProofSatisfied))
+                    result.GuiTestProofRequired, result.GuiTestProofSatisfied,
+                    result.VerifiedUiAssertions))
                 {
                     await AgentOrchestratorClient.Current.AppendLogAsync(task.Id,
                         "Computer Use did not report its goal complete: " + result.Summary,
