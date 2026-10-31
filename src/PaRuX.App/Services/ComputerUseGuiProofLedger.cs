@@ -5,15 +5,15 @@ namespace PaRuX.Services
 {
     /// <summary>
     /// A bounded, task-local collection of independent exact UIA assertions
-    /// recorded since the LAST UI mutation or app/window focus transition.
-    /// The old implementation remembered only the final successful ui_assert
-    /// and could therefore overlook a preceding control changed asynchronously.
+    /// recorded since the LAST data mutation. Verified, read-only focus
+    /// transitions can retain prior assertions when the executor separately
+    /// reattests the OS PID/HWND/EXE and live executable allowlist.
     ///
-    /// All expectations must be in the same OS-observed PID/HWND so that ONE
-    /// new, foreground-scoped WinApp observation can independently recheck all
-    /// controls at done. Proof for another window must not be silently admitted
-    /// on the basis of a screenshot from the current one. Cross-window QA
-    /// remains a separately scoped future contract, not implied by this ledger.
+    /// The legacy no-identity API stays strict to ONE foreground PID/HWND.
+    /// The opt-in OS-verified path can collect multiple explicitly focused
+    /// windows: each must be re-read separately by trusted, read-only WinApp
+    /// at done. This is sequential verification, NOT an atomic cross-app
+    /// transaction and never proof of arbitrary user-goal side effects.
     ///
     /// No selectors, expected strings, HWNDs, PIDs or private UIA content
     /// leave this object through status, ToString or a persisted receipt.
@@ -100,10 +100,6 @@ namespace PaRuX.Services
             _strictSingleWindowOnly = false;
         }
 
-        /// <summary>All distinct asserted controls are re-evaluated against the
-        /// SAME fresh observation on the SAME original foreground PID/HWND.
-        /// A change to ANY control makes the entire batch fail, not just the
-        /// last assertion the model chose to show the verifier.</summary>
         /// <summary>Readback policy only: the executor separately owns OS
         /// PID/HWND/EXE reattestation and current allowlist checks before/after
         /// every read. Never accept missing/duplicate target observations.</summary>
@@ -141,6 +137,9 @@ namespace PaRuX.Services
             return true;
         }
 
+        /// <summary>Single-window readback: every distinct asserted control
+        /// must still have the expected exact state in one NEW foreground
+        /// observation. A recorded multi-window batch cannot pass here.</summary>
         internal bool RecheckAll(WindowsUiTreeObservationService.Observation? fresh)
         {
             if (_proofs.Count == 0 || fresh is not { HasEvidence: true }
