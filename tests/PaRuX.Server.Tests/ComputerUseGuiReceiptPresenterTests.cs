@@ -28,6 +28,7 @@ public sealed class ComputerUseGuiReceiptPresenterTests
                 finalReadbackChecks = 2,
                 finalReadbackFailures = 1,
                 finalDistinctControlsVerified = guiTest ? 2 : 0,
+                finalDistinctWindowsVerified = guiTest ? 1 : 0,
                 readyForIndependentVerifier = ready,
                 selector = "synthetic SECRET selector"
             }
@@ -167,5 +168,19 @@ public sealed class ComputerUseGuiReceiptPresenterTests
         Assert.Null(ComputerUseGuiReceiptPresenter.BuildLine(
             "computer-use", Receipt().Replace(oldValue, newValue)));
     }
+    [Fact]
+    public void Final_window_count_is_rendered_but_invalid_counts_are_hidden()
+    {
+        string v1 = Receipt();
+        Assert.Contains("distinct windows 1",
+            ComputerUseGuiReceiptPresenter.BuildLine("computer-use", v1)!);
+        Assert.Null(ComputerUseGuiReceiptPresenter.BuildLine("computer-use",
+            v1.Replace("\"finalDistinctWindowsVerified\":1",
+                       "\"finalDistinctWindowsVerified\":0")));
+        Assert.Null(ComputerUseGuiReceiptPresenter.BuildLine("computer-use",
+            v1.Replace("\"finalDistinctWindowsVerified\":1",
+                       "\"finalDistinctWindowsVerified\":3")));
+    }
+
 
 }
