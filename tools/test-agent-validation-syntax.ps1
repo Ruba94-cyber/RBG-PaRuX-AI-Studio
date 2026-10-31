@@ -48,9 +48,9 @@ if ($runner.Split([string[]]@('function Invoke-Gate {'), [StringSplitOptions]::N
 # a duplicate tail happens to parse: no false green QA report.
 $live = [IO.File]::ReadAllText((Join-Path $repo 'tools\test-agent-live-computer-use.ps1'))
 if ($live.Split([string[]]@('[CmdletBinding()]'), [StringSplitOptions]::None).Length -ne 2
-    -or $live.Split([string[]]@("catch {\n    `$report.outcome = 'FAIL'"), [StringSplitOptions]::None).Length -ne 2
+    -or $live.Split([string[]]@('$report.outcome = ''FAIL'''), [StringSplitOptions]::None).Length -ne 2
     -or $live.Split([string[]]@("if (`$report.outcome -ne 'PASS')"), [StringSplitOptions]::None).Length -ne 2
-    -or $live.Split([string[]]@("finally {\n    # Only cancel this test"), [StringSplitOptions]::None).Length -ne 2
+    -or $live.Split([string[]]@('Only cancel this test''s own unfinished task'), [StringSplitOptions]::None).Length -ne 2
     -or -not $live.Contains('Stop-Process -Id $secondaryFixture.Id')
     -or -not $live.Contains('$receipt.finalDistinctWindowsVerified -lt 2')
     -or -not $live.Contains('$secondTreeFinal = Read-BoundedWinAppTree')) {
