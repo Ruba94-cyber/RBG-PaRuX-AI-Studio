@@ -28,6 +28,7 @@ internal sealed class FixtureForm : Form
     internal const string ActionAutomationId = "parux-fixture-run";
     internal const string ResultAutomationId = "parux-fixture-result";
     internal const string InputAutomationId = "parux-fixture-input";
+    internal const string ResetAutomationId = "parux-fixture-reset";
 
     internal FixtureForm(string nonce)
     {
@@ -59,6 +60,22 @@ internal sealed class FixtureForm : Form
             TabStop = true,
             Text = "PENDING", Location = new Point(20, 158), Width = 445
         };
+        var reset = new Button
+        {
+            Name = ResetAutomationId,
+            AccessibleName = "Reset acceptance result",
+            Text = "Reset",
+            Location = new Point(215, 106),
+            Width = 180, Height = 36
+        };
+        reset.Click += (_, _) =>
+        {
+            // Deterministically remove previously verified evidence. A
+            // subsequent successful test must invoke Run and re-check again.
+            result.Text = "PENDING";
+            result.AccessibleDescription = "State reset for a disposable regression test";
+        };
+
         var run = new Button
         {
             Name = ActionAutomationId,
@@ -73,6 +90,6 @@ internal sealed class FixtureForm : Form
             result.AccessibleDescription = "State changed by an actual button invocation";
         };
 
-        Controls.AddRange(new Control[] { instruction, input, run, result });
+        Controls.AddRange(new Control[] { instruction, input, run, reset, result });
     }
 }
