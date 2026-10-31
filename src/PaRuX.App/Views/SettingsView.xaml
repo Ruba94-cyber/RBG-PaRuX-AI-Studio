@@ -818,9 +818,12 @@
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Spacing="2">
                                 <TextBlock Text="Allowed apps and emulators" Style="{StaticResource PaRuXBodyStrongTextStyle}" />
-                                <TextBlock Text="Only apps added here can be launched from chat. PaRuX never executes arbitrary chat text as a command." TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
+                                <TextBlock Text="Discover an open app and approve its executable, or browse to an EXE. Discovery never grants access automatically. Only apps approved here can be launched from chat." TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
                             </StackPanel>
-                            <Button Grid.Column="1" Content="Add app…" Click="ChooseComputerApp_Click" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Button Content="Find open apps…" Click="ChooseRunningComputerApp_Click" AutomationProperties.Name="Discover open desktop apps for approval" />
+                                <Button Content="Browse EXE…" Click="ChooseComputerApp_Click" AutomationProperties.Name="Browse for an executable to approve" />
+                            </StackPanel>
                         </Grid>
                         <StackPanel x:Name="ComputerAppsList" Spacing="{StaticResource PaRuXSpaceS}" />
                     </StackPanel>
