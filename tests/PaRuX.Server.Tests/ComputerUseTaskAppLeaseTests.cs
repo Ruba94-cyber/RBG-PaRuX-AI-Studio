@@ -12,12 +12,14 @@ public sealed class ComputerUseTaskAppLeaseTests
         new(pid, hwnd, "User document title");
     private static ComputerUseWindowFocusPolicy.Candidate Current(
         string exe, int pid = 70, long hwnd = 100) => new("Untrusted title", pid, hwnd, Exe(exe));
+    private static string[] Approved(params string[] binaries) =>
+        Array.ConvertAll(binaries, Exe);
 
     [Fact]
     public void Unbound_task_keeps_existing_explicit_user_computer_use_authority()
     {
         var lease = new ComputerUseTaskAppLease();
-        Assert.Null(lease.RefusalForAction(Screenshot(), null));
+        Assert.Null(lease.RefusalForAction(Screenshot(), null, Approved("Editor.exe", "Excel.exe", "Helper.exe")));
     }
 
     [Fact]
@@ -27,10 +29,10 @@ public sealed class ComputerUseTaskAppLeaseTests
         Assert.True(lease.BindApprovedExecutable(Exe("Editor.exe")));
         Assert.True(lease.IsActive);
         Assert.False(lease.HasVerifiedProcess);
-        Assert.Contains("focus_window", lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
+        Assert.Contains("focus_window", lease.RefusalForAction(Screenshot(), Current("Editor.exe"), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
         Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
         Assert.True(lease.HasVerifiedProcess);
-        Assert.Null(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
+        Assert.Null(lease.RefusalForAction(Screenshot(), Current("Editor.exe"), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
     }
 
     [Fact]
@@ -38,16 +40,16 @@ public sealed class ComputerUseTaskAppLeaseTests
     {
         var lease = new ComputerUseTaskAppLease();
         Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
-        Assert.Null(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200)));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe", 71, 100)));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(71, 100), Current("Editor.exe", 71, 100)));
+        Assert.Null(lease.RefusalForAction(Screenshot(), Current("Editor.exe"), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe", 71, 100), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(71, 100), Current("Editor.exe", 71, 100), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
 
         // A deliberately requested and OS-verified focus transition, while
         // the executable remains approved, may authorize the new instance.
         Assert.True(lease.BindVerifiedFocus(Current("Editor.exe", 71, 200), true));
-        Assert.Null(lease.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200)));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
+        Assert.Null(lease.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe"), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
     }
 
     [Fact]
@@ -55,9 +57,9 @@ public sealed class ComputerUseTaskAppLeaseTests
     {
         var lease = new ComputerUseTaskAppLease();
         Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
-        Assert.Null(lease.RefusalForAction(Screenshot(70, 201), Current("Editor.exe", 70, 201)));
-        Assert.Null(lease.RefusalForAction(Screenshot(70, 202), Current("Editor.exe", 70, 202)));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(70, 202), Current("Editor.exe", 70, 201)));
+        Assert.Null(lease.RefusalForAction(Screenshot(70, 201), Current("Editor.exe", 70, 201), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
+        Assert.Null(lease.RefusalForAction(Screenshot(70, 202), Current("Editor.exe", 70, 202), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(70, 202), Current("Editor.exe", 70, 201), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
     }
 
     [Fact]
@@ -66,12 +68,12 @@ public sealed class ComputerUseTaskAppLeaseTests
         var lease = new ComputerUseTaskAppLease();
         Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
         Assert.False(lease.BindVerifiedFocus(Current("Helper.exe", 71, 200), false));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(71, 200), Current("Helper.exe", 71, 200)));
-        Assert.Null(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(71, 200), Current("Helper.exe", 71, 200), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
+        Assert.Null(lease.RefusalForAction(Screenshot(), Current("Editor.exe"), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
 
         Assert.True(lease.BindVerifiedFocus(Current("Helper.exe", 71, 200), true));
-        Assert.Null(lease.RefusalForAction(Screenshot(71, 200), Current("Helper.exe", 71, 200)));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
+        Assert.Null(lease.RefusalForAction(Screenshot(71, 200), Current("Helper.exe", 71, 200), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe"), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
     }
 
     [Fact]
@@ -79,8 +81,11 @@ public sealed class ComputerUseTaskAppLeaseTests
     {
         var lease = new ComputerUseTaskAppLease();
         Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
-        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe", 70, 202), false));
-        Assert.Null(lease.RefusalForAction(Screenshot(70, 203), Current("Editor.exe", 70, 203)));
+        // No additional consent dialog is necessary when the app remains in
+        // Settings, but a revoked setting must NEVER be silently inherited.
+        Assert.False(lease.BindVerifiedFocus(Current("Editor.exe", 70, 202), false));
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe", 70, 202), true));
+        Assert.Null(lease.RefusalForAction(Screenshot(70, 203), Current("Editor.exe", 70, 203), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
     }
 
     [Fact]
@@ -95,8 +100,8 @@ public sealed class ComputerUseTaskAppLeaseTests
         Assert.False(lease.BindVerifiedFocus(Current("cmd.exe"), true));
         Assert.False(lease.BindVerifiedFocus(Current("Helper.exe", 71, 201), false));
         Assert.False(lease.BindVerifiedFocus(Current("Editor.exe", 71, 201), false));
-        Assert.Null(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("cmd.exe")));
+        Assert.Null(lease.RefusalForAction(Screenshot(), Current("Editor.exe"), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("cmd.exe"), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
         Assert.False(lease.BindVerifiedFocus(null, true));
     }
 
@@ -107,10 +112,10 @@ public sealed class ComputerUseTaskAppLeaseTests
         Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
         Assert.True(lease.BindApprovedExecutable(Exe("Excel.exe")));
         Assert.False(lease.HasVerifiedProcess);
-        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(90, 300), Current("Excel.exe", 90, 300)));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe"), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(90, 300), Current("Excel.exe", 90, 300), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
         Assert.True(lease.BindVerifiedFocus(Current("Excel.exe", 90, 300), true));
-        Assert.Null(lease.RefusalForAction(Screenshot(90, 300), Current("Excel.exe", 90, 300)));
+        Assert.Null(lease.RefusalForAction(Screenshot(90, 300), Current("Excel.exe", 90, 300), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
     }
 
     [Fact]
@@ -121,7 +126,43 @@ public sealed class ComputerUseTaskAppLeaseTests
         Assert.True(first.BindVerifiedFocus(Current("Editor.exe", 70, 100), true));
         Assert.False(second.IsActive);
         Assert.True(second.BindVerifiedFocus(Current("Editor.exe", 71, 200), true));
-        Assert.NotNull(first.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200)));
-        Assert.Null(second.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200)));
+        Assert.NotNull(first.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
+        Assert.Null(second.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
     }
+    [Fact]
+    public void Revocation_of_a_verified_app_immediately_stops_actions_and_completion()
+    {
+        var lease = new ComputerUseTaskAppLease();
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
+        Assert.Null(lease.RefusalForAction(
+            Screenshot(), Current("Editor.exe"), Approved("Editor.exe")));
+
+        string? denial = lease.RefusalForAction(
+            Screenshot(), Current("Editor.exe"), Approved("Excel.exe"));
+        Assert.NotNull(denial);
+        Assert.Contains("removed", denial);
+        Assert.NotNull(lease.RefusalForCurrentApproval(Array.Empty<string>()));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe"), null));
+        Assert.False(lease.BindVerifiedFocus(Current("Editor.exe", 70, 201), false));
+
+        // An explicit user reapproval of the SAME exe restores input for
+        // the still verified PID, without changing any other task's scope.
+        Assert.Null(lease.RefusalForAction(
+            Screenshot(70, 201), Current("Editor.exe", 70, 201), Approved("Editor.exe")));
+    }
+
+    [Fact]
+    public void A_secondary_helper_cannot_inherit_parent_allowlist_after_focus()
+    {
+        var lease = new ComputerUseTaskAppLease();
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
+        Assert.False(lease.BindVerifiedFocus(Current("Helper.exe", 71, 200), false));
+        Assert.True(lease.BindVerifiedFocus(Current("Helper.exe", 71, 200), true));
+
+        Assert.NotNull(lease.RefusalForAction(
+            Screenshot(71, 200), Current("Helper.exe", 71, 200), Approved("Editor.exe")));
+        Assert.Null(lease.RefusalForAction(
+            Screenshot(71, 200), Current("Helper.exe", 71, 200), Approved("Editor.exe", "Helper.exe")));
+    }
+
 }
