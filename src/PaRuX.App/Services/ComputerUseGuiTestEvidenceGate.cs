@@ -1,5 +1,4 @@
 using System;
-using System.Text.RegularExpressions;
 
 namespace PaRuX.Services
 {
@@ -15,26 +14,10 @@ namespace PaRuX.Services
     /// </summary>
     internal sealed class ComputerUseGuiTestEvidenceGate
     {
-        // "Testa DITM" or "test AcmeTool" are valid app-testing goals
-        // without any generic "app"/"GUI" noun. Computer Use is already
-        // explicitly authorized to operate on Windows, so a strong test verb
-        // must request verification even for an unknown application name.
-        private static readonly Regex StrongTestWords = new(
-            @"\b(test|tests|testing|testa|testare|collauda|collaudare)\b",
-            RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
-
-        private static readonly Regex VerifyWords = new(
-            @"\b(test|tests|testing|testa|testare|testaremo|collauda|collaudare|verifica|verificare|verify|validate|check|checks)\b",
-            RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
-
-        private static readonly Regex GuiWords = new(
-            @"\b(app|apps|applicazione|applicazioni|application|applications|ui|gui|interfaccia|interfacce|interface|finestra|finestre|window|windows|form|desktop)\b",
-            RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
-
+        // The same exact classifier runs independently on Core before
+        // admission to the goal verifier. Do not duplicate its regex here.
         internal static bool IsGuiTestGoal(string? goal) =>
-            !string.IsNullOrWhiteSpace(goal) && goal!.Length <= 16_384
-            && (StrongTestWords.IsMatch(goal)
-                || (VerifyWords.IsMatch(goal) && GuiWords.IsMatch(goal)));
+            PaRuX.Contracts.ComputerUseGuiIntentPolicy.RequiresAssertion(goal);
 
         internal bool RequiresAssertion { get; }
         internal bool VerifiedAfterLatestMutation { get; private set; }
