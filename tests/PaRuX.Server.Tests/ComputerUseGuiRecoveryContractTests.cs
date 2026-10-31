@@ -196,7 +196,7 @@ public sealed class ComputerUseGuiRecoveryContractTests
         trace.RecordActionAttempt(); // done, bounded 5 model actions
         bool repaired = proofs.RecheckAll(new("observed", verified, Pid, Hwnd));
         Assert.True(repaired);
-        trace.RecordFinalReadback(repaired);
+        trace.RecordFinalReadback(repaired, proofs.Count);
         var receipt = trace.Build(true, false, true, false,
             gui.CanReportDone, repaired, gui.VerifiedAssertions, 5);
         Assert.True(receipt.ReadyForIndependentVerifier);
