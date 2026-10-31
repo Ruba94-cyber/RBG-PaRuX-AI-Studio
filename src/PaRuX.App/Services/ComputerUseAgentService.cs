@@ -642,14 +642,39 @@ namespace PaRuX.Services
                     // Reported as done only when a window matched and Windows brought it forward. A title that matched nothing
                     // used to be logged as focused, and the run went on acting in whatever window happened to be in front.
                     List<DesktopWindowInfo> windows = DesktopAutomationService.ListWindows();
-                    int targetIndex = ComputerUseWindowSelectionPolicy.FindUniqueIndex(
-                        windows.Select(w => w.Title).ToList(), action.Title);
-                    if (targetIndex == ComputerUseWindowSelectionPolicy.Ambiguous)
-                        return "Several windows match that title, so none was focused. Provide a more specific window title.";
-                    if (targetIndex == ComputerUseWindowSelectionPolicy.NotFound)
-                        return ComputerUseActionParser.FocusRefusal(false, false);
+                    string[] approvedPaths = (SettingsStore.Current.Data.ComputerApps
+                        ?? new List<ComputerAppShortcut>())
+                        .Where(a => ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(a.ExecutablePath))
+                        .Select(a => a.ExecutablePath).ToArray();
+                    var candidates = windows.Select(w => new ComputerUseWindowFocusPolicy.Candidate(
+                        w.Title, w.ProcessId, w.Handle.ToInt64(), w.ExecutablePath)).ToArray();
+
+                    // A title alone is not app ownership. Only same-process
+                    // windows or explicitly user-approved executables are selectable.
+                    int targetIndex = ComputerUseWindowFocusPolicy.FindScopedUniqueIndex(
+                        candidates, action.Title, pin.Pinned.ProcessId, approvedPaths);
+                    if (targetIndex == ComputerUseWindowFocusPolicy.Ambiguous)
+                        return "Several authorized windows match that title. No window was focused.";
+                    if (targetIndex == ComputerUseWindowFocusPolicy.NotFound)
+                        return "No authorized Windows application matched that window. Approve the app in Computer Use Settings first.";
+
+                    // Enumerated windows can exit, change process or be replaced
+                    // while the model is thinking. Re-read OS identity before focus.
+                    ComputerUseWindowFocusPolicy.Candidate? now =
+                        DesktopAutomationService.CaptureWindowFocusIdentity(windows[targetIndex].Handle);
+                    if (!ComputerUseWindowFocusPolicy.IsUnchanged(candidates[targetIndex], now))
+                        return "The selected window changed or could not be identified. No focus command was sent.";
+                    string? focusStop = stopReason();
+                    if (focusStop != null) return focusStop;
                     bool focused = DesktopAutomationService.FocusWindow(windows[targetIndex].Handle);
-                    return ComputerUseActionParser.FocusRefusal(true, focused);
+                    if (!focused) return ComputerUseActionParser.FocusRefusal(true, false);
+
+                    // SetForegroundWindow can report success without the target
+                    // actually owning the foreground after a concurrent switch.
+                    ForegroundWindowSnapshot after = DesktopAutomationService.CaptureForegroundWindow();
+                    return ComputerUseActionParser.FocusRefusal(true,
+                        after.ProcessId == candidates[targetIndex].ProcessId
+                        && after.WindowHandle == candidates[targetIndex].WindowHandle);
                 }
                 case "wait":
                 {
