@@ -12,6 +12,7 @@ assertion never becomes PASS. Does not edit a user's repository or use GitHub Ac
 param(
     [Parameter(Mandatory=$true)][switch]$ConfirmFunctionalTest,
     [switch]$RunRecoveryScenario,
+    [switch]$RunDialogScenario,
     [string]$WinAppCli = 'winapp',
     [string]$OutputRoot
 )
@@ -41,6 +42,13 @@ $fixtureOutput = Join-Path $OutputRoot 'fixture'
 $nonce = [guid]::NewGuid().ToString('N')
 $target = Join-Path $repo 'tools\PaRuX.UiAcceptanceFixture\PaRuX.UiAcceptanceFixture.csproj'
 $process = $null
+$dialogReport = [ordered]@{
+    scenario = 'disposable-owned-native-dialog'
+    twoWindowsOnePid = 'NOT_RUN'
+    dialogAction = 'NOT_RUN'
+    mainWindowPostcondition = 'NOT_RUN'
+    realAgentOrchestration = 'NOT_RUN'
+}
 $recovery = [ordered]@{
     scenario = 'disposable-native-uia-recovery'
     executedUtc = [DateTime]::UtcNow.ToString('o')
@@ -134,6 +142,7 @@ try {
     $action = $null
     $result = $null
     $reset = $null
+    $dialogAction = $null
     $ownerFound = $false
     foreach ($node in @($tree.windows)) {
         if ([string]$node.hwnd -cne $window) { continue }
@@ -143,6 +152,9 @@ try {
         if ($RunRecoveryScenario) {
             $reset = Find-FixtureSelector -Elements $node.elements -AutomationId 'parux-fixture-reset'
         }
+        if ($RunDialogScenario) {
+            $dialogAction = Find-FixtureSelector -Elements $node.elements -AutomationId 'parux-fixture-open-dialog'
+        }
         break
     }
     if (-not $ownerFound -or [string]::IsNullOrWhiteSpace($action) -or
@@ -150,6 +162,10 @@ try {
         throw 'Fixture selectors were not independently observed under the exact HWND.'
     }
     if ($action -ceq $result) { throw 'Action and result controls cannot share a selector.' }
+    if ($RunDialogScenario -and ([string]::IsNullOrWhiteSpace($dialogAction)
+        -or $dialogAction -ceq $action -or $dialogAction -ceq $result)) {
+        throw 'Owned-dialog selector was absent or duplicates another control.'
+    }
     if ($RunRecoveryScenario -and ([string]::IsNullOrWhiteSpace($reset)
         -or $reset -ceq $action -or $reset -ceq $result)) {
         throw 'The reset control must be independently observed and distinct.'
@@ -211,6 +227,143 @@ try {
         }
         $recovery.finalReadback = 'PASS'
     }
+    if ($RunDialogScenario) {
+        # A true owned HWND from the same OS PID, not a title-only guess.
+        if (-not ('PaRuXTestOnly.OwnedDialogLookup' -as [type])) {
+            Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+namespace PaRuXTestOnly {
+    public static class OwnedDialogLookup {
+        private delegate bool Callback(IntPtr handle, IntPtr ignored);
+        [DllImport("user32.dll")] private static extern bool EnumWindows(Callback cb, IntPtr param);
+        [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetWindowText(IntPtr h, StringBuilder b, int capacity);
+        [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr h, uint relationship);
+        public static long[] Find(int pid, long expectedOwner, string title) {
+            var hits = new List<long>();
+            EnumWindows((h, _) => {
+                uint actualPid;
+                GetWindowThreadProcessId(h, out actualPid);
+                if (actualPid == pid && GetWindow(h, 4).ToInt64() == expectedOwner) {
+                    var text = new StringBuilder(256);
+                    GetWindowText(h, text, text.Capacity);
+                    if (String.Equals(text.ToString(), title, StringComparison.Ordinal))
+                        hits.Add(h.ToInt64());
+                }
+                return true;
+            }, IntPtr.Zero);
+            return hits.ToArray();
+        }
+    }
+}
+'@ -ErrorAction Stop
+        }
+
+        $global:LASTEXITCODE = 0
+        & $exe ui invoke $dialogAction -w $window --json *>&1 |
+            Out-File -FilePath (Join-Path $OutputRoot 'dialog-open.json') -Encoding UTF8
+        if ($LASTEXITCODE -ne 0) { throw 'WinApp could not invoke the owned-dialog action.' }
+        try { $opened = ConvertFrom-Json -InputObject (
+            [IO.File]::ReadAllText((Join-Path $OutputRoot 'dialog-open.json'))) -ErrorAction Stop }
+        catch { throw 'Opening the owned dialog returned invalid JSON.' }
+        if ($null -eq $opened -or $null -ne $opened.error -or
+            $opened.success -ceq $false -or $opened.ok -ceq $false) {
+            throw 'Owned dialog invoke returned a negative action response.'
+        }
+
+        $dialogHandle = [long]0
+        $dialogDeadline = [DateTime]::UtcNow.AddSeconds(12)
+        while ([DateTime]::UtcNow -lt $dialogDeadline) {
+            $matches = @([PaRuXTestOnly.OwnedDialogLookup]::Find(
+                $process.Id, $handle, ('PaRuX Fixture Dialog ' + $nonce)))
+            if ($matches.Count -gt 1) { throw 'Ambiguous native owned dialogs.' }
+            if ($matches.Count -eq 1 -and $matches[0] -gt 0) {
+                $dialogHandle = [long]$matches[0]
+                break
+            }
+            [Threading.Thread]::Sleep(120)
+        }
+        if ($dialogHandle -le 0 -or $dialogHandle -eq $handle) {
+            throw 'The dialog is not a distinct HWND owned by the fixture PID.'
+        }
+        $dialogReport.twoWindowsOnePid = 'PASS'
+
+        $global:LASTEXITCODE = 0
+        & $exe ui inspect -w ([string]$dialogHandle) --json *>&1 |
+            Out-File -FilePath (Join-Path $OutputRoot 'dialog-inspect.json') -Encoding UTF8
+        if ($LASTEXITCODE -ne 0) { throw 'WinApp inspect of the dialog failed.' }
+        try { $treeDialog = ConvertFrom-Json -InputObject (
+            [IO.File]::ReadAllText((Join-Path $OutputRoot 'dialog-inspect.json'))) -ErrorAction Stop }
+        catch { throw 'WinApp dialog inspect was invalid JSON.' }
+        $dialogNodes = @($treeDialog.windows | Where-Object {
+            [string]$_.hwnd -ceq [string]$dialogHandle
+        })
+        if ($dialogNodes.Count -ne 1) { throw 'Dialog UIA evidence did not match its native HWND.' }
+        $confirm = Find-FixtureSelector -Elements $dialogNodes[0].elements -AutomationId 'parux-fixture-dialog-confirm'
+        if ([string]::IsNullOrWhiteSpace($confirm) -or
+            $confirm -notmatch '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}
+    Write-Output ('NATIVE UIA E2E PASS: bound fixture PID=' + $process.Id + '; HWND=' +
+        $window + '; expected nonce=' + $nonce + '; recovery=' + [bool]$RunRecoveryScenario +
+        '; evidence=' + $OutputRoot)
+    if ($RunRecoveryScenario) {
+        Write-Output 'The WinApp CLI fixture recovery passed, NOT the autonomous PaRuX agent loop.'
+    }
+}
+catch {
+    Write-Error ('NATIVE UIA E2E FAIL: ' + $_.Exception.Message + '; evidence=' + $OutputRoot)
+    exit 1
+}
+finally {
+    if ($RunRecoveryScenario) {
+        $recovery.executedUtc = [DateTime]::UtcNow.ToString('o')
+        $recovery | ConvertTo-Json -Depth 4 |
+            Out-File -FilePath (Join-Path $OutputRoot 'native-recovery-status.json') -Encoding UTF8
+    }
+    if ($null -ne $process) {
+        try {
+            $process.Refresh()
+            if (-not $process.HasExited) {
+                Stop-Process -Id $process.Id -Force -ErrorAction Stop
+                $null = $process.WaitForExit(5000)
+            }
+        }
+        catch { Write-Warning 'Disposable test process cleanup needs manual inspection.' }
+        finally { $process.Dispose() }
+    }
+}
+) {
+            throw 'The owned-dialog Confirm selector was not independently observed.'
+        }
+        $global:LASTEXITCODE = 0
+        & $exe ui invoke $confirm -w ([string]$dialogHandle) --json *>&1 |
+            Out-File -FilePath (Join-Path $OutputRoot 'dialog-confirm.json') -Encoding UTF8
+        if ($LASTEXITCODE -ne 0) { throw 'WinApp could not confirm the native dialog.' }
+        try { $confirmed = ConvertFrom-Json -InputObject (
+            [IO.File]::ReadAllText((Join-Path $OutputRoot 'dialog-confirm.json'))) -ErrorAction Stop }
+        catch { throw 'Dialog Confirm returned invalid JSON.' }
+        if ($null -eq $confirmed -or $null -ne $confirmed.error -or
+            $confirmed.success -ceq $false -or $confirmed.ok -ceq $false) {
+            throw 'Dialog Confirm was not delivered.'
+        }
+        $dialogReport.dialogAction = 'PASS'
+        $global:LASTEXITCODE = 0
+        & $exe ui wait-for $result -w $window --value ('DIALOG-ACCEPTED-' + $nonce) --timeout 2000 --json *>&1 |
+            Out-File -FilePath (Join-Path $OutputRoot 'dialog-postcondition.json') -Encoding UTF8
+        if ($LASTEXITCODE -ne 0) { throw 'Main window did not show dialog result.' }
+        try { $post = ConvertFrom-Json -InputObject (
+            [IO.File]::ReadAllText((Join-Path $OutputRoot 'dialog-postcondition.json'))) -ErrorAction Stop }
+        catch { throw 'Cross-window UIA postcondition was invalid JSON.' }
+        if ($null -eq $post -or $post.found -cne $true -or
+            $post.timedOut -ceq $true -or $null -ne $post.error) {
+            throw 'Dialog postcondition was not independently observed in the main window.'
+        }
+        $dialogReport.mainWindowPostcondition = 'PASS'
+    }
+
     $process.Refresh()
     if ($process.HasExited -or $process.MainWindowHandle.ToInt64() -ne $handle) {
         throw 'Native fixture changed identity during UI acceptance.'
