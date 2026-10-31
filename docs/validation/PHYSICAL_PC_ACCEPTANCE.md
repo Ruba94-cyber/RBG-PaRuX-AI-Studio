@@ -4,6 +4,30 @@ Manual procedures for the owner to run on a real Windows PC and phone. Every pro
 
 ## Computer Use across Windows applications (NOT RUN)
 
+### 2026-10-31 real PaRuX Computer Use agent + native HWND postcondition (NOT RUN)
+
+This is the **first explicitly runnable agent-driven** Windows fixture acceptance lane, separate from direct WinApp CLI action tests. Use an isolated disposable Windows test account/desktop, with PaRuX Windows and a functioning local model running and WinApp CLI configured for the PaRuX Windows process (`PARUX_WINAPP_CLI` = its explicit native EXE path). Do not run on an active workstation containing sensitive documents or business applications: this is user-approved desktop automation, **not** an OS sandbox.
+
+Publish/build the CLI from this **same checkout** so `parux agent show <taskId> --json` is available. For example, use `dotnet publish src\PaRuX.Cli\PaRuX.Cli.csproj -c Release -r win-x64 --self-contained true -o artifacts\validation\cli` on the Windows development PC. Then, from the repo root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunLiveComputerUseE2E -CliPath "artifacts\validation\cli\parux.exe" -WinAppCli winapp
+```
+
+The opt-in script builds only a disposable `PaRuX.UiAcceptanceFixture` child app. It checks the starting state is `PENDING` and asks the human to review and approve this **fixture EXE only** in PaRuX Windows Computer Use Settings. To authorize the subsequent Core task, **leave persistent Full Computer Use off** and approve the task from the normal PaRuX Windows/paired-PC interface when the task appears. No test code changes this setting or self-approves. The harness cancels only its own incomplete task after a bounded timeout and stops only its fixture.
+
+For a **PASS**, capture and confirm:
+
+1. Exact non-empty running Core task ID from CLI, role `computer-use`, unchanged original task goal, real user task-scoped authorization (`authorization=task-scoped-remote-approval`), task state `completed` and separate `verificationStatus=pass`.
+2. Worker v1 receipt: `guiTestRequired=true`, `outcome=ready_for_independent_verifier`, `readyForIndependentVerifier=true`, `finalControlReadbackVerified=true`, positive delivered-action and UIA assertion counts, positive final readback count and bounded 15-step budget. A reported model PASS alone is insufficient.
+3. Fixture process still belongs to the originally started PID and HWND. A new **external** WinApp inspect must read the exact nonce-bound `ACCEPTED-...` value on the same uniquely observed Result control, not a screenshot or arbitrary duplicate control.
+4. A sanitized local `artifacts/validation/.../live-agent-gui/real-agent-acceptance.json` contains only PASS/FAIL/NOT_RUN stage codes, task ID, revision ID, and a reason code—never bootstrap tokens, paths to private apps, or raw model/GUI text. The parent `validation-status.json` reports `liveComputerUseAgent` separately from `nativeUiRecovery`. Both must remain `NOT_RUN` unless explicitly enabled.
+5. Negative controls (separate manual runs): refuse task authorization, close fixture, switch to an unapproved app, use missing WinApp CLI, leave a stale CLI without `show --json`, stop task mid-inference and have the independent verifier reject the goal. None may produce a green `liveComputerUseAgent` result. Never infer that a native WinApp fixture PASS proves the actual agent ran.
+
+**Status:** source path and scripts implemented, not executed on a real Windows desktop, with no observed real model completion or WinApp result; leave UAI-07 **PARTIAL** until commit-specific evidence exists. Desktop task approval is manually performed, not scripted.
+
+
+
 ### 2026-10-31 bounded GUI self-repair and native Windows UIA recovery (NOT RUN)
 
 This is **two distinct tests**. The native fixture CLI test is deterministic but is NOT a live PaRuX agent/autonomous Core acceptance. Do not combine their PASS statuses.
