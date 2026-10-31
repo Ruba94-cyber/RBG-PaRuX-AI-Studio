@@ -462,7 +462,7 @@ namespace PaRuX.Services
                                 && pin.RefusalForUiaObservation(
                                     finalReadback.ProcessId, finalReadback.WindowHandle) == null
                                 && guiProofs.RecheckAll(finalReadback);
-                            trace.RecordFinalReadback(finalReadbackVerified);
+                            trace.RecordFinalReadback(finalReadbackVerified, guiProofs.Count);
                             if (!finalReadbackVerified)
                             {
                                 // A changed/unavailable independent control
