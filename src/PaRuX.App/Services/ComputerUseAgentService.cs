@@ -640,7 +640,7 @@ namespace PaRuX.Services
                     }
                     else
                     {
-                        string? withheldReason = await ExecuteAsync(action, pin, ct, stopReason).ConfigureAwait(false);
+                        string? withheldReason = await ExecuteAsync(action, pin, ct, stopReason, appLease).ConfigureAwait(false);
                         if (withheldReason != null)
                         {
                             onStep?.Invoke("Step " + step + ": " + withheldReason + " Stopping.");
@@ -678,44 +678,6 @@ namespace PaRuX.Services
                         }
                         // Built-in shell/UWP launches have no reliable executable
                         // attestation here; never replace an existing lease with one.
-                    }
-                    else if (string.Equals(action.Action, "focus_window", StringComparison.Ordinal))
-                    {
-                        // focus_window has already re-checked OS identity before
-                        // and after SetForegroundWindow. Bind the PROCESS INSTANCE
-                        // only after a third fresh HWND/PID/exe check. The old
-                        // path-only binding silently trusted another running copy
-                        // of an approved exe without an explicit focus transition.
-                        ForegroundWindowSnapshot focused = DesktopAutomationService.CaptureForegroundWindow();
-                        ComputerUseWindowFocusPolicy.Candidate? actual =
-                            DesktopAutomationService.CaptureWindowFocusIdentity(
-                                new IntPtr(focused.WindowHandle));
-                        if (actual == null || focused.IsEmpty
-                            || actual.ProcessId != focused.ProcessId
-                            || actual.WindowHandle != focused.WindowHandle)
-                        {
-                            return new ComputerUseAgentResult
-                            {
-                                StepsTaken = step,
-                                Summary = "Stopped: the target window changed before its process identity could be bound."
-                            };
-                        }
-                        bool explicitlyApproved = (SettingsStore.Current.Data.ComputerApps
-                            ?? new List<ComputerAppShortcut>()).Any(a =>
-                            ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(a.ExecutablePath)
-                            && string.Equals(a.ExecutablePath, actual.ExecutablePath,
-                                StringComparison.OrdinalIgnoreCase));
-                        if (appLease.IsActive || explicitlyApproved)
-                        {
-                            if (!appLease.BindVerifiedFocus(actual, explicitlyApproved))
-                            {
-                                return new ComputerUseAgentResult
-                                {
-                                    StepsTaken = step,
-                                    Summary = "Stopped: a secondary process requires separate application approval. No further input was sent."
-                                };
-                            }
-                        }
                     }
                     trace.RecordActionDelivered();
                     guiRepairBudget.RecordDeliveredAction(action.Action);
@@ -780,7 +742,8 @@ namespace PaRuX.Services
         /// the action was carried out, or the reason it was withheld, in which case the run stops.
         /// </summary>
         private static async Task<string?> ExecuteAsync(
-            ComputerUseAction action, ComputerUseInputPin pin, CancellationToken ct, Func<string?> stopReason)
+            ComputerUseAction action, ComputerUseInputPin pin, CancellationToken ct,
+            Func<string?> stopReason, ComputerUseTaskAppLease appLease)
         {
             ct.ThrowIfCancellationRequested();
             // The caller has canonicalised the name and refused every name the grammar does not define. The empty
@@ -876,11 +839,23 @@ namespace PaRuX.Services
                     ComputerUseWindowFocusPolicy.Candidate? afterIdentity =
                         DesktopAutomationService.CaptureWindowFocusIdentity(
                             new IntPtr(after.WindowHandle));
-                    return ComputerUseActionParser.FocusRefusal(true,
-                        after.ProcessId == candidates[targetIndex].ProcessId
+                    bool unchanged = after.ProcessId == candidates[targetIndex].ProcessId
                         && after.WindowHandle == candidates[targetIndex].WindowHandle
                         && ComputerUseWindowFocusPolicy.IsUnchanged(
-                            candidates[targetIndex], afterIdentity));
+                            candidates[targetIndex], afterIdentity);
+                    string? focusRefusal = ComputerUseActionParser.FocusRefusal(true, unchanged);
+                    if (focusRefusal != null) return focusRefusal;
+
+                    // Bind inside the same independently selected-and-confirmed
+                    // focus operation: never grab a later arbitrary foreground
+                    // window and treat that unrelated PID as approved.
+                    bool explicitlyApproved = approvedPaths.Any(path =>
+                        string.Equals(path, afterIdentity!.ExecutablePath,
+                            StringComparison.OrdinalIgnoreCase));
+                    if ((appLease.IsActive || explicitlyApproved)
+                        && !appLease.BindVerifiedFocus(afterIdentity, explicitlyApproved))
+                        return "The selected secondary process was not explicitly approved. No further input was sent.";
+                    return null;
                 }
                 case "wait":
                 {
