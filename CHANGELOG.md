@@ -1,5 +1,13 @@
 # Changelog
 
+### 2026-10-31 — Live Computer Use app-revocation enforcement and true modal-dialog fixture (source only)
+
+- A PID-bound app lease now continuously validates the **current** executable allowlist, not just the permission snapshot taken when the app was first focused. Removing an app in Computer Use Settings blocks later GUI input and completion, including same-PID dialogs and separately approved helper processes. The existing STOP/Gaming Mode callback checks app revocation between model steps, waits and typed characters; focus rechecks the allowlist after the actual foreground switch.
+- Added pure xUnit regressions for revoked/renewed app permission, helper process isolation and stale screenshots/UIA when a modal steals or returns foreground focus.
+- Extended the disposable WinForms fixture with an actual blocking `ShowDialog(this)` modal. Added `tools/test-agent-native-modal-e2e.ps1` and opt-in master gate `-RunNativeModalE2E`, recorded as `nativeUiModal`. Windows must prove same PID/owner HWND, main disabled while modal is shown, a UIA Confirm within the modal, parent re-enabled and a fresh exact result readback. Test output explicitly says it is NOT a live autonomous agent test.
+- Updated source-only PowerShell parser coverage, execution plan and physical Windows acceptance scenarios. **Windows PowerShell, .NET, xUnit, WinApp, FlaUI and real live-agent testing NOT RUN in this GitHub-only session.** No GitHub Actions, user secrets, local private paths or telemetry uploads added.
+
+
 ### 2026-10-31 — Process-instance authorization and owned-window Computer Use acceptance (source only)
 
 - Registered `open_app` now creates a provisional, non-actionable executable lease. `focus_window` verifies exact native HWND/PID/EXE and binds the actual OS process before subsequent UIA, typing and completion. An unrelated second process using the same approved exe no longer automatically inherits the launched app's authority. Same-PID dialogs remain in scope; separate helper processes require their own approved executable and explicit focus.
