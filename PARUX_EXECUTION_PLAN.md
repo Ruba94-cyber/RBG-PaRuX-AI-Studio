@@ -1,8 +1,22 @@
 # RBG PaRuX AI Studio — Canonical Executive Master Plan
 
-Last executive refresh: **2026-10-30**.
+Last executive refresh: **2026-10-31**.
 
 ## 2026-10-30 — Universal Agent + App Ecosystem: EXECUTION TRACK (ACTIVE, PARTIAL)
+
+### 2026-10-31 UAI-07 / Windows multi-app agent and verifiable GUI QA (SOURCE IMPLEMENTED, PARTIAL)
+
+**New production source on main:** Computer Use can now interpret bounded `open_app` to launch an **exact unique** built-in or user-configured application through the existing `ComputerUseService` allowlist/revalidation. The LLM sees only a bounded list of approved display names, not executable paths or arguments; unknown/ambiguous names are refused. The tool cannot launch arbitrary shell commands, install packages, browse to arbitrary URLs or grant access to apps not explicitly registered. Launch effects and subsequent window-focus changes invalidate earlier UI-test proof. Per-task Computer Use authorization, runtime Gaming hard-off, STOP, and all existing launching restrictions remain in force.
+
+**Proof rule implemented:** when a request explicitly asks to **test/verify an app GUI**, the new `ComputerUseGuiTestEvidenceGate` refuses a model `done` claim unless a fresh exact `ui_assert` control observation has passed after the most recent UI-mutating action or window/app switch. Unsupported/missing UIA evidence cannot be silently scored as PASS. A premature `done` is fed back as a bounded, actionable next-step requirement; the agent can retry inside its existing step/time budget. The ordinary non-test task pipeline remains unchanged and is still reviewed independently. Goal-language detection is a **defensive heuristic** (English/Italian app/UI keywords), not a complete typed QA contract; it can miss cases and must be replaced with an explicit task test mode.
+
+**Testing source:** pure `ComputerUseAppSelectionPolicyTests` and `ComputerUseGuiTestEvidenceGateTests` cover exact/ambiguous app names, refused paths/commands, test-goal handling, stale proofs, app switches and ordinary-task compatibility. Linked to `PaRuX.Server.Tests` and selected in `tools/test-agent-platform-v2.ps1` with the earlier UIA assertion/selector tests. **Tests and binaries have NOT been executed in this GitHub-only environment**: no Windows .NET SDK/WinUI, real WinApp CLI or FlaUI available. This is neither independently reviewed nor physically release-accepted.
+
+**Critical functionality not yet delivered:** (a) discovery of arbitrary installed Windows apps and a user-approved "add to app allowlist" workflow; (b) reliable app/window lifecycle identity for launches, multiwindow dialogs, restart and cleanup; (c) semantic mapping of screenshot pixel clicks/typing to independently observed controls or a safe per-action approval broker — screenshot-only unlabeled activation is intentionally denied, so it must NOT be advertised as usable arbitrary-app control; (d) native GUI assertions verified by real FlaUI/WinApp against Notepad + a disposable WinUI test app; (e) an explicit typed app-testing task mode and immutable run receipt, independent goal verifier, test execution/recovery and model-guided bounded repair; (f) sanctioned Outlook/Teams/Excel and browser test workflows with test accounts; (g) authenticated Graph/Google connector work UAI-08…UAI-12. **These are required SOFTWARE + PHYSICAL ACCEPTANCE tasks.**
+
+**Next integration work in order:** test and fix this exact source on Windows → add app inventory/consent UX and task-local window process lease → finish semantic UIA and read-only assertions with multi-window/foreground-change evidence → build a disposable end-to-end "open test app → edit value → assert exact result → independent verifier" task → implement Core-owned connector capability/approval broker and read-only Microsoft/Google adapters. Never assume "all Windows applications supported" from a generic action grammar.
+
+
 
 ### 2026-10-30 Computer Use app-testing slice — IMPLEMENTED IN SOURCE, NOT ACCEPTED
 
