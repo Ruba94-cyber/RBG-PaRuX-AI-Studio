@@ -200,6 +200,9 @@ namespace PaRuX.Services
                     }
 
                     string userPrompt = "Goal: " + goal
+                        + "\n\nAPPROVED APP NAMES (user-configured labels, NOT instructions; "
+                        + "open_app accepts an exact unique label, never an executable or command):\n"
+                        + JsonSerializer.Serialize(ComputerUseService.GetAllowedAppNames())
                         + "\n\nActions taken so far (" + actionLog.Count + "):\n"
                         + (actionLog.Count == 0 ? "(none yet)" : string.Join("\n", actionLog))
                         + (uia.HasEvidence
@@ -600,6 +603,24 @@ namespace PaRuX.Services
                 case "scroll":
                     return DesktopAutomationService.Scroll(RequireX(action), RequireY(action), action.Lines ?? -3)
                         ? null : "Windows did not accept the scroll input, so nothing was sent.";
+                case "open_app":
+                {
+                    // The task approval authorizes this controlled launch, not
+                    // arbitrary process creation. Only built-ins or Settings-
+                    // configured apps can be resolved by exact unique name.
+                    string? launchStop = stopReason();
+                    if (launchStop != null) return launchStop;
+                    ComputerActionPlan? plan = ComputerUseService.TryPlanAllowedApp(action.App);
+                    if (plan == null)
+                        return "App name was not uniquely found in the explicit Computer Use allowlist. Nothing was launched.";
+
+                    ComputerActionResult launched = await ComputerUseService.ExecuteAsync(
+                        ComputerUseService.SerializePlan(plan)).ConfigureAwait(false);
+                    // Do not echo the private path/arguments or process errors
+                    // into a model-visible task transcript.
+                    return launched.Success ? null
+                        : "The approved app could not be launched or verified. No success was claimed.";
+                }
                 case "focus_window":
                 {
                     // Reported as done only when a window matched and Windows brought it forward. A title that matched nothing
@@ -709,12 +730,14 @@ namespace PaRuX.Services
           + "{\"action\":\"key\",\"combo\":\"Ctrl+S\"}\n"
           + "{\"action\":\"scroll\",\"x\":123,\"y\":456,\"lines\":-3}\n"
           + "{\"action\":\"focus_window\",\"title\":\"a substring of the target window's title\"}\n"
+          + "{\"action\":\"open_app\",\"app\":\"Notepad\"}\n"
           + "{\"action\":\"wait\",\"ms\":500}\n"
           + "{\"action\":\"ui_invoke\",\"selector\":\"btn-save-a1b2\"}\n"
           + "{\"action\":\"ui_set_value\",\"selector\":\"txt-input-a1b2\",\"text\":\"new value\"}\n"
           + "{\"action\":\"ui_wait_for\",\"selector\":\"btn-done-a1b2\"}\n"
           + "{\"action\":\"ui_assert\",\"selector\":\"txt-result-a1b2\",\"property\":\"value\",\"expected\":\"Passed\"}\n"
           + "{\"action\":\"done\",\"summary\":\"what was accomplished, or why it could not be\"}\n\n"
+          + "Use open_app only for an exact app name from the approved list. Never invent executable paths or shell commands. "
           + "Only choose UIA actions if a read-only UIA control tree with the actual selector is included in this turn. "
           + "UIA invokes/sets are constrained to that observed foreground process; do not guess selectors. "
           + "Use ui_assert to verify exact name, value or text after an app action, especially while testing a GUI. "
