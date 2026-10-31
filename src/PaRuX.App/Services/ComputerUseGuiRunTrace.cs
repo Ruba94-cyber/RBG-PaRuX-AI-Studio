@@ -19,6 +19,7 @@ namespace PaRuX.Services
         internal int FinalReadbackFailures { get; private set; }
         internal bool LastFinalReadbackPassed { get; private set; }
         internal int LastDistinctControlsVerified { get; private set; }
+        internal int LastDistinctWindowsVerified { get; private set; }
 
         internal void RecordActionAttempt()
         {
@@ -39,13 +40,16 @@ namespace PaRuX.Services
             else if (UiAssertionsFailed < MaxEvents) UiAssertionsFailed++;
         }
 
-        internal void RecordFinalReadback(bool verified, int distinctControlsVerified = 1)
+        internal void RecordFinalReadback(
+            bool verified, int distinctControlsVerified = 1, int distinctWindowsVerified = 1)
         {
             LastFinalReadbackPassed = verified;
             // This is executor-reported control count, not an assertion from
             // the language model. Never retain selectors or expected values.
             LastDistinctControlsVerified = verified
                 ? Math.Clamp(distinctControlsVerified, 1, ComputerUseGuiProofLedger.MaxControls) : 0;
+            LastDistinctWindowsVerified = verified
+                ? Math.Clamp(distinctWindowsVerified, 1, LastDistinctControlsVerified) : 0;
             if (FinalReadbackChecks < MaxEvents) FinalReadbackChecks++;
             if (!verified && FinalReadbackFailures < MaxEvents) FinalReadbackFailures++;
         }
@@ -94,6 +98,7 @@ namespace PaRuX.Services
                 FinalReadbackChecks = FinalReadbackChecks,
                 FinalReadbackFailures = FinalReadbackFailures,
                 FinalDistinctControlsVerified = LastDistinctControlsVerified,
+                FinalDistinctWindowsVerified = LastDistinctWindowsVerified,
                 StepsTaken = boundedSteps,
                 FinalControlReadbackVerified = finalReadbackVerified,
                 ReadyForIndependentVerifier = outcome == "ready_for_independent_verifier"
@@ -120,6 +125,7 @@ namespace PaRuX.Services
         public int FinalReadbackChecks { get; init; }
         public int FinalReadbackFailures { get; init; }
         public int FinalDistinctControlsVerified { get; init; }
+        public int FinalDistinctWindowsVerified { get; init; }
         public int StepsTaken { get; init; }
         public bool FinalControlReadbackVerified { get; init; }
         public bool ReadyForIndependentVerifier { get; init; }
