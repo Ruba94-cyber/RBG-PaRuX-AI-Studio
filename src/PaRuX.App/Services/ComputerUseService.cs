@@ -178,8 +178,10 @@ namespace PaRuX.Services
 
         public static string SerializePlan(ComputerActionPlan plan) => JsonSerializer.Serialize(plan);
 
-        public static async Task<ComputerActionResult> ExecuteAsync(string payload)
+        public static async Task<ComputerActionResult> ExecuteAsync(
+            string payload, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (GamingManager.Current.IsActive)
                 return new ComputerActionResult { Message = "Gaming Mode is active. Computer Use is suspended." };
 
@@ -229,6 +231,9 @@ namespace PaRuX.Services
 
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (GamingManager.Current.IsActive)
+                    return new ComputerActionResult { Message = "Gaming Mode is active. Computer Use is suspended." };
                 // plan.Executable/Arguments come only from the fixed BuiltIns list or the user's
                 // SettingsStore.ComputerApps allowlist (both checked above), never from the
                 // untrusted deserialized payload directly.
@@ -236,7 +241,7 @@ namespace PaRuX.Services
                 if (!string.IsNullOrWhiteSpace(plan.Arguments)) info.Arguments = plan.Arguments;
                 Process? process = Process.Start(info);
                 if (process == null) return new ComputerActionResult { Message = plan.Name + " did not start." };
-                await Task.Delay(900);
+                await Task.Delay(900, cancellationToken).ConfigureAwait(false);
                 bool alive;
                 try { alive = !process.HasExited; } catch { alive = true; }
                 return new ComputerActionResult
@@ -246,6 +251,12 @@ namespace PaRuX.Services
                         : plan.BuiltIn ? "Windows accepted the " + plan.Name + " launch request."
                         : plan.Name + " closed immediately."
                 };
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // A user app that launched just before STOP remains open; the
+                // caller knows the task stopped, not that the app was undone.
+                throw;
             }
             catch (Exception ex)
             {
