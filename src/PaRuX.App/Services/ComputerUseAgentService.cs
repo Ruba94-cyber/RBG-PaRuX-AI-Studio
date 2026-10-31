@@ -102,7 +102,7 @@ namespace PaRuX.Services
             // requirement. Delegated context, browser content and predecessor
             // transcripts are untrusted and may contain arbitrary test wording.
             var guiTestGate = new ComputerUseGuiTestEvidenceGate(originalGoal ?? goal);
-            ComputerUseGuiFinalProof? lastGuiProof = null;
+            var guiProofs = new ComputerUseGuiProofLedger();
             var guiRepairBudget = new ComputerUseGuiRepairBudget();
             // Scoped to this invocation; no user-wide permissions are inferred from a process launch.
             var appLease = new ComputerUseTaskAppLease();
@@ -429,7 +429,7 @@ namespace PaRuX.Services
                             // application update could change the value before done.
                             // The new observation is independent of the model's
                             // answer and never prints private expected values.
-                            if (lastGuiProof == null || !guiTestGate.CanReportDone)
+                            if (!guiProofs.HasProof || !guiTestGate.CanReportDone)
                             {
                                 actionLog.Add(ComputerUseGuiTestEvidenceGate.MissingProofReason);
                                 continue;
@@ -461,7 +461,7 @@ namespace PaRuX.Services
                             finalReadbackVerified = finalReadback.HasEvidence
                                 && pin.RefusalForUiaObservation(
                                     finalReadback.ProcessId, finalReadback.WindowHandle) == null
-                                && lastGuiProof.Recheck(finalReadback);
+                                && guiProofs.RecheckAll(finalReadback);
                             trace.RecordFinalReadback(finalReadbackVerified);
                             if (!finalReadbackVerified)
                             {
@@ -470,7 +470,7 @@ namespace PaRuX.Services
                                 // the authorized agent only the REMAINING steps
                                 // to re-observe and reassert, never a fake PASS.
                                 guiTestGate.InvalidateExternalChange();
-                                lastGuiProof = null;
+                                guiProofs.Invalidate();
                                 onStep?.Invoke("Step " + step
                                     + ": final GUI readback changed or is unavailable. A new exact assertion is required.");
                                 actionLog.Add("Final GUI readback failed: previously verified state is stale. "
@@ -583,7 +583,7 @@ namespace PaRuX.Services
                         if (verdict != WindowsUiAssertionPolicy.Verdict.Verified)
                         {
                             guiTestGate.InvalidateExternalChange();
-                            lastGuiProof = null;
+                            guiProofs.Invalidate();
                             if (guiRepairBudget.TryReserve(
                                 verdict, step, MaxSteps, guiTestGate.RequiresAssertion))
                             {
@@ -604,12 +604,33 @@ namespace PaRuX.Services
                                     + status + "). Recovery is unavailable or its budget was exhausted."
                             };
                         }
+                        ComputerUseGuiFinalProof? newProof =
+                            ComputerUseGuiFinalProof.FromVerifiedAssertion(
+                                fresh.ProcessId, fresh.WindowHandle,
+                                action.Selector, action.Property, action.Expected, verdict);
+                        ComputerUseGuiProofLedger.AddResult recorded =
+                            guiProofs.TryRecord(newProof);
+                        if (recorded is not (ComputerUseGuiProofLedger.AddResult.Recorded
+                            or ComputerUseGuiProofLedger.AddResult.AlreadyRecorded))
+                        {
+                            // A different HWND, contradictory control value or
+                            // overflowing set cannot be silently substituted
+                            // for a valid complete postcondition suite.
+                            guiTestGate.InvalidateExternalChange();
+                            guiProofs.Invalidate();
+                            return new ComputerUseAgentResult
+                            {
+                                StepsTaken = step,
+                                Summary = "UI test failed: the assertion suite crossed windows, conflicted "
+                                    + "with a previous expectation or exceeded its bounded size. "
+                                    + "Make a new test phase after an actual GUI mutation."
+                            };
+                        }
                         guiTestGate.RecordVerifiedAssertion();
-                        lastGuiProof = ComputerUseGuiFinalProof.FromVerifiedAssertion(
-                            fresh.ProcessId, fresh.WindowHandle,
-                            action.Selector, action.Property, action.Expected, verdict);
-                        // An exact control assertion is a prerequisite for an
-                        // app-test completion claim, not the independent goal verdict.
+                        onStep?.Invoke("Step " + step + ": "
+                            + guiProofs.Count + " distinct UIA postcondition(s) recorded for final readback.");
+                        // This proves ONLY the current foreground window's
+                        // asserted control states, not every part of the goal.
                     }
                     else if ((action.Action ?? string.Empty).StartsWith("ui_", StringComparison.OrdinalIgnoreCase))
                     {
@@ -704,7 +725,7 @@ namespace PaRuX.Services
                     guiRepairBudget.RecordDeliveredAction(action.Action);
                     guiTestGate.RecordDeliveredAction(action.Action);
                     if (!guiTestGate.VerifiedAfterLatestMutation)
-                        lastGuiProof = null;
+                        guiProofs.Invalidate();
                     if (visualSnapshot != null)
                     {
                         pendingBeforeSnapshotId = visualSnapshot.Id;
@@ -998,6 +1019,9 @@ namespace PaRuX.Services
           + "Only choose UIA actions if a read-only UIA control tree with the actual selector is included in this turn. "
           + "UIA invokes/sets are constrained to that observed foreground process; do not guess selectors. "
           + "Use ui_assert to verify exact name, value or text after an app action, especially while testing a GUI. "
+          + "For GUI testing, assert each required observable control (up to 8 distinct controls) after the LAST mutation; final done rechecks ALL of them. "
+          + "Do not switch windows, click, type, focus or change controls between the assertions and done: this invalidates the proof batch. "
+          + "One batch must refer to the SAME foreground window; cross-window tests need separate phases, and a model claim never proves earlier windows. "
           + "It obtains a fresh foreground UIA observation; never claim PASS if the assertion fails. "
           + "Look at the attached screenshot before choosing. Take the most direct path toward the goal. "
           + "Use \"done\" as soon as the goal is met, or if it cannot be completed — explain why in summary either way. "
