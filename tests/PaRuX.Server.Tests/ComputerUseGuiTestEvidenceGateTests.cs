@@ -94,6 +94,20 @@ public sealed class ComputerUseGuiTestEvidenceGateTests
     }
 
     [Fact]
+    public void Independent_final_readback_failure_invalidates_old_proof_without_erasing_audit_count()
+    {
+        var gate = new ComputerUseGuiTestEvidenceGate("Test the app GUI");
+        gate.RecordVerifiedAssertion();
+        Assert.True(gate.CanReportDone);
+        gate.InvalidateExternalChange();
+        Assert.False(gate.CanReportDone);
+        Assert.Equal(1, gate.VerifiedAssertions);
+        gate.RecordVerifiedAssertion();
+        Assert.True(gate.CanReportDone);
+        Assert.Equal(2, gate.VerifiedAssertions);
+    }
+
+    [Fact]
     public void A_test_that_cannot_access_ui_automation_must_not_claim_success()
     {
         var gate = new ComputerUseGuiTestEvidenceGate("Test application GUI");
