@@ -129,7 +129,8 @@ namespace PaRuX.Services
             foreach (ComputerAppShortcut entry in SettingsStore.Current.Data.ComputerApps
                 ?? new List<ComputerAppShortcut>())
             {
-                if (!ComputerUseAppSelectionPolicy.IsValidName(entry.Name))
+                if (!ComputerUseAppSelectionPolicy.IsValidName(entry.Name)
+                    || !ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(entry.ExecutablePath))
                     continue;
 
                 string[] aliases = (entry.Aliases ?? string.Empty)
@@ -170,8 +171,9 @@ namespace PaRuX.Services
             BuiltIns.Select(p => p.Name)
                 .Concat((SettingsStore.Current.Data.ComputerApps
                     ?? new List<ComputerAppShortcut>())
-                    .Select(p => p.Name)
-                    .Where(ComputerUseAppSelectionPolicy.IsValidName))
+                    .Where(p => ComputerUseAppSelectionPolicy.IsValidName(p.Name)
+                        && ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(p.ExecutablePath))
+                    .Select(p => p.Name))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(24)
                 .ToArray();
