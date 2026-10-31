@@ -24,6 +24,12 @@ namespace PaRuX.Services
         /// <summary>True when the run was refused before its first action because another Computer Use run
         /// already held the mouse and keyboard. Nothing was sent, so the caller may retry later.</summary>
         public bool NotStarted { get; set; }
+
+        /// <summary>Structured, redacted control-check evidence for the independent
+        /// verifier. Counts/booleans do not expose private UIA values or selectors.</summary>
+        public bool GuiTestProofRequired { get; set; }
+        public bool GuiTestProofSatisfied { get; set; }
+        public int VerifiedUiAssertions { get; set; }
     }
 
     /// <summary>
@@ -64,7 +70,8 @@ namespace PaRuX.Services
             Action<string> onStep,
             CancellationToken ct,
             Func<bool>? persistentAuthorizationStillValid = null,
-            ComputerUseRunGate.Lease? heldLease = null)
+            ComputerUseRunGate.Lease? heldLease = null,
+            string? originalGoal = null)
         {
             // The mouse and keyboard are one shared device, so only one run may hold them. A run that cannot
             // take the gate is refused before it sends any input, and the caller decides whether to retry.
@@ -84,7 +91,10 @@ namespace PaRuX.Services
             }
 
             var actionLog = new List<string>();
-            var guiTestGate = new ComputerUseGuiTestEvidenceGate(goal);
+            // Only the user's actual goal may activate the GUI-test evidence
+            // requirement. Delegated context, browser content and predecessor
+            // transcripts are untrusted and may contain arbitrary test wording.
+            var guiTestGate = new ComputerUseGuiTestEvidenceGate(originalGoal ?? goal);
             string? lastRepeatKey = null;
             int repeats = 0;
             string tempImagePath = Path.Combine(Path.GetTempPath(), "parux-computeruse-" + Guid.NewGuid().ToString("N") + ".png");
@@ -361,6 +371,9 @@ namespace PaRuX.Services
                         return new ComputerUseAgentResult
                         {
                             GoalReported = true,
+                            GuiTestProofRequired = guiTestGate.RequiresAssertion,
+                            GuiTestProofSatisfied = guiTestGate.RequiresAssertion && guiTestGate.CanReportDone,
+                            VerifiedUiAssertions = guiTestGate.VerifiedAssertions,
                             StepsTaken = step,
                             Summary = string.IsNullOrWhiteSpace(action.Summary) ? "PaRuX reported the task complete." : action.Summary
                         };
