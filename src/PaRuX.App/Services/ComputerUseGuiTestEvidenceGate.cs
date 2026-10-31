@@ -29,6 +29,9 @@ namespace PaRuX.Services
 
         internal bool RequiresAssertion { get; }
         internal bool VerifiedAfterLatestMutation { get; private set; }
+        /// <summary>Total successful exact checks in this task, informational only.
+        /// Older checks never substitute for one after the latest mutation.</summary>
+        internal int VerifiedAssertions { get; private set; }
 
         internal ComputerUseGuiTestEvidenceGate(string? goal) =>
             RequiresAssertion = IsGuiTestGoal(goal);
@@ -45,8 +48,11 @@ namespace PaRuX.Services
                 VerifiedAfterLatestMutation = false;
         }
 
-        internal void RecordVerifiedAssertion() =>
+        internal void RecordVerifiedAssertion()
+        {
+            VerifiedAssertions++;
             VerifiedAfterLatestMutation = RequiresAssertion;
+        }
 
         internal bool CanReportDone => !RequiresAssertion || VerifiedAfterLatestMutation;
 
