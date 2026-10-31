@@ -108,6 +108,74 @@ namespace PaRuX.Services
             return null;
         }
 
+        /// <summary>
+        /// The ONLY applications an already-approved agent may launch. A name
+        /// (not an executable or arbitrary command) must exactly match one
+        /// known built-in or an app the user explicitly configured in Settings.
+        /// Ambiguous aliases do not select the first item.
+        /// </summary>
+        internal static ComputerActionPlan? TryPlanAllowedApp(string? exactName)
+        {
+            var plans = new List<ComputerActionPlan>();
+            var candidates = new List<ComputerUseAppSelectionPolicy.Candidate>();
+
+            foreach (ComputerActionPlan builtIn in BuiltIns)
+            {
+                plans.Add(builtIn);
+                candidates.Add(new ComputerUseAppSelectionPolicy.Candidate(
+                    builtIn.Name, BuiltInAliases[builtIn.Name]));
+            }
+
+            foreach (ComputerAppShortcut entry in SettingsStore.Current.Data.ComputerApps
+                ?? new List<ComputerAppShortcut>())
+            {
+                if (!ComputerUseAppSelectionPolicy.IsValidName(entry.Name))
+                    continue;
+
+                string[] aliases = (entry.Aliases ?? string.Empty)
+                    .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(x => x.Trim())
+                    .Where(ComputerUseAppSelectionPolicy.IsValidName)
+                    .ToArray();
+
+                plans.Add(new ComputerActionPlan
+                {
+                    Name = entry.Name,
+                    Executable = entry.ExecutablePath,
+                    Arguments = entry.Arguments,
+                    BuiltIn = false
+                });
+                candidates.Add(new ComputerUseAppSelectionPolicy.Candidate(
+                    entry.Name, aliases));
+            }
+
+            int index = ComputerUseAppSelectionPolicy.FindUniqueIndex(candidates, exactName);
+            if (index < 0) return null;
+            ComputerActionPlan selected = plans[index];
+            return new ComputerActionPlan
+            {
+                Name = selected.Name,
+                Executable = selected.Executable,
+                Arguments = selected.Arguments,
+                BuiltIn = selected.BuiltIn
+            };
+        }
+
+        /// <summary>
+        /// Bounded labels for the approved Computer Use task prompt. No paths,
+        /// arguments or inferred installed applications are exposed; configured
+        /// app names with control characters are omitted.
+        /// </summary>
+        internal static IReadOnlyList<string> GetAllowedAppNames() =>
+            BuiltIns.Select(p => p.Name)
+                .Concat((SettingsStore.Current.Data.ComputerApps
+                    ?? new List<ComputerAppShortcut>())
+                    .Select(p => p.Name)
+                    .Where(ComputerUseAppSelectionPolicy.IsValidName))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(24)
+                .ToArray();
+
         public static string SerializePlan(ComputerActionPlan plan) => JsonSerializer.Serialize(plan);
 
         public static async Task<ComputerActionResult> ExecuteAsync(string payload)
