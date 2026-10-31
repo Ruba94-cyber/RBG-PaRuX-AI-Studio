@@ -128,4 +128,81 @@ public sealed class ComputerUseGuiRecoveryContractTests
         Assert.Null(ComputerUseGuiFinalProof.FromVerifiedAssertion(
             Pid, Hwnd, Selector, "value", "ACCEPTED", verdict));
     }
+    [Fact]
+    public void Two_assertions_can_prove_the_goal_only_if_every_control_survives_the_latest_mutation()
+    {
+        const string verified = """
+            {"windows":[{"hwnd":202,"elements":[
+              {"selector":"status-result","value":"ACCEPTED"},
+              {"selector":"input-field","value":"ready"}
+            ]}]}
+            """;
+        const string changedFirst = """
+            {"windows":[{"hwnd":202,"elements":[
+              {"selector":"status-result","value":"PENDING"},
+              {"selector":"input-field","value":"ready"}
+            ]}]}
+            """;
+        var gui = new ComputerUseGuiTestEvidenceGate("Test the application GUI");
+        var proofs = new ComputerUseGuiProofLedger();
+        var trace = new ComputerUseGuiRunTrace();
+
+        gui.RecordDeliveredAction("ui_invoke");
+        foreach (var (selector, expected) in new[] {
+            ("status-result", "ACCEPTED"), ("input-field", "ready") })
+        {
+            var verdict = WindowsUiAssertionPolicy.AssertExact(
+                verified, Hwnd, selector, "value", expected);
+            Assert.Equal(WindowsUiAssertionPolicy.Verdict.Verified, verdict);
+            var proof = ComputerUseGuiFinalProof.FromVerifiedAssertion(
+                Pid, Hwnd, selector, "value", expected, verdict);
+            Assert.Equal(ComputerUseGuiProofLedger.AddResult.Recorded,
+                proofs.TryRecord(proof));
+            trace.RecordActionAttempt();
+            trace.RecordActionDelivered();
+            trace.RecordAssertion(true);
+            gui.RecordVerifiedAssertion();
+        }
+        Assert.True(gui.CanReportDone);
+        Assert.Equal(2, proofs.Count);
+
+        // An asynchronous regression to the FIRST control invalidates the
+        // whole batch, despite the SECOND control still being correct.
+        bool stillVerified = proofs.RecheckAll(new("observed", changedFirst, Pid, Hwnd));
+        Assert.False(stillVerified);
+        trace.RecordFinalReadback(stillVerified);
+        gui.InvalidateExternalChange();
+        proofs.Invalidate();
+        Assert.False(gui.CanReportDone);
+        Assert.False(proofs.HasProof);
+
+        // A delivered mutation opens a new epoch. Recheck BOTH controls
+        // freshly instead of preserving the old single successful assertion.
+        gui.RecordDeliveredAction("ui_invoke");
+        for (int i = 0; i < 2; i++)
+        {
+            string selector = i == 0 ? "status-result" : "input-field";
+            string expected = i == 0 ? "ACCEPTED" : "ready";
+            var proof = ComputerUseGuiFinalProof.FromVerifiedAssertion(
+                Pid, Hwnd, selector, "value", expected,
+                WindowsUiAssertionPolicy.Verdict.Verified);
+            Assert.Equal(ComputerUseGuiProofLedger.AddResult.Recorded,
+                proofs.TryRecord(proof));
+            gui.RecordVerifiedAssertion();
+            trace.RecordActionAttempt();
+            trace.RecordActionDelivered();
+            trace.RecordAssertion(true);
+        }
+        trace.RecordActionAttempt(); // done, bounded 5 model actions
+        bool repaired = proofs.RecheckAll(new("observed", verified, Pid, Hwnd));
+        Assert.True(repaired);
+        trace.RecordFinalReadback(repaired);
+        var receipt = trace.Build(true, false, true, false,
+            gui.CanReportDone, repaired, gui.VerifiedAssertions, 5);
+        Assert.True(receipt.ReadyForIndependentVerifier);
+        Assert.Equal(4, receipt.UiAssertionsPassed);
+        Assert.Equal(2, proofs.Count);
+        Assert.Equal(2, receipt.FinalReadbackChecks);
+    }
+
 }
