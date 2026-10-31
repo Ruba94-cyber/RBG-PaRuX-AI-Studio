@@ -4,6 +4,21 @@ Manual procedures for the owner to run on a real Windows PC and phone. Every pro
 
 ## Computer Use across Windows applications (NOT RUN)
 
+### 2026-10-31 redacted GUI run receipt, truth-in-verification (NOT RUN)
+
+On a disposable Windows test profile and exact checked-out commit, configure a fake WinUI application with non-sensitive test controls and independently run the UIA/FlaUI acceptance scenarios:
+
+1. Run an authorized GUI test with one delivered mutation, a verified `ui_assert`, and successful fresh final readback. The `guiRunReceipt` should show the actual bounded attempted/delivered action counts, assertions passed and final readbacks; its `outcome` must be `ready_for_independent_verifier` **not** `passed`. The orchestration task should transition to `Verifying` rather than `Completed` on the strength of this receipt alone.
+2. Have Windows change the control between the first assertion and final readback. The receipt must count a failed final readback and the GUI task must not reach `Verifying` unless a new assertion and successful final readback occur using remaining authorized steps. On exhaustion, the status must be `Failed`.
+3. Force an incorrect UIA value, duplicate selector, missing property, unavailable WinApp CLI, denied input, STOP and Gaming Mode. Inspect the typed receipt for `incomplete`, `unverified` or `cancelled` and nonzero failure counts only when an actual comparison was performed; a refused command is attempted but never delivered.
+4. With a model summary intentionally containing synthetic secrets, paths, selectors, HWND/PID and window titles, check the `guiRunReceipt` JSON itself contains none of those values. Also review the **surrounding task result and logs separately**, since these legacy fields may contain model summaries; do not confuse redaction of the receipt with redaction of all task content.
+5. Verify an ordinary non-testing task is not newly forced through UIA final readback. Compare worker receipt counts with the physical action log. Test two simultaneous tasks: their receipts must not share counters.
+6. Execute `ComputerUseGuiRunTraceTests`, `ComputerUseGuiFinalProofTests`, the completion-gate tests and real FlaUI GUI tests; save per-suite PASS/FAIL/NOT RUN and commit provenance.
+
+**Status:** source and hermetic policy tests committed, no Windows .NET compilation, xUnit, WinUI/FlaUI or physical acceptance run. A worker-produced receipt is **not** signed by a separate attestor and is not a full goal verdict.
+
+
+
 ### 2026-10-31 completion-time GUI assertion acceptance (NOT RUN)
 
 Use a disposable, non-sensitive Windows WinUI test control and a configured WinApp CLI, with the agent held to an explicit user-approved Computer Use task:
