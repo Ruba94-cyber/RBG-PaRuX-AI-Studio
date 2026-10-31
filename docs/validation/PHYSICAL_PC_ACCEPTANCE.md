@@ -4,6 +4,21 @@ Manual procedures for the owner to run on a real Windows PC and phone. Every pro
 
 ## Computer Use across Windows applications (NOT RUN)
 
+### 2026-10-31 process-bound focus and app-lease acceptance (NOT RUN)
+
+Run on a **disposable Windows test profile** using two harmless Win32 applications, separate top-level windows of one of them, and test fixtures only:
+
+1. With only App A approved under Computer Use Settings, ask for `focus_window` on an unapproved App B whose title matches or contains the same words. Verify no focus change; confirm neither the title nor a window's claimed process name grants access.
+2. Approve App B and repeat. Only the unique, OS-identified B window may focus; two approved windows with the same title must refuse as ambiguous. A second window from the current foreground PID may focus when it has an accessible, valid EXE identity.
+3. Launch approved App A from the agent, then deliberately change the foreground to an unrelated app before the next `ui_set_value`, pixel action or `ui_assert`. The agent must stop without delivering the action or reporting GUI-test success. Repeat after a user retitles the correct window: handle, PID and EXE must still match.
+4. Remove or replace an approved registration during an app launch, then attempt to continue. The task must fail closed; app processes already started must **not** be silently killed. Exercise STOP, Gaming and a cancelled launch as separate cases.
+5. Open an approved single-instance application that relaunches through a stub or hands off to another process, plus a packaged UWP-style app. Record honest limitations and refused child-window transitions. Do not infer acceptance from screenshots.
+6. Run the targeted `ComputerUseWindowFocusPolicyTests`, `ComputerUseTaskAppLeaseTests`, `ComputerUseAppLaunchPolicyTests` and real Windows/FlaUI integration tests. Record the exact HEAD, build result and PASS/FAIL/NOT RUN with redacted logs.
+
+**Status:** policy/agent source committed; physical Windows build, tests, UI automation and security review **NOT RUN**. This is a per-run executable restriction, not yet a full process-tree sandbox or OS-enforced application-grant system.
+
+
+
 ### 2026-10-31 multi-step application launch and GUI-test completion gate (NOT RUN)
 
 The exact `main` candidate must additionally prove, using a disposable Windows test installation:
