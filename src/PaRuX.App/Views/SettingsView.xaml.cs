@@ -6136,7 +6136,7 @@ namespace PaRuX.Views
             // presenter accepts only a fixed, redacted worker receipt schema
             // and explicitly does NOT call the goal independently verified.
             string? guiReceiptLine = ComputerUseGuiReceiptPresenter.BuildLine(
-                task.Role, task.ResultJson);
+                task.Role, task.ResultJson, task.Status, task.VerificationStatus);
             if (guiReceiptLine != null)
             {
                 var evidenceLine = new TextBlock
