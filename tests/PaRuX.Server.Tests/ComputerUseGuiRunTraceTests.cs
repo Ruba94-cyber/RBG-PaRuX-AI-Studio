@@ -31,6 +31,7 @@ public sealed class ComputerUseGuiRunTraceTests
         Assert.Equal(1, receipt.UiAssertionsPassed);
         Assert.Equal(1, receipt.FinalReadbackChecks);
         Assert.Equal(1, receipt.FinalDistinctControlsVerified);
+        Assert.Equal(1, receipt.FinalDistinctWindowsVerified);
         Assert.Equal(0, receipt.FinalReadbackFailures);
         Assert.Equal("executor-reported-not-independently-attested", receipt.Assurance);
     }
@@ -160,5 +161,24 @@ public sealed class ComputerUseGuiRunTraceTests
         Assert.Equal(0, stale.FinalDistinctControlsVerified);
         Assert.False(stale.ReadyForIndependentVerifier);
     }
+    [Fact]
+    public void Multiple_windows_are_distinct_from_multiple_controls_in_one_window()
+    {
+        var trace = new ComputerUseGuiRunTrace();
+        trace.RecordActionAttempt();
+        trace.RecordAssertion(true);
+        trace.RecordActionAttempt();
+        trace.RecordAssertion(true);
+        trace.RecordFinalReadback(true, distinctControlsVerified: 2, distinctWindowsVerified: 2);
+        var result = trace.Build(true, false, true, false, true, true, 2, 3);
+        Assert.True(result.ReadyForIndependentVerifier);
+        Assert.Equal(2, result.FinalDistinctControlsVerified);
+        Assert.Equal(2, result.FinalDistinctWindowsVerified);
+        trace.RecordFinalReadback(false);
+        var invalid = trace.Build(true, false, true, false, true, true, 2, 3);
+        Assert.Equal(0, invalid.FinalDistinctWindowsVerified);
+        Assert.False(invalid.ReadyForIndependentVerifier);
+    }
+
 
 }
