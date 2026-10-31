@@ -1,5 +1,13 @@
 # Changelog
 
+### 2026-10-31 — Bounded GUI test repair and native Windows recovery gate (source only)
+
+- Computer Use GUI tests can now recover from up to two real `DifferentValue`, `MissingTarget` or `MissingProperty` UIA assertion failures with remaining steps, but each additional recovery requires a successfully delivered UI mutation. Ambiguous, invalid or fabricated observations still stop the task, and old proof is discarded.
+- The disposable native WinForms UIA fixture now has a Reset control. A new opt-in `-RunNativeUiRecovery` runner gate can exercise first-pass UIA, deliberate regression to PENDING, independently observed failure, a fresh correction, and final exact value readback. It maintains its own separate result and explicitly records `realAgentOrchestration=NOT_RUN`.
+- Fixed a serious corrupted/duplicated tail in `tools/test-agent-platform-v2.ps1` that had broken its Git commit parsing. Added PowerShell syntax/structure validation as a required local runner gate, plus xUnit tests for bounded GUI repair.
+- **No Windows PowerShell AST parsing, .NET build, xUnit, WinApp CLI or FlaUI run was executed in this GitHub-only turn.** Native fixture success must not be confused with an LLM-driven PaRuX agent successfully testing an application.
+
+
 ### 2026-10-31 — Core verification gate and GUI evidence in Agents (source only)
 
 - PaRuX Core now rejects missing, contradictory, unbounded or forged-looking v1 Computer Use results **before** asking an independent verifier model. GUI-test intent comes from one shared Contracts classifier applied to the original user goal, preventing a desktop worker from silently opting out of the requirement.
