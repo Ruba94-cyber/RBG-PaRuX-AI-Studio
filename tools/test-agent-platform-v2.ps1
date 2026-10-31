@@ -36,7 +36,8 @@ param(
     [switch]$CaptureWinAppScreenshot,
     [string]$WinAppTarget,
     [string]$AppPath,
-    [string]$OutputRoot
+    [string]$OutputRoot,
+    [switch]$SelfTestNativeProcessCapture
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -47,6 +48,7 @@ if (-not ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win3
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     throw '.NET SDK is not installed; no xUnit or release test can be accepted.'
 }
+$dotnetExecutable = (Get-Command dotnet -ErrorAction Stop | Select-Object -First 1).Source
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repo ('artifacts\validation\agent-platform-v2-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
@@ -94,6 +96,75 @@ $results = [ordered]@{
     selfImprovementDogfood = 'NOT_RUN'
 }
 
+function ConvertTo-NativeArgumentString {
+    param([string[]]$Arguments)
+    $quoted = foreach ($argument in $Arguments) {
+        if ($argument.Length -gt 0 -and $argument -notmatch '[\s"]') {
+            $argument
+            continue
+        }
+
+        $builder = New-Object System.Text.StringBuilder
+        [void]$builder.Append('"')
+        $slashes = 0
+        foreach ($character in $argument.ToCharArray()) {
+            if ($character -eq '\') {
+                $slashes++
+                continue
+            }
+            if ($character -eq '"') {
+                [void]$builder.Append(('\' * (2 * $slashes + 1)))
+                [void]$builder.Append('"')
+                $slashes = 0
+                continue
+            }
+            if ($slashes -gt 0) { [void]$builder.Append(('\' * $slashes)); $slashes = 0 }
+            [void]$builder.Append($character)
+        }
+        if ($slashes -gt 0) { [void]$builder.Append(('\' * (2 * $slashes))) }
+        [void]$builder.Append('"')
+        $builder.ToString()
+    }
+    return ($quoted -join ' ')
+}
+
+function Invoke-NativeProcessCapture {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory
+    )
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $FilePath
+    $startInfo.Arguments = ConvertTo-NativeArgumentString -Arguments $Arguments
+    $startInfo.WorkingDirectory = $WorkingDirectory
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) { throw "Could not start native process '$FilePath'." }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        $output = [System.Text.StringBuilder]::new()
+        if (-not [string]::IsNullOrEmpty($stdout)) { [void]$output.Append($stdout) }
+        if (-not [string]::IsNullOrEmpty($stderr)) {
+            [void]$output.AppendLine('--- native stderr ---')
+            [void]$output.Append($stderr)
+        }
+        return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $output.ToString() }
+    }
+    finally {
+        $process.Dispose()
+    }
+}
+
 function Invoke-Gate {
     param([string]$Name, [scriptblock]$Action, [string]$LogName)
     $log = Join-Path $OutputRoot $LogName
@@ -112,12 +183,35 @@ function Invoke-Gate {
     }
 }
 
+if ($SelfTestNativeProcessCapture) {
+    $cmd = Join-Path $env:SystemRoot 'System32\cmd.exe'
+    $success = Invoke-NativeProcessCapture -FilePath $cmd -Arguments @('/c', 'echo SENTINEL_STDOUT & echo SENTINEL_STDERR 1>&2 & exit /b 0') -WorkingDirectory $repo
+    if ($success.ExitCode -ne 0 -or $success.Output -notmatch 'SENTINEL_STDOUT' -or $success.Output -notmatch 'SENTINEL_STDERR') {
+        throw 'Native process capture failed the stderr plus exit-zero sentinel.'
+    }
+    $failure = Invoke-NativeProcessCapture -FilePath $cmd -Arguments @('/c', 'echo SENTINEL_STDERR 1>&2 & exit /b 23') -WorkingDirectory $repo
+    if ($failure.ExitCode -ne 23 -or $failure.Output -notmatch 'SENTINEL_STDERR') {
+        throw 'Native process capture failed the stderr plus nonzero-exit sentinel.'
+    }
+    Invoke-Gate -Name 'powershellExceptionSentinel' -LogName 'agent-process-capture-powershell-exception.log' -Action {
+        throw 'SENTINEL_PS_EXCEPTION'
+    }
+    if ($results.powershellExceptionSentinel -ne 'FAIL') {
+        throw 'Invoke-Gate incorrectly accepted a PowerShell exception sentinel.'
+    }
+    Write-Output 'PASS: native stderr with exit 0, native stderr with exit 23, and PowerShell exception sentinels.'
+    return
+}
+
 try {
     Invoke-Gate -Name scriptSyntax -LogName 'agent-script-syntax.log' -Action {
         & (Join-Path $repo 'tools\test-agent-validation-syntax.ps1')
     }
     Invoke-Gate -Name unit -LogName 'agent-v2-xunit.log' -Action {
-        dotnet test tests\PaRuX.Server.Tests\PaRuX.Server.Tests.csproj -c Debug --filter 'FullyQualifiedName~CodingAgentPromptBudgetPolicyTests|FullyQualifiedName~CodingAgentCheckpointStoreTests|FullyQualifiedName~CodingWorkspaceVerificationFingerprintTests|FullyQualifiedName~CodingWorkspaceGitLayoutPolicyTests|FullyQualifiedName~CodingRepositoryAliasPolicyTests|FullyQualifiedName~CodingBrowserPostconditionPolicyTests|FullyQualifiedName~CodingVerificationCommandPolicyTests|FullyQualifiedName~CodingVerificationManifestPolicyTests|FullyQualifiedName~CodingVerificationDiscoveryTests|FullyQualifiedName~CodingTaskApplyAdmissionPolicyTests|FullyQualifiedName~CodingAgentObservationPolicyTests|FullyQualifiedName~OpenCodeLocalProbeTests|FullyQualifiedName~WindowsUiActionServiceTests|FullyQualifiedName~WindowsUiAssertionPolicyTests|FullyQualifiedName~ComputerUseAppSelectionPolicyTests|FullyQualifiedName~ComputerUseAppLaunchPolicyTests|FullyQualifiedName~ComputerUseRunningAppDiscoveryTests|FullyQualifiedName~ComputerUseGuiTestEvidenceGateTests|FullyQualifiedName~ComputerUseGuiFinalProofTests|FullyQualifiedName~ComputerUseGuiProofLedgerTests|FullyQualifiedName~ComputerUseGuiRepairBudgetTests|FullyQualifiedName~ComputerUseGuiRecoveryContractTests|FullyQualifiedName~ComputerUseGuiRunTraceTests|FullyQualifiedName~ComputerUseGuiReceiptPresenterTests|FullyQualifiedName~ComputerUseResultVerifierGateTests|FullyQualifiedName~ComputerUseWindowSelectionPolicyTests|FullyQualifiedName~ComputerUseWindowFocusPolicyTests|FullyQualifiedName~ComputerUseTaskAppLeaseTests|FullyQualifiedName~ComputerUseSensitiveActionPolicyTests|FullyQualifiedName~WindowsUiTreeObservationServiceTests|FullyQualifiedName~UiCaptureProvenancePolicyTests|FullyQualifiedName~UiVerificationEvidenceGateTests|FullyQualifiedName~CodingResultVerifierGateTests|FullyQualifiedName~VerifierServiceTests|FullyQualifiedName~ComputerUseActionParserTests|FullyQualifiedName~ComputerUseCompletionGateTests|FullyQualifiedName~LocalSearxngSearchProviderTests|FullyQualifiedName~CodingWebSearchPolicyTests|FullyQualifiedName~CodingWebSearchEvidenceFormatterTests|FullyQualifiedName~CodingWebSearchEndpointTests|FullyQualifiedName~OpenCodeSessionObserverTests|FullyQualifiedName~OpenCodeSessionEndpointTests|FullyQualifiedName~CodingAgentBackendSelectionPolicyTests|FullyQualifiedName~BrowserDevToolsEvaluationPolicyTests|FullyQualifiedName~WindowsUiActionResultPolicyTests|FullyQualifiedName~CodingRenderedPromptCountContractTests|FullyQualifiedName~CodingPromptTokenCountEndpointTests|FullyQualifiedName~RuntimeTokenCounterTests|FullyQualifiedName~BrowserRedirectObservationPolicyTests|FullyQualifiedName~BrowserRequestAdmissionPolicyTests|FullyQualifiedName~BrowserLiteralAddressPolicyTests|FullyQualifiedName~BrowserAttachedTargetPolicyTests|FullyQualifiedName~BrowserDevToolsNavigationResultPolicyTests|FullyQualifiedName~BrowserNetworkEvidencePolicyTests|FullyQualifiedName~CodingCompletionClaimPolicyTests|FullyQualifiedName~CodingAgentProactiveContextPolicyTests|FullyQualifiedName~CodingProjectInstructionResolverTests|FullyQualifiedName~CodingStepStageReporterTests|FullyQualifiedName~BrowserDomActionScriptBuilderTests|FullyQualifiedName~BrowserDomActionResultPolicyTests|FullyQualifiedName~BrowserDomAssertionPolicyTests|FullyQualifiedName~BrowserDomAssertionResultPolicyTests|FullyQualifiedName~BrowserUiMutationPolicyTests|FullyQualifiedName~BrowserTaskOwnerLeaseTests|FullyQualifiedName~CodingTaskRunLeaseTests|FullyQualifiedName~CodeWorktreeApplyServiceTests|FullyQualifiedName~MultiRepositoryApplyServiceTests|FullyQualifiedName~ShadowWorkspaceServiceTests|FullyQualifiedName~ShadowApplyTransactionTests|FullyQualifiedName~ShadowApplyRecoveryInspectorTests|FullyQualifiedName~ShadowApplyRecoveryServiceTests|FullyQualifiedName~ShadowRecoveryDialogModelTests|FullyQualifiedName~ShadowApplyPathPolicyTests'
+        $unitFilter = 'FullyQualifiedName~CodingAgentPromptBudgetPolicyTests|FullyQualifiedName~CodingAgentCheckpointStoreTests|FullyQualifiedName~CodingWorkspaceVerificationFingerprintTests|FullyQualifiedName~CodingWorkspaceGitLayoutPolicyTests|FullyQualifiedName~CodingRepositoryAliasPolicyTests|FullyQualifiedName~CodingBrowserPostconditionPolicyTests|FullyQualifiedName~CodingVerificationCommandPolicyTests|FullyQualifiedName~CodingVerificationManifestPolicyTests|FullyQualifiedName~CodingVerificationDiscoveryTests|FullyQualifiedName~CodingTaskApplyAdmissionPolicyTests|FullyQualifiedName~CodingAgentObservationPolicyTests|FullyQualifiedName~OpenCodeLocalProbeTests|FullyQualifiedName~WindowsUiActionServiceTests|FullyQualifiedName~WindowsUiAssertionPolicyTests|FullyQualifiedName~ComputerUseAppSelectionPolicyTests|FullyQualifiedName~ComputerUseAppLaunchPolicyTests|FullyQualifiedName~ComputerUseRunningAppDiscoveryTests|FullyQualifiedName~ComputerUseGuiTestEvidenceGateTests|FullyQualifiedName~ComputerUseGuiFinalProofTests|FullyQualifiedName~ComputerUseGuiProofLedgerTests|FullyQualifiedName~ComputerUseGuiRepairBudgetTests|FullyQualifiedName~ComputerUseGuiRecoveryContractTests|FullyQualifiedName~ComputerUseGuiRunTraceTests|FullyQualifiedName~ComputerUseGuiReceiptPresenterTests|FullyQualifiedName~ComputerUseResultVerifierGateTests|FullyQualifiedName~ComputerUseWindowSelectionPolicyTests|FullyQualifiedName~ComputerUseWindowFocusPolicyTests|FullyQualifiedName~ComputerUseTaskAppLeaseTests|FullyQualifiedName~ComputerUseSensitiveActionPolicyTests|FullyQualifiedName~WindowsUiTreeObservationServiceTests|FullyQualifiedName~UiCaptureProvenancePolicyTests|FullyQualifiedName~UiVerificationEvidenceGateTests|FullyQualifiedName~CodingResultVerifierGateTests|FullyQualifiedName~VerifierServiceTests|FullyQualifiedName~ComputerUseActionParserTests|FullyQualifiedName~ComputerUseCompletionGateTests|FullyQualifiedName~LocalSearxngSearchProviderTests|FullyQualifiedName~CodingWebSearchPolicyTests|FullyQualifiedName~CodingWebSearchEvidenceFormatterTests|FullyQualifiedName~CodingWebSearchEndpointTests|FullyQualifiedName~OpenCodeSessionObserverTests|FullyQualifiedName~OpenCodeSessionEndpointTests|FullyQualifiedName~CodingAgentBackendSelectionPolicyTests|FullyQualifiedName~BrowserDevToolsEvaluationPolicyTests|FullyQualifiedName~WindowsUiActionResultPolicyTests|FullyQualifiedName~CodingRenderedPromptCountContractTests|FullyQualifiedName~CodingPromptTokenCountEndpointTests|FullyQualifiedName~RuntimeTokenCounterTests|FullyQualifiedName~BrowserRedirectObservationPolicyTests|FullyQualifiedName~BrowserRequestAdmissionPolicyTests|FullyQualifiedName~BrowserLiteralAddressPolicyTests|FullyQualifiedName~BrowserAttachedTargetPolicyTests|FullyQualifiedName~BrowserDevToolsNavigationResultPolicyTests|FullyQualifiedName~BrowserNetworkEvidencePolicyTests|FullyQualifiedName~CodingCompletionClaimPolicyTests|FullyQualifiedName~CodingAgentProactiveContextPolicyTests|FullyQualifiedName~CodingProjectInstructionResolverTests|FullyQualifiedName~CodingStepStageReporterTests|FullyQualifiedName~BrowserDomActionScriptBuilderTests|FullyQualifiedName~BrowserDomActionResultPolicyTests|FullyQualifiedName~BrowserDomAssertionPolicyTests|FullyQualifiedName~BrowserDomAssertionResultPolicyTests|FullyQualifiedName~BrowserUiMutationPolicyTests|FullyQualifiedName~BrowserTaskOwnerLeaseTests|FullyQualifiedName~CodingTaskRunLeaseTests|FullyQualifiedName~CodeWorktreeApplyServiceTests|FullyQualifiedName~MultiRepositoryApplyServiceTests|FullyQualifiedName~ShadowWorkspaceServiceTests|FullyQualifiedName~ShadowApplyTransactionTests|FullyQualifiedName~ShadowApplyRecoveryInspectorTests|FullyQualifiedName~ShadowApplyRecoveryServiceTests|FullyQualifiedName~ShadowRecoveryDialogModelTests|FullyQualifiedName~ShadowApplyPathPolicyTests'
+        $unitRun = Invoke-NativeProcessCapture -FilePath $dotnetExecutable -Arguments @('test', 'tests\PaRuX.Server.Tests\PaRuX.Server.Tests.csproj', '-c', 'Debug', '--filter', $unitFilter) -WorkingDirectory $repo
+        $unitRun.Output
+        $global:LASTEXITCODE = $unitRun.ExitCode
     }
     # browserDomJs is a required gate, not an opt-in one. Without Node its two suites never execute, so the
     # gate must read FAIL (the exit logic below then fails the run) rather than stay NOT_RUN and exit 0.
