@@ -1,5 +1,12 @@
 # Changelog
 
+### 2026-10-31 — Independent GUI completion readback (source only)
+
+- A model's `done` no longer reuses an earlier `ui_assert` as proof of a GUI test result. PaRuX checks the same control/property/expected value again in a fresh UIA observation tied to the same PID/HWND, with no private text in the serialized result.
+- An externally changed/unavailable final control invalidates earlier proof. Only remaining authorized agent steps can attempt a fresh assertion; stale proof blocks verifier handoff.
+- The worker exposes only the redacted `guiFinalReadbackVerified` flag. Added pure policy/regression tests and a real-Windows acceptance checklist. Build, xUnit, WinUI and FlaUI **NOT RUN**.
+
+
 ### 2026-10-31 — Computer Use OS-verified focus and app lease (source only)
 
 - `focus_window` now requires OS-observed PID, HWND and a valid executable path. A title match alone cannot select a window outside the current foreground process or the user-approved app list. Recheck target identity before focus and verify the actual foreground identity afterward.
