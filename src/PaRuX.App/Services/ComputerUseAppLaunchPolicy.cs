@@ -32,11 +32,19 @@ namespace PaRuX.Services
         internal static bool IsAllowedConfiguredExecutable(string? executablePath)
         {
             if (string.IsNullOrWhiteSpace(executablePath)
-                || !Path.IsPathFullyQualified(executablePath)
-                || !string.Equals(Path.GetExtension(executablePath), ".exe",
-                    StringComparison.OrdinalIgnoreCase))
-                return false;
-            return !CommandRunners.Contains(Path.GetFileName(executablePath));
+                || executablePath.StartsWith(@"\\", StringComparison.Ordinal)
+                || executablePath.StartsWith("//", StringComparison.Ordinal))
+                return false; // UNC, device namespace and network-backed executables
+            try
+            {
+                return Path.IsPathFullyQualified(executablePath)
+                    && string.Equals(Path.GetExtension(executablePath), ".exe",
+                        StringComparison.OrdinalIgnoreCase)
+                    && !CommandRunners.Contains(Path.GetFileName(executablePath));
+            }
+            catch (ArgumentException) { return false; }
+            catch (NotSupportedException) { return false; }
+            catch (PathTooLongException) { return false; }
         }
     }
 }
