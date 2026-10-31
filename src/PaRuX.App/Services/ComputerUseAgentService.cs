@@ -425,22 +425,30 @@ namespace PaRuX.Services
                             WindowsUiTreeObservationService.Observation finalReadback =
                                 await WindowsUiTreeObservationService.CaptureForegroundAsync(ct)
                                     .ConfigureAwait(false);
-                            finalReadbackVerified = finalReadback.HasEvidence
-                                && pin.RefusalForUiaObservation(
-                                    finalReadback.ProcessId, finalReadback.WindowHandle) == null
-                                && lastGuiProof.Recheck(finalReadback)
-                                && stopReason() == null;
-                            if (!finalReadbackVerified)
-                            {
-                                // No model assertion or historical UIA result can
-                                // rescue an unavailable/changed final observation.
-                                onStep?.Invoke("Step " + step
-                                    + ": final GUI readback changed or is unavailable; task is not verified.");
+                            string? stopAfterRead = stopReason();
+                            if (stopAfterRead != null)
                                 return new ComputerUseAgentResult
                                 {
                                     StepsTaken = step,
-                                    Summary = "GUI verification failed: the final control state was not independently confirmed."
+                                    Summary = "Stopped during final UI verification: " + stopAfterRead
                                 };
+                            finalReadbackVerified = finalReadback.HasEvidence
+                                && pin.RefusalForUiaObservation(
+                                    finalReadback.ProcessId, finalReadback.WindowHandle) == null
+                                && lastGuiProof.Recheck(finalReadback);
+                            if (!finalReadbackVerified)
+                            {
+                                // A changed/unavailable independent control
+                                // observation invalidates the old proof. Give
+                                // the authorized agent only the REMAINING steps
+                                // to re-observe and reassert, never a fake PASS.
+                                guiTestGate.InvalidateExternalChange();
+                                lastGuiProof = null;
+                                onStep?.Invoke("Step " + step
+                                    + ": final GUI readback changed or is unavailable. A new exact assertion is required.");
+                                actionLog.Add("Final GUI readback failed: previously verified state is stale. "
+                                    + ComputerUseGuiTestEvidenceGate.MissingProofReason);
+                                continue;
                             }
                         }
                         return new ComputerUseAgentResult
