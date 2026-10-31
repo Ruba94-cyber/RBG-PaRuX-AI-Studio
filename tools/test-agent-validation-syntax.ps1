@@ -15,6 +15,7 @@ $repo = Split-Path -Parent $PSScriptRoot
 $targets = @(
     'tools\test-agent-platform-v2.ps1',
     'tools\test-agent-native-ui-e2e.ps1',
+    'tools\test-agent-native-modal-e2e.ps1',
     'tools\test-agent-live-computer-use.ps1',
     'tools\test-winapp-functional.ps1',
     'tools\test-winapp-ui.ps1',
