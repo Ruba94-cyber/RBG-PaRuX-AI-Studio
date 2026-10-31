@@ -405,6 +405,17 @@ finally {
             Write-Warning 'The script-owned test task cancellation failed; inspect PaRuX Agents and STOP it manually.'
         }
     }
+    if ($null -ne $secondaryFixture) {
+        try {
+            $secondaryFixture.Refresh()
+            if (-not $secondaryFixture.HasExited) {
+                Stop-Process -Id $secondaryFixture.Id -Force -ErrorAction Stop
+                $null = $secondaryFixture.WaitForExit(5000)
+            }
+        }
+        catch { Write-Warning 'Second disposable fixture cleanup requires inspection.' }
+        finally { $secondaryFixture.Dispose() }
+    }
     if ($null -ne $fixture) {
         try {
             $fixture.Refresh()
