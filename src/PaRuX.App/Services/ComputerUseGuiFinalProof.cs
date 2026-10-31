@@ -59,8 +59,10 @@ namespace PaRuX.Services
             && string.Equals(_expected, other!._expected, StringComparison.Ordinal);
 
         internal bool SameWindowAs(ComputerUseGuiFinalProof? other) =>
-            other != null && _processId == other._processId
-            && _windowHandle == other._windowHandle;
+            other != null && MatchesWindow(other._processId, other._windowHandle);
+
+        internal bool MatchesWindow(int processId, long windowHandle) =>
+            _processId == processId && _windowHandle == windowHandle;
 
         /// <summary>
         /// The caller is responsible for obtaining a NEW OS foreground UIA
