@@ -252,6 +252,7 @@ public sealed class ComputerUseActionParserTests
     [InlineData("ui_set_value")]
     [InlineData("ui_wait_for")]
     [InlineData("ui_assert")]
+    [InlineData("open_app")]
     public void Uia_actions_are_typed_and_declared_in_the_constrained_schema(string action)
     {
         Assert.True(ComputerUseActionParser.IsExecutable(action));
