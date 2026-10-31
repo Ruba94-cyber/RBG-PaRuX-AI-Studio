@@ -608,8 +608,29 @@ namespace PaRuX.Services
                             ComputerUseGuiFinalProof.FromVerifiedAssertion(
                                 fresh.ProcessId, fresh.WindowHandle,
                                 action.Selector, action.Property, action.Expected, verdict);
+                        // Cross-window proof is allowed only when the
+                        // already-authorized focus target can again be
+                        // independently attested to OS PID/HWND/EXE AND its
+                        // executable is STILL in the user's live allowlist.
+                        // Built-in/unattested targets keep strict single-window
+                        // legacy verification, never silent cross-app scope.
+                        ComputerUseWindowFocusPolicy.Candidate? assertedIdentity =
+                            appLease.HasVerifiedProcess
+                                ? DesktopAutomationService.CaptureWindowFocusIdentity(
+                                    new IntPtr(fresh.WindowHandle))
+                                : null;
+                        string[] assertionAllowlist = (SettingsStore.Current.Data.ComputerApps
+                            ?? new List<ComputerAppShortcut>())
+                            .Select(a => a.ExecutablePath).ToArray();
+                        bool attestedAllowed = assertedIdentity != null
+                            && assertedIdentity.ProcessId == fresh.ProcessId
+                            && assertedIdentity.WindowHandle == fresh.WindowHandle
+                            && ComputerUseWindowFocusPolicy.IsInScope(
+                                assertedIdentity, 0, assertionAllowlist);
                         ComputerUseGuiProofLedger.AddResult recorded =
-                            guiProofs.TryRecord(newProof);
+                            attestedAllowed
+                                ? guiProofs.TryRecordVerifiedWindow(newProof, assertedIdentity)
+                                : guiProofs.TryRecord(newProof);
                         if (recorded is not (ComputerUseGuiProofLedger.AddResult.Recorded
                             or ComputerUseGuiProofLedger.AddResult.AlreadyRecorded))
                         {
@@ -724,7 +745,13 @@ namespace PaRuX.Services
                     trace.RecordActionDelivered();
                     guiRepairBudget.RecordDeliveredAction(action.Action);
                     guiTestGate.RecordDeliveredAction(action.Action);
-                    if (!guiTestGate.VerifiedAfterLatestMutation)
+                    // A verified focus transition is not a data mutation.
+                    // Preserve prior OS-attested window proofs, but still
+                    // require a fresh assertion before done (the evidence
+                    // gate is invalidated by focus_window). Final readback
+                    // independently checks all previous windows/controls.
+                    if (!guiTestGate.VerifiedAfterLatestMutation
+                        && action.Action != "focus_window")
                         guiProofs.Invalidate();
                     if (visualSnapshot != null)
                     {
@@ -1020,8 +1047,10 @@ namespace PaRuX.Services
           + "UIA invokes/sets are constrained to that observed foreground process; do not guess selectors. "
           + "Use ui_assert to verify exact name, value or text after an app action, especially while testing a GUI. "
           + "For GUI testing, assert each required observable control (up to 8 distinct controls) after the LAST mutation; final done rechecks ALL of them. "
-          + "Do not switch windows, click, type, focus or change controls between the assertions and done: this invalidates the proof batch. "
-          + "One batch must refer to the SAME foreground window; cross-window tests need separate phases, and a model claim never proves earlier windows. "
+          + "For multi-app workflows, finish ALL edits first, then use verified focus_window to visit each explicitly approved app and assert its controls. "
+          + "A verified focus can preserve earlier OS-attested read-only proofs; actual clicks, typing, UIA writes or app launches erase them. "
+          + "Do not perform any data-changing action after the first final proof. Another app or window must be separately approved and focused before ui_assert. "
+          + "The final multi-window checks are sequential, not a simultaneous transaction; a model claim never proves earlier windows. "
           + "It obtains a fresh foreground UIA observation; never claim PASS if the assertion fails. "
           + "Look at the attached screenshot before choosing. Take the most direct path toward the goal. "
           + "Use \"done\" as soon as the goal is met, or if it cannot be completed — explain why in summary either way. "
