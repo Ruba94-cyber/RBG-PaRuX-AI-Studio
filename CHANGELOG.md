@@ -1,5 +1,12 @@
 # Changelog
 
+### 2026-10-31 — Computer Use OS-verified focus and app lease (source only)
+
+- `focus_window` now requires OS-observed PID, HWND and a valid executable path. A title match alone cannot select a window outside the current foreground process or the user-approved app list. Recheck target identity before focus and verify the actual foreground identity afterward.
+- After launching an explicitly registered app, the agent creates a task-local executable lease: UIA/pixel actions and completion are refused if the foreground no longer matches the approved app. Authorized switches to another registered app can rebind the lease. Changes to app approval during launch fail closed.
+- Added pure xUnit policy tests, local test-gate selection and a real-Windows acceptance checklist. **No Windows build, xUnit/FlaUI execution or physical acceptance has been performed; UAI-07 remains PARTIAL.**
+
+
 ### 2026-10-31 — Computer Use discovery and explicit app approval (source only)
 
 - Computer Use Settings can scan already-open Windows GUI applications when the user requests it, display the exact executable path, and register one selected app only after explicit approval; the scan itself is read-only and cannot auto-authorize a process.
