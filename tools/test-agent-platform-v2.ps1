@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Reproducible Windows validation of the Agent Platform V2 draft branch.
+Reproducible Windows validation of the current PaRuX checkout and its agent platform.
 .DESCRIPTION
 Runs real xUnit and optional Release/FlaUI/WinApp UIA checks, preserving each exit
 code as independent PASS/FAIL/NOT_RUN. Never counts an unrun hardware test as success.
