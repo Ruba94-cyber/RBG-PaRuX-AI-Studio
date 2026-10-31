@@ -123,8 +123,20 @@ namespace PaRuX.Services
 
                 // Read again at every keystroke and every poll of a wait, so ending the authorization stops a long
                 // action at the next character or tick rather than after it has finished.
-                Func<string?> stopReason = () => ComputerUseAuthorizationPolicy.StopReason(
-                    persistentAuthorizationStillValid, GamingManager.Current.IsActive);
+                Func<string?> stopReason = () =>
+                {
+                    // The same revocation channel is polled at every keystroke
+                    // and while waiting; a former app approval is NOT a
+                    // durable grant for the rest of the agent run.
+                    string? globalRefusal = ComputerUseAuthorizationPolicy.StopReason(
+                        persistentAuthorizationStillValid, GamingManager.Current.IsActive);
+                    if (globalRefusal != null) return globalRefusal;
+                    if (!appLease.IsActive) return null;
+                    string[] approvedNow = (SettingsStore.Current.Data.ComputerApps
+                        ?? new List<ComputerAppShortcut>())
+                        .Select(a => a.ExecutablePath).ToArray();
+                    return appLease.RefusalForCurrentApproval(approvedNow);
+                };
 
                 for (int step = 1; step <= MaxSteps; step++)
                 {
