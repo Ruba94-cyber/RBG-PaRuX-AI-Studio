@@ -69,6 +69,20 @@ internal static class ComputerUseResultVerifierGate
                     return Reject("Distinct final GUI control counts contradict the worker evidence.");
             }
 
+            if (receipt.TryGetProperty("finalDistinctWindowsVerified", out _))
+            {
+                if (!ReadInt(receipt, "finalDistinctWindowsVerified", 0, 8,
+                        out int distinctWindows)
+                    || (required && workerReadback && distinctWindows == 0)
+                    || (!required && distinctWindows != 0)
+                    || (receipt.TryGetProperty("finalDistinctControlsVerified", out _)
+                        && (!ReadInt(receipt, "finalDistinctControlsVerified", 0, 8,
+                            out int controlsInReceipt)
+                            || distinctWindows > controlsInReceipt))
+                    || distinctWindows > passed)
+                    return Reject("Distinct final GUI window counts contradict worker evidence.");
+            }
+
             if (receiptRequired != required || workerRequired != required)
                 return Reject("GUI testing requirement differs from the original user goal.");
             if (delivered > attempted || attempted > workerSteps || failures > checks
