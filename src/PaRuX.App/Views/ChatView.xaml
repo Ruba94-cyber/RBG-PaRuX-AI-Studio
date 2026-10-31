@@ -302,7 +302,9 @@
                     HorizontalAlignment="Center"
                     TextAlignment="Center" />
                 <TextBlock
-                    Text="Running entirely on your machine, through your local Qwen model. Nothing leaves this PC."
+                    x:Name="EmptyStateProviderGuidanceText"
+                    AutomationProperties.AutomationId="Chat_EmptyState_Provider_Guidance_Text"
+                    Text="Choose a provider and compatible model in Model Hub and Model Intelligence &amp; Routing. Check provider status before sending a message."
                     Style="{StaticResource PaRuXCaptionTextStyle}"
                     HorizontalAlignment="Center"
                     TextAlignment="Center"

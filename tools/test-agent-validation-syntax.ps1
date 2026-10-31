@@ -36,6 +36,24 @@ foreach ($relative in $targets) {
             $first.Extent.StartLineNumber + ': ' + $first.Message)
     }
 }
+# Parse-only PowerShell validation cannot catch Add-Type source that the Windows PowerShell/.NET Framework
+# compiler rejects. Compile the modal helper type in memory; its P/Invoke methods are declarations only and
+# are not called by this gate.
+$modalPath = Join-Path $repo 'tools\test-agent-native-modal-e2e.ps1'
+$modalText = [IO.File]::ReadAllText($modalPath)
+$modalSourceMatch = [regex]::Match($modalText,
+    "(?ms)^\s*Add-Type\s+-TypeDefinition\s+@'\r?\n(?<source>.*?)^'@\s+-ErrorAction\s+Stop")
+if (-not $modalSourceMatch.Success) {
+    throw 'Modal acceptance script does not contain the expected Add-Type source block.'
+}
+$modalSource = $modalSourceMatch.Groups['source'].Value
+$stableNamespace = 'namespace PaRuXTestOnly {'
+if (-not $modalSource.Contains($stableNamespace)) {
+    throw 'Modal Add-Type source is missing its expected namespace declaration.'
+}
+$validationNamespace = 'PaRuXTestOnlySyntaxCheck_' + [guid]::NewGuid().ToString('N')
+$modalSource = $modalSource.Replace($stableNamespace, ('namespace ' + $validationNamespace + ' {'))
+Add-Type -TypeDefinition $modalSource -ErrorAction Stop
 # The previous agent runner could be accidentally duplicated in one file
 # while keeping balanced syntax. Require exactly one main test declaration.
 $runner = [IO.File]::ReadAllText((Join-Path $repo 'tools\test-agent-platform-v2.ps1'))

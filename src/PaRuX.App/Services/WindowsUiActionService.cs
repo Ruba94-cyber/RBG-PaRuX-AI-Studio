@@ -128,13 +128,14 @@ namespace PaRuX.Services
 
         public static async Task<Result> ExecuteAsync(
             string? action, string? selector, string? text,
-            int observedPid, long observedHwnd, CancellationToken cancellationToken)
+            int observedPid, long observedHwnd, CancellationToken cancellationToken,
+            Func<bool>? mayContinue = null, Func<bool>? mayStart = null)
         {
             if (!OperatingSystem.IsWindows())
                 return new Result(false, "windows_required");
             if (!IsValidAction(action, selector, text, observedPid))
                 return new Result(false, "invalid_action");
-            if (observedHwnd == 0 ||
+            if ((mayStart != null && !mayStart()) || (mayContinue != null && !mayContinue()) || observedHwnd == 0 ||
                 WindowsUiTreeObservationService.GetForegroundWindowIdentity()
                     != (observedPid, observedHwnd))
                 return new Result(false, "foreground_changed");
@@ -168,7 +169,7 @@ namespace PaRuX.Services
             start.ArgumentList.Add("--json");
 
             // Protect against a window switch that races argument construction.
-            if (observedHwnd == 0 ||
+            if ((mayStart != null && !mayStart()) || (mayContinue != null && !mayContinue()) || observedHwnd == 0 ||
                 WindowsUiTreeObservationService.GetForegroundWindowIdentity()
                     != (observedPid, observedHwnd))
                 return new Result(false, "foreground_changed");
@@ -186,8 +187,15 @@ namespace PaRuX.Services
                 started = true;
                 Task<string> stdout = ReadBoundedAsync(process.StandardOutput, linked.Token);
                 Task<string> stderr = ReadBoundedAsync(process.StandardError, linked.Token);
-                await Task.WhenAll(stdout, stderr, process.WaitForExitAsync(linked.Token))
-                    .ConfigureAwait(false);
+                Task exit = process.WaitForExitAsync(linked.Token);
+                if (!await WaitWhileAuthorizedAsync(exit, mayContinue, linked.Token).ConfigureAwait(false))
+                {
+                    linked.Cancel();
+                    return new Result(false, "authorization_revoked");
+                }
+                await Task.WhenAll(stdout, stderr, exit).ConfigureAwait(false);
+                if (mayContinue != null && !mayContinue())
+                    return new Result(false, "authorization_revoked");
                 if (process.ExitCode != 0) return new Result(false, "uia_action_failed");
                 string envelope = await stdout.ConfigureAwait(false);
                 if (!WindowsUiActionResultPolicy.IsDelivered(action, envelope))
@@ -223,6 +231,19 @@ namespace PaRuX.Services
                     catch (Win32Exception) { }
                 }
             }
+        }
+
+        internal static async Task<bool> WaitWhileAuthorizedAsync(
+            Task exit, Func<bool>? mayContinue, CancellationToken cancellationToken)
+        {
+            while (!exit.IsCompleted)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (mayContinue != null && !mayContinue()) return false;
+                await Task.WhenAny(exit, Task.Delay(50, cancellationToken)).ConfigureAwait(false);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            return mayContinue == null || mayContinue();
         }
 
         private static async Task<string> ReadBoundedAsync(

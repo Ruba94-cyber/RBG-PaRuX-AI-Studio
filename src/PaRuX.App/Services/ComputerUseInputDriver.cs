@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -37,6 +38,34 @@ namespace PaRuX.Services
             uint pressed = driver.SendKeyboardEvent(0, character, KeyEventUnicode);
             uint released = driver.SendKeyboardEvent(0, character, KeyEventUnicode | KeyEventKeyUp);
             return pressed != 0 && released != 0;
+        }
+
+        /// <summary>Revalidate immediately before each key-down; always release already pressed keys.</summary>
+        internal static async Task<bool> PressComboAsync(
+            IComputerUseInputDriver driver, IReadOnlyList<ushort> keys,
+            Func<bool>? mayContinue, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(driver);
+            ArgumentNullException.ThrowIfNull(keys);
+            int pressed = 0;
+            try
+            {
+                foreach (ushort key in keys)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (mayContinue != null && !mayContinue()) return false;
+                    if (driver.SendKeyboardEvent(key, 0, 0) == 0) return false;
+                    pressed++;
+                }
+                if (pressed == 0) return false;
+                await Task.Delay(30, cancellationToken).ConfigureAwait(false);
+                return true;
+            }
+            finally
+            {
+                for (int i = pressed - 1; i >= 0; i--)
+                    driver.SendKeyboardEvent(keys[i], 0, KeyEventKeyUp);
+            }
         }
     }
 

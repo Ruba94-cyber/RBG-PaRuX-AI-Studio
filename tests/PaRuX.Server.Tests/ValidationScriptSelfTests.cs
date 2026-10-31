@@ -23,7 +23,7 @@ public sealed class ValidationScriptSelfTests
         {
             string outputRoot = Path.Combine(root, "out");
             // dotnet stands in for the unit gate. node is deliberately absent from the child PATH.
-            string shims = WriteShims(root, "dotnet");
+            string shims = await WriteShimsAsync(root, "dotnet");
 
             ScriptRun run = await RunScriptAsync("tools/test-agent-platform-v2.ps1",
                 new[] { "-OutputRoot", outputRoot }, pathValue: ShimPath(shims));
@@ -46,7 +46,7 @@ public sealed class ValidationScriptSelfTests
         try
         {
             string outputRoot = Path.Combine(root, "out");
-            string shims = WriteShims(root, "dotnet", "node");
+            string shims = await WriteShimsAsync(root, "dotnet", "node");
 
             ScriptRun run = await RunScriptAsync("tools/test-agent-platform-v2.ps1",
                 new[] { "-OutputRoot", outputRoot }, pathValue: ShimPath(shims));
@@ -55,8 +55,121 @@ public sealed class ValidationScriptSelfTests
             JsonElement status = ReadStatus(outputRoot);
             Assert.Equal("PASS", status.GetProperty("unit").GetString());
             Assert.Equal("PASS", status.GetProperty("browserDomJs").GetString());
+            Assert.Contains("NATIVE_SHIM_STDERR node.exe",
+                File.ReadAllText(Path.Combine(outputRoot, "browser-dom-js.log")), StringComparison.Ordinal);
             // Hardware gates stay NOT_RUN by design and are reported as such, never as PASS.
             Assert.Equal("NOT_RUN", status.GetProperty("physicalGpuAndLongContext").GetString());
+        }
+        finally
+        {
+            DeleteQuietly(root);
+        }
+    }
+
+    [WindowsFact(WindowsOnly)]
+    public async Task Agent_platform_acceptance_with_node_nonzero_exit_records_browserDomJs_as_FAIL()
+    {
+        string root = NewScratchDirectory();
+        try
+        {
+            string outputRoot = Path.Combine(root, "out");
+            string shims = await WriteShimsAsync(root, "dotnet", "node");
+
+            ScriptRun run = await RunScriptAsync("tools/test-agent-platform-v2.ps1",
+                new[] { "-OutputRoot", outputRoot }, pathValue: ShimPath(shims),
+                environment: new Dictionary<string, string> { ["PARUX_VALIDATION_NODE_EXIT"] = "23" });
+
+            Assert.NotEqual(0, run.ExitCode);
+            JsonElement status = ReadStatus(outputRoot);
+            Assert.Equal("PASS", status.GetProperty("unit").GetString());
+            Assert.Equal("FAIL", status.GetProperty("browserDomJs").GetString());
+            Assert.Contains("NATIVE_SHIM_STDERR node.exe",
+                File.ReadAllText(Path.Combine(outputRoot, "browser-dom-js.log")), StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteQuietly(root);
+        }
+    }
+
+    [WindowsFact(WindowsOnly)]
+    public async Task Agent_platform_native_process_capture_preserves_stderr_and_exit_codes()
+    {
+        string root = NewScratchDirectory();
+        try
+        {
+            string outputRoot = Path.Combine(root, "out");
+            ScriptRun run = await RunScriptAsync("tools/test-agent-platform-v2.ps1",
+                new[] { "-OutputRoot", outputRoot, "-SelfTestNativeProcessCapture" });
+
+            Assert.Equal(0, run.ExitCode);
+            Assert.Contains("SENTINEL_STDOUT", run.Output, StringComparison.Ordinal);
+            Assert.Contains("SENTINEL_STDERR", run.Output, StringComparison.Ordinal);
+            Assert.Contains("exit 0, native stderr with exit 23", run.Output, StringComparison.Ordinal);
+            string exceptionLog = Path.Combine(outputRoot, "agent-process-capture-powershell-exception.log");
+            Assert.Contains("SENTINEL_PS_EXCEPTION", File.ReadAllText(exceptionLog), StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteQuietly(root);
+        }
+    }
+
+    [WindowsFact(WindowsOnly)]
+    public async Task Agent_validation_syntax_gate_recompiles_changed_modal_source_in_reused_powershell_host()
+    {
+        string root = NewScratchDirectory();
+        try
+        {
+            string repository = RepositoryRoot();
+            string[] requiredScripts =
+            {
+                "tools/test-agent-validation-syntax.ps1",
+                "tools/test-agent-platform-v2.ps1",
+                "tools/test-agent-native-ui-e2e.ps1",
+                "tools/test-agent-native-modal-e2e.ps1",
+                "tools/test-agent-live-computer-use.ps1",
+                "tools/test-winapp-functional.ps1",
+                "tools/test-winapp-ui.ps1",
+                "tools/test-ui.ps1"
+            };
+            foreach (string relative in requiredScripts)
+            {
+                string destination = Path.Combine(root, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(Path.Combine(repository, relative), destination, overwrite: true);
+            }
+
+            string harness = Path.Combine(root, "revalidate-modal-source.ps1");
+            File.WriteAllText(harness, @"
+$ErrorActionPreference = 'Stop'
+$syntaxGate = $env:PARUX_SYNTAX_GATE_PATH
+$modalSourcePath = $env:PARUX_MODAL_SOURCE_PATH
+& $syntaxGate
+$source = [IO.File]::ReadAllText($modalSourcePath)
+$validMethod = 'return IsWindowEnabled(new IntPtr(hwnd));'
+if (-not $source.Contains($validMethod)) { throw 'Could not locate the modal method in the isolated source copy.' }
+[IO.File]::WriteAllText($modalSourcePath, $source.Replace($validMethod, 'return ???;'))
+$compileFailure = $null
+try { & $syntaxGate } catch { $compileFailure = $_.Exception.ToString() }
+if ($null -eq $compileFailure) { throw 'The syntax gate accepted modified invalid modal C# after an earlier successful compile.' }
+if ($compileFailure -notmatch 'return \?\?\?;') {
+    throw ('The second syntax-gate run failed for an unexpected reason: ' + $compileFailure)
+}
+Write-Output 'PASS: second gate run compiled the current malformed modal source and rejected it.'
+");
+
+            ScriptRun run = await RunScriptAsync(harness, Array.Empty<string>(),
+                environment: new Dictionary<string, string>
+                {
+                    ["PARUX_SYNTAX_GATE_PATH"] = Path.Combine(root, "tools", "test-agent-validation-syntax.ps1"),
+                    ["PARUX_MODAL_SOURCE_PATH"] = Path.Combine(root, "tools", "test-agent-native-modal-e2e.ps1")
+                },
+                hostOverride: WindowsPowerShellHost());
+
+            Assert.True(run.ExitCode == 0, run.Output);
+            Assert.Contains("PASS: second gate run compiled the current malformed modal source and rejected it.",
+                run.Output, StringComparison.Ordinal);
         }
         finally
         {
@@ -90,10 +203,14 @@ public sealed class ValidationScriptSelfTests
         string relativeScript,
         IReadOnlyList<string> arguments,
         string? pathValue = null,
-        IReadOnlyDictionary<string, string>? environment = null)
+        IReadOnlyDictionary<string, string>? environment = null,
+        string? hostOverride = null)
     {
         string root = RepositoryRoot();
-        string host = PowerShellHost();
+        string host = hostOverride ?? PowerShellHost();
+        string scriptPath = Path.IsPathRooted(relativeScript)
+            ? relativeScript
+            : Path.Combine(root, relativeScript);
         var startInfo = new ProcessStartInfo
         {
             FileName = host,
@@ -103,7 +220,7 @@ public sealed class ValidationScriptSelfTests
             RedirectStandardError = true,
             CreateNoWindow = true
         };
-        foreach (string argument in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", Path.Combine(root, relativeScript) }
+        foreach (string argument in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath }
                      .Concat(arguments))
         {
             startInfo.ArgumentList.Add(argument);
@@ -131,8 +248,8 @@ public sealed class ValidationScriptSelfTests
         return new ScriptRun(process.ExitCode, await stdout + Environment.NewLine + await stderr);
     }
 
-    // The shim directory is searched first. System32 stays reachable so cmd.exe and the PowerShell runtime
-    // resolve, but a real node or dotnet installed elsewhere on PATH is not visible to the script.
+    // The shim directory is searched first. Windows system paths remain available, but real node or dotnet
+    // installations elsewhere on PATH are not visible to the acceptance script.
     private static string ShimPath(string shimDirectory) =>
         string.Join(Path.PathSeparator, new[]
         {
@@ -141,15 +258,72 @@ public sealed class ValidationScriptSelfTests
             Environment.GetFolderPath(Environment.SpecialFolder.Windows)
         });
 
-    // PowerShell shims rather than .cmd files. cmd.exe would parse the unquoted '|' in the unit filter as a
-    // pipeline and report the shim itself as failed, which would be a property of cmd and not of the script.
-    private static string WriteShims(string root, params string[] names)
+    // Build fixed native-process shims so ProcessStartInfo exercises the same executable path as production.
+    // They ignore arguments, emit deterministic stdout/stderr sentinels, and only return a configurable code
+    // for the node shim; no shell or user-provided command text is interpreted.
+    private static async Task<string> WriteShimsAsync(string root, params string[] names)
     {
         string directory = Path.Combine(root, "shims");
         Directory.CreateDirectory(directory);
+        string source = Path.Combine(root, "NativeGateShim.cs");
+        string appHost = Path.Combine(directory, "NativeGateShim.exe");
+        File.WriteAllText(source,
+            "using System;\r\nusing System.IO;\r\ninternal static class Program\r\n{\r\n    private static int Main()\r\n    {\r\n        string exe = Path.GetFileName(Environment.GetCommandLineArgs()[0]);\r\n        Console.Out.WriteLine(\"NATIVE_SHIM_STDOUT \" + exe);\r\n        Console.Error.WriteLine(\"NATIVE_SHIM_STDERR \" + exe);\r\n        int code;\r\n        return String.Equals(exe, \"node.exe\", StringComparison.OrdinalIgnoreCase) && Int32.TryParse(Environment.GetEnvironmentVariable(\"PARUX_VALIDATION_NODE_EXIT\"), out code) ? code : 0;\r\n    }\r\n}\r\n");
+
+        string compiler = FrameworkCSharpCompiler();
+        var buildInfo = new ProcessStartInfo
+        {
+            FileName = compiler,
+            WorkingDirectory = root,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        foreach (string argument in new[] { "/nologo", "/target:exe", "/out:" + appHost, source })
+            buildInfo.ArgumentList.Add(argument);
+
+        using Process build = Process.Start(buildInfo)
+            ?? throw new InvalidOperationException("Could not start the .NET Framework C# compiler to build the test-only native shim.");
+        Task<string> stdout = build.StandardOutput.ReadToEndAsync();
+        Task<string> stderr = build.StandardError.ReadToEndAsync();
+        using var deadline = new CancellationTokenSource(ProcessLimit);
+        try
+        {
+            await build.WaitForExitAsync(deadline.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            try { build.Kill(entireProcessTree: true); } catch { }
+            throw new TimeoutException("The test-only native shim build did not finish within " + ProcessLimit.TotalMinutes + " minutes.");
+        }
+        string buildOutput = await stdout + Environment.NewLine + await stderr;
+        if (build.ExitCode != 0)
+            throw new InvalidOperationException("Could not compile the test-only native shim: " + buildOutput);
+
+        Assert.True(File.Exists(appHost), "The .NET Framework compiler did not produce the expected native shim executable.");
         foreach (string name in names)
-            File.WriteAllText(Path.Combine(directory, name + ".ps1"), "exit 0\r\n");
+        {
+            if (name is not ("dotnet" or "node"))
+                throw new ArgumentException("Only the fixed dotnet and node test shim names are supported.", nameof(names));
+            File.Copy(appHost, Path.Combine(directory, name + ".exe"), overwrite: true);
+        }
         return directory;
+    }
+
+    private static string FrameworkCSharpCompiler()
+    {
+        string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        string frameworkRoot = Path.Combine(windows, "Microsoft.NET");
+        string[] candidates = Environment.Is64BitOperatingSystem
+            ? new[]
+            {
+                Path.Combine(frameworkRoot, "Framework64", "v4.0.30319", "csc.exe"),
+                Path.Combine(frameworkRoot, "Framework", "v4.0.30319", "csc.exe")
+            }
+            : new[] { Path.Combine(frameworkRoot, "Framework", "v4.0.30319", "csc.exe") };
+        return candidates.FirstOrDefault(File.Exists)
+            ?? throw new InvalidOperationException("The .NET Framework C# compiler was not found; required for the Windows acceptance test's native process shims.");
     }
 
     private static JsonElement ReadStatus(string outputRoot)
@@ -177,6 +351,16 @@ public sealed class ValidationScriptSelfTests
             Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
         if (File.Exists(windowsPowerShell)) return windowsPowerShell;
         throw new InvalidOperationException("No PowerShell host was found, so the acceptance-script self-tests could not run.");
+    }
+
+    private static string WindowsPowerShellHost()
+    {
+        string path = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.System),
+            "WindowsPowerShell", "v1.0", "powershell.exe");
+        return File.Exists(path)
+            ? path
+            : throw new InvalidOperationException("Windows PowerShell was not found for the legacy Add-Type regression.");
     }
 
     private static string RepositoryRoot()

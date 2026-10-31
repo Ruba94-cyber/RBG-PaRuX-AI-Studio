@@ -145,7 +145,7 @@ public sealed class ComputerUseGuiProofLedgerTests
     private static ComputerUseWindowFocusPolicy.Candidate OsWindow(
         string file, int pid, long hwnd) =>
         new("OS title is not evidence", pid, hwnd,
-            Path.Combine(Path.GetTempPath(), "parux-provenance-fixture", file));
+            Path.Combine(Path.GetTempPath(), "parux-provenance-fixture", file), 100);
 
     [Fact]
     public void Two_approved_processes_are_verified_again_from_separate_fresh_trees()

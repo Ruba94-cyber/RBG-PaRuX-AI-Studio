@@ -66,7 +66,9 @@ namespace PaRuXTestOnly {
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int length);
         [DllImport("user32.dll")] private static extern bool IsWindowEnabled(IntPtr hwnd);
-        public static bool Enabled(long hwnd) => IsWindowEnabled(new IntPtr(hwnd));
+        public static bool Enabled(long hwnd) {
+            return IsWindowEnabled(new IntPtr(hwnd));
+        }
         public static int Pid(long hwnd) {
             uint pid;
             GetWindowThreadProcessId(new IntPtr(hwnd), out pid);

@@ -57,6 +57,15 @@ namespace PaRuX.Services
             return list ?? new List<GamingProviderStatusDto>();
         }
 
+        public Task<GamingCallResult<List<ManualGameDto>>> ListManualGamesAsync(CancellationToken ct = default) =>
+            SendAsync<List<ManualGameDto>>(HttpMethod.Get, "/api/v1/gaming/library", null, ct);
+
+        public Task<GamingCallResult<ManualGameDto>> AddManualGameAsync(AddManualGameRequest request, CancellationToken ct = default) =>
+            SendAsync<ManualGameDto>(HttpMethod.Post, "/api/v1/gaming/library", request, ct);
+
+        public Task<GamingCallResult<object>> RemoveManualGameAsync(string id, CancellationToken ct = default) =>
+            SendAsync<object>(HttpMethod.Delete, "/api/v1/gaming/library/" + Uri.EscapeDataString(id), null, ct);
+
         private static async Task<GamingCallResult<T>> SendAsync<T>(HttpMethod method, string path, object? body, CancellationToken ct)
         {
             try

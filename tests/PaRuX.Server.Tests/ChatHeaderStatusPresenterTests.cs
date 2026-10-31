@@ -36,9 +36,19 @@ public sealed class ChatHeaderStatusPresenterTests
     public void Healthy_model_shows_profile_and_marks_active_coding_work()
     {
         var header = ChatHeaderStatusPresenter.Describe(State(healthy: true, process: true, profile: "Qwen3.5-4B Standard GPU"), "Generating");
-        Assert.Equal("Qwen 4B · Standard · coding task", header.Text);
+        Assert.Equal("Qwen3.5-4B · Standard · coding task", header.Text);
         Assert.Equal(ChatHeaderDot.Ok, header.Dot);
-        Assert.Equal("Qwen 4B · Standard", ChatHeaderStatusPresenter.Describe(State(healthy: true, profile: "Qwen3.5-4B Standard GPU"), null).Text);
+        Assert.Equal("Qwen3.5-4B · Standard", ChatHeaderStatusPresenter.Describe(State(healthy: true, profile: "Qwen3.5-4B Standard GPU"), null).Text);
+    }
+
+    [Fact]
+    public void Unready_provider_does_not_expose_a_stale_active_model_profile()
+    {
+        var header = ChatHeaderStatusPresenter.Describe(
+            State(healthy: false, process: false, profile: "Qwen3.8-27B Standard GPU"), null);
+
+        Assert.Equal("Model idle", header.Text);
+        Assert.Equal(ChatHeaderDot.Off, header.Dot);
     }
 
     [Fact]

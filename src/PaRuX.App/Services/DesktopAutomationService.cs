@@ -19,6 +19,7 @@ namespace PaRuX.Services
         // Read by Windows, not by the model or the untrusted window title.
         public int ProcessId { get; set; }
         public string ExecutablePath { get; set; } = string.Empty;
+        public long ProcessStartTimeUtcTicks { get; set; }
     }
 
     /// <summary>
@@ -73,7 +74,6 @@ namespace PaRuX.Services
 
         private const uint MOUSEEVENTF_WHEEL = 0x0800;
 
-        private const uint KEYEVENTF_KEYUP = 0x0002;
         private const uint KEYEVENTF_UNICODE = 0x0004;
         private const uint KEYEVENTF_SCANCODE = 0x0008;
 
@@ -271,7 +271,7 @@ namespace PaRuX.Services
 
         /// <summary>Presses a key combo like "Ctrl+S", "Alt+Tab", or a single key like "Enter". Keys that went down
         /// are always released, including when the combo is cancelled part way through.</summary>
-        public static async Task<bool> PressKeyComboAsync(string combo, CancellationToken cancellationToken = default)
+        public static async Task<bool> PressKeyComboAsync(string combo, CancellationToken cancellationToken = default, Func<bool>? mayContinue = null)
         {
             if (string.IsNullOrWhiteSpace(combo)) return false;
             var codes = new List<ushort>();
@@ -285,28 +285,8 @@ namespace PaRuX.Services
             }
             if (codes.Count == 0) return false;
 
-            cancellationToken.ThrowIfCancellationRequested();
-            int pressed = 0;
-            bool accepted = true;
-            try
-            {
-                foreach (ushort code in codes)
-                {
-                    if (Win32Driver.SendKeyboardEvent(code, 0, 0) == 0)
-                    {
-                        accepted = false;
-                        break;
-                    }
-                    pressed++;
-                }
-                if (accepted) await Task.Delay(30, cancellationToken).ConfigureAwait(false);
-            }
-            finally
-            {
-                // Release whatever went down, even when cancelled mid-combo, so no modifier stays held.
-                for (int i = pressed - 1; i >= 0; i--) Win32Driver.SendKeyboardEvent(codes[i], 0, KEYEVENTF_KEYUP);
-            }
-            return accepted;
+            return await ComputerUseKeyboard.PressComboAsync(Win32Driver, codes, mayContinue, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         // ------------------------------------------------------------------
@@ -330,6 +310,7 @@ namespace PaRuX.Services
                 string processName = "unknown";
                 string executablePath = string.Empty;
                 int processId = 0;
+                long processStartTimeUtcTicks = 0;
                 try
                 {
                     GetWindowThreadProcessId(hWnd, out uint pid);
@@ -339,6 +320,7 @@ namespace PaRuX.Services
                         using Process process = Process.GetProcessById(processId);
                         processName = process.ProcessName;
                         executablePath = process.MainModule?.FileName ?? string.Empty;
+                        processStartTimeUtcTicks = process.StartTime.ToUniversalTime().Ticks;
                     }
                 }
                 catch
@@ -351,7 +333,8 @@ namespace PaRuX.Services
                 results.Add(new DesktopWindowInfo
                 {
                     Handle = hWnd, Title = title, ProcessName = processName,
-                    ProcessId = processId, ExecutablePath = executablePath
+                    ProcessId = processId, ExecutablePath = executablePath,
+                    ProcessStartTimeUtcTicks = processStartTimeUtcTicks
                 });
                 return true;
             }, IntPtr.Zero);
@@ -371,10 +354,12 @@ namespace PaRuX.Services
                 if (pid == 0 || pid > int.MaxValue) return null;
                 using Process process = Process.GetProcessById((int)pid);
                 string? executable = process.MainModule?.FileName;
+                long processStartTimeUtcTicks = process.StartTime.ToUniversalTime().Ticks;
                 if (!ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(executable))
                     return null;
                 return new ComputerUseWindowFocusPolicy.Candidate(
-                    string.Empty, (int)pid, handle.ToInt64(), executable);
+                    string.Empty, (int)pid, handle.ToInt64(), executable,
+                    processStartTimeUtcTicks);
             }
             catch (Exception)
             {

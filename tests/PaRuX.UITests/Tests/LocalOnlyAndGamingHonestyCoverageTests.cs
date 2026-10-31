@@ -298,6 +298,11 @@ public sealed class LocalOnlyAndGamingHonestyCoverageTests
             var profileText = UiWait.ById(app.MainWindow, "Chat_Header_Profile_Text", ControlType.Text);
             Assert.Equal("Model idle", profileText.Name);
 
+            var providerGuidance = UiWait.ById(app.MainWindow, "Chat_EmptyState_Provider_Guidance_Text", ControlType.Text);
+            Assert.Contains("Choose a provider and compatible model", providerGuidance.Name, StringComparison.Ordinal);
+            Assert.DoesNotContain("Qwen", providerGuidance.Name, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("entirely on your machine", providerGuidance.Name, StringComparison.OrdinalIgnoreCase);
+
             var routeReasonBtn = UiWait.ById(app.MainWindow, "Chat_SimpleMode_RouteReason_Button", ControlType.Button);
             Assert.StartsWith("Why this model?", routeReasonBtn.Name, StringComparison.Ordinal);
 

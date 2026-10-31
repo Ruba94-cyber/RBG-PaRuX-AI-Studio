@@ -12,15 +12,18 @@ namespace PaRuX.Services
     /// running the SAME exe needs another explicitly verified focus.
     /// A secondary process with a different executable requires its own
     /// user-configured application approval, never inherited parent rights.
-    /// This is not an OS security sandbox or PID-reuse-resistant attestation.
+    /// Process creation time distinguishes PID reuse, but this is not an OS
+    /// security sandbox or an atomic lock on a window/process.
     /// </summary>
     internal sealed class ComputerUseTaskAppLease
     {
         private string? _executablePath;
         private int _verifiedProcessId;
+        private long _verifiedProcessStartTimeUtcTicks;
 
         internal bool IsActive => _executablePath != null;
-        internal bool HasVerifiedProcess => _verifiedProcessId > 0;
+        internal bool HasVerifiedProcess => _verifiedProcessId > 0
+            && _verifiedProcessStartTimeUtcTicks > 0;
 
         internal bool BindApprovedExecutable(string? path)
         {
@@ -30,6 +33,7 @@ namespace PaRuX.Services
             // An approved path is NOT an approved process instance. Do not
             // accept arbitrary windows running another copy of the same exe.
             _verifiedProcessId = 0;
+            _verifiedProcessStartTimeUtcTicks = 0;
             return true;
         }
 
@@ -46,6 +50,7 @@ namespace PaRuX.Services
             bool executableExplicitlyApproved)
         {
             if (window == null || window.ProcessId <= 0 || window.WindowHandle == 0
+                || window.ProcessStartTimeUtcTicks <= 0
                 || !ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(window.ExecutablePath))
                 return false;
             // A second window of the already selected PID needs no extra
@@ -55,6 +60,7 @@ namespace PaRuX.Services
                 return false;
             _executablePath = window.ExecutablePath;
             _verifiedProcessId = window.ProcessId;
+            _verifiedProcessStartTimeUtcTicks = window.ProcessStartTimeUtcTicks;
             return true;
         }
 
@@ -83,6 +89,7 @@ namespace PaRuX.Services
                 || freshWindow.ProcessId != screenshotWindow.ProcessId
                 || freshWindow.WindowHandle != screenshotWindow.WindowHandle
                 || screenshotWindow.ProcessId != _verifiedProcessId
+                || freshWindow.ProcessStartTimeUtcTicks != _verifiedProcessStartTimeUtcTicks
                 || !ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(
                     freshWindow.ExecutablePath)
                 || !string.Equals(freshWindow.ExecutablePath, _executablePath,

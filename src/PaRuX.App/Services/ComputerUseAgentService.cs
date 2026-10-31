@@ -513,9 +513,26 @@ namespace PaRuX.Services
                                         StepsTaken = step,
                                         Summary = "Stopped during final UI verification: " + stopAfterRead
                                     };
+                                bool finalReadbackLeaseValid = true;
+                                if (finalReadback.HasEvidence && appLease.IsActive)
+                                {
+                                    ComputerUseWindowFocusPolicy.Candidate? finalIdentity =
+                                        DesktopAutomationService.CaptureWindowFocusIdentity(
+                                            new IntPtr(finalReadback.WindowHandle));
+                                    string[] finalApprovedPaths = (SettingsStore.Current.Data.ComputerApps
+                                        ?? new List<ComputerAppShortcut>())
+                                        .Select(a => a.ExecutablePath).ToArray();
+                                    finalReadbackLeaseValid = appLease.RefusalForAction(
+                                        new ForegroundWindowSnapshot(
+                                            finalReadback.ProcessId,
+                                            finalReadback.WindowHandle,
+                                            string.Empty),
+                                        finalIdentity, finalApprovedPaths) == null;
+                                }
                                 finalReadbackVerified = finalReadback.HasEvidence
                                     && pin.RefusalForUiaObservation(
                                         finalReadback.ProcessId, finalReadback.WindowHandle) == null
+                                    && finalReadbackLeaseValid
                                     && guiProofs.RecheckAll(finalReadback);
                             }
                             trace.RecordFinalReadback(
@@ -644,6 +661,23 @@ namespace PaRuX.Services
                         string? newRefusal = fresh.HasEvidence
                             ? pin.RefusalForUiaObservation(fresh.ProcessId, fresh.WindowHandle)
                             : "No fresh UI Automation observation is available.";
+                        ComputerUseWindowFocusPolicy.Candidate? assertedIdentity = null;
+                        string[] assertionAllowlist = (SettingsStore.Current.Data.ComputerApps
+                            ?? new List<ComputerAppShortcut>())
+                            .Select(a => a.ExecutablePath).ToArray();
+                        if (newRefusal == null && appLease.IsActive)
+                        {
+                            // CaptureForegroundAsync crosses an async boundary.
+                            // PID/HWND alone can still match a recycled process,
+                            // so recheck the leased instance before reading or
+                            // recording a UI assertion.
+                            assertedIdentity = DesktopAutomationService.CaptureWindowFocusIdentity(
+                                new IntPtr(fresh.WindowHandle));
+                            newRefusal = appLease.RefusalForAction(
+                                new ForegroundWindowSnapshot(
+                                    fresh.ProcessId, fresh.WindowHandle, string.Empty),
+                                assertedIdentity, assertionAllowlist);
+                        }
                         if (newRefusal != null)
                             return new ComputerUseAgentResult
                             {
@@ -684,6 +718,27 @@ namespace PaRuX.Services
                                     + status + "). Recovery is unavailable or its budget was exhausted."
                             };
                         }
+                        if (appLease.IsActive)
+                        {
+                            // Keep the process-instance check adjacent to proof
+                            // creation as well; the exact assertion evaluation
+                            // must not bridge a replacement of the leased app.
+                            assertedIdentity = DesktopAutomationService.CaptureWindowFocusIdentity(
+                                new IntPtr(fresh.WindowHandle));
+                            assertionAllowlist = (SettingsStore.Current.Data.ComputerApps
+                                ?? new List<ComputerAppShortcut>())
+                                .Select(a => a.ExecutablePath).ToArray();
+                            string? leaseRefusal = appLease.RefusalForAction(
+                                new ForegroundWindowSnapshot(
+                                    fresh.ProcessId, fresh.WindowHandle, string.Empty),
+                                assertedIdentity, assertionAllowlist);
+                            if (leaseRefusal != null)
+                                return new ComputerUseAgentResult
+                                {
+                                    StepsTaken = step,
+                                    Summary = "UI assertion cannot verify target: " + leaseRefusal
+                                };
+                        }
                         ComputerUseGuiFinalProof? newProof =
                             ComputerUseGuiFinalProof.FromVerifiedAssertion(
                                 fresh.ProcessId, fresh.WindowHandle,
@@ -694,19 +749,14 @@ namespace PaRuX.Services
                         // executable is STILL in the user's live allowlist.
                         // Built-in/unattested targets keep strict single-window
                         // legacy verification, never silent cross-app scope.
-                        ComputerUseWindowFocusPolicy.Candidate? assertedIdentity =
-                            appLease.HasVerifiedProcess
-                                ? DesktopAutomationService.CaptureWindowFocusIdentity(
-                                    new IntPtr(fresh.WindowHandle))
-                                : null;
-                        string[] assertionAllowlist = (SettingsStore.Current.Data.ComputerApps
+                        string[] currentAssertionAllowlist = (SettingsStore.Current.Data.ComputerApps
                             ?? new List<ComputerAppShortcut>())
                             .Select(a => a.ExecutablePath).ToArray();
                         bool attestedAllowed = assertedIdentity != null
                             && assertedIdentity.ProcessId == fresh.ProcessId
                             && assertedIdentity.WindowHandle == fresh.WindowHandle
                             && ComputerUseWindowFocusPolicy.IsInScope(
-                                assertedIdentity, 0, assertionAllowlist);
+                                assertedIdentity, 0, currentAssertionAllowlist);
                         ComputerUseGuiProofLedger.AddResult recorded =
                             attestedAllowed
                                 ? guiProofs.TryRecordVerifiedWindow(newProof, assertedIdentity)
@@ -768,7 +818,9 @@ namespace PaRuX.Services
                         WindowsUiActionService.Result delivery =
                             await WindowsUiActionService.ExecuteAsync(
                                 typed, action.Selector, action.Text,
-                                uia.ProcessId, uia.WindowHandle, ct)
+                                uia.ProcessId, uia.WindowHandle, ct,
+                                () => RefusalForUiInFlight(pin, appLease, stopReason) == null,
+                                () => RefusalForDispatch(pin, appLease, stopReason) == null)
                                 .ConfigureAwait(false);
                         onStep?.Invoke("Step " + step + ": UIA " + delivery.Status + ".");
                         actionLog.Add("UIA result: " + delivery.Status);
@@ -895,12 +947,13 @@ namespace PaRuX.Services
             Func<string?> stopReason, ComputerUseTaskAppLease appLease)
         {
             ct.ThrowIfCancellationRequested();
+            Func<bool> authorized = () => RefusalForDispatch(pin, appLease, stopReason) == null;
             // The caller has canonicalised the name and refused every name the grammar does not define. The empty
             // fallback therefore lands on the refusal in the default case below, never on the success path.
             string kind = ComputerUseActionParser.CanonicalAction(action.Action) ?? string.Empty;
             if (IsPixelAction(kind))
             {
-                string? refusal = pin.RefusalIfChanged();
+                string? refusal = RefusalForDispatch(pin, appLease, stopReason);
                 if (refusal != null) return refusal;
             }
             if (kind is "click" or "double_click" or "right_click" or "scroll")
@@ -914,19 +967,19 @@ namespace PaRuX.Services
             switch (kind)
             {
                 case "click":
-                    return await ClickPinnedAsync(RequireX(action), RequireY(action), action.Button ?? "left", false, pin, ct).ConfigureAwait(false);
+                    return await ClickPinnedAsync(RequireX(action), RequireY(action), action.Button ?? "left", false, pin, ct, authorized).ConfigureAwait(false);
                 case "double_click":
-                    return await ClickPinnedAsync(RequireX(action), RequireY(action), action.Button ?? "left", true, pin, ct).ConfigureAwait(false);
+                    return await ClickPinnedAsync(RequireX(action), RequireY(action), action.Button ?? "left", true, pin, ct, authorized).ConfigureAwait(false);
                 case "right_click":
-                    return await ClickPinnedAsync(RequireX(action), RequireY(action), "right", false, pin, ct).ConfigureAwait(false);
+                    return await ClickPinnedAsync(RequireX(action), RequireY(action), "right", false, pin, ct, authorized).ConfigureAwait(false);
                 case "move":
                     return DesktopAutomationService.MoveMouseTo(RequireX(action), RequireY(action))
                         ? null : "Windows did not move the pointer, so nothing was sent.";
                 case "type":
-                    return await TypePinnedAsync(action.Text ?? string.Empty, pin, ct, stopReason).ConfigureAwait(false);
+                    return await TypePinnedAsync(action.Text ?? string.Empty, pin, ct, stopReason, authorized).ConfigureAwait(false);
                 case "key":
                 {
-                    bool pressed = await DesktopAutomationService.PressKeyComboAsync(action.Combo ?? string.Empty, ct).ConfigureAwait(false);
+                    bool pressed = await DesktopAutomationService.PressKeyComboAsync(action.Combo ?? string.Empty, ct, authorized).ConfigureAwait(false);
                     return pressed ? null : "The key combo is not recognized, or Windows did not accept it, so nothing was pressed.";
                 }
                 case "scroll":
@@ -962,7 +1015,8 @@ namespace PaRuX.Services
                     if (appLease.RefusalForCurrentApproval(approvedPaths) is { } revokedScope)
                         return revokedScope;
                     var candidates = windows.Select(w => new ComputerUseWindowFocusPolicy.Candidate(
-                        w.Title, w.ProcessId, w.Handle.ToInt64(), w.ExecutablePath)).ToArray();
+                        w.Title, w.ProcessId, w.Handle.ToInt64(), w.ExecutablePath,
+                        w.ProcessStartTimeUtcTicks)).ToArray();
 
                     // A title alone is not app ownership. Only same-process
                     // windows or explicitly user-approved executables are selectable.
@@ -1046,11 +1100,35 @@ namespace PaRuX.Services
         private static int RequireY(ComputerUseAction action) =>
             action.Y ?? throw new InvalidOperationException("A pixel action reached the executor without a y coordinate.");
 
+        private static string? RefusalForDispatch(ComputerUseInputPin pin, ComputerUseTaskAppLease lease, Func<string?> stopReason)
+        {
+            string? refusal = stopReason() ?? pin.RefusalIfChanged();
+            if (refusal != null || !lease.IsActive) return refusal;
+            var identity = DesktopAutomationService.CaptureWindowFocusIdentity(new IntPtr(pin.Pinned.WindowHandle));
+            string[] approved = (SettingsStore.Current.Data.ComputerApps ?? new List<ComputerAppShortcut>())
+                .Select(a => a.ExecutablePath).ToArray();
+            return lease.RefusalForAction(pin.Pinned, identity, approved);
+        }
+
+        private static string? RefusalForUiInFlight(ComputerUseInputPin pin, ComputerUseTaskAppLease lease, Func<string?> stopReason)
+        {
+            string? refusal = stopReason();
+            if (refusal != null) return refusal;
+            if (!lease.IsActive) return pin.RefusalIfChanged();
+            // A UIA invoke may legitimately open a modal in the same leased
+            // instance. It may not hand authority to a different process.
+            ForegroundWindowSnapshot foreground = DesktopAutomationService.CaptureForegroundWindow();
+            var identity = DesktopAutomationService.CaptureWindowFocusIdentity(new IntPtr(foreground.WindowHandle));
+            string[] approved = (SettingsStore.Current.Data.ComputerApps ?? new List<ComputerAppShortcut>())
+                .Select(a => a.ExecutablePath).ToArray();
+            return lease.RefusalForAction(foreground, identity, approved);
+        }
+
         private static async Task<string?> ClickPinnedAsync(
-            int x, int y, string button, bool doubleClick, ComputerUseInputPin pin, CancellationToken ct)
+            int x, int y, string button, bool doubleClick, ComputerUseInputPin pin, CancellationToken ct, Func<bool> authorized)
         {
             ComputerUsePointer.ClickResult result = await DesktopAutomationService.ClickAsync(
-                x, y, button, doubleClick, ct, () => pin.IsStillForegroundAt(x, y)).ConfigureAwait(false);
+                x, y, button, doubleClick, ct, () => pin.IsStillForegroundAt(x, y) && authorized()).ConfigureAwait(false);
             switch (result.Outcome)
             {
                 case ComputerUsePointer.Outcome.Delivered:
@@ -1066,10 +1144,10 @@ namespace PaRuX.Services
         }
 
         private static async Task<string?> TypePinnedAsync(
-            string text, ComputerUseInputPin pin, CancellationToken ct, Func<string?> stopReason)
+            string text, ComputerUseInputPin pin, CancellationToken ct, Func<string?> stopReason, Func<bool> authorized)
         {
             ComputerUseTypingSequencer.Result typed = await DesktopAutomationService.TypeTextAsync(
-                text, ct, pin.IsStillForeground, () => stopReason() == null).ConfigureAwait(false);
+                text, ct, pin.IsStillForeground, authorized).ConfigureAwait(false);
             switch (typed.Outcome)
             {
                 case ComputerUseTypingSequencer.Outcome.Completed:

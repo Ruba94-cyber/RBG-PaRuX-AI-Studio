@@ -143,7 +143,7 @@ internal sealed class RealCodingProduct : IDisposable
             UiWait.For(() =>
             {
                 mainWindow = _application.GetAllTopLevelWindows(Automation)
-                    .FirstOrDefault(window => string.Equals(window.Title, "RBG PaRuX AI Studio", StringComparison.Ordinal));
+                    .FirstOrDefault(window => string.Equals(window.Title, "PaRuX AI & Gaming OS", StringComparison.Ordinal));
                 return mainWindow != null;
             }, "PaRuX main window", TimeSpan.FromSeconds(60));
             MainWindow = mainWindow ?? throw new InvalidOperationException("PaRuX main window was not found.");

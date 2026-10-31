@@ -45,6 +45,8 @@ namespace PaRuX.Services
                 return GamingCallResult<T>.Fail(DescribeRefusal(response.StatusCode, body));
             }
 
+            if (response.StatusCode == HttpStatusCode.NoContent) return GamingCallResult<T>.Ok(default);
+
             T? value = await response.Content.ReadFromJsonAsync<T>(options, ct).ConfigureAwait(false);
             return GamingCallResult<T>.Ok(value);
         }

@@ -5,6 +5,23 @@ namespace PaRuX.Server.Tests;
 
 public sealed class WindowsUiActionServiceTests
 {
+    [Fact]
+    public async Task Pending_uia_process_is_refused_when_authorization_is_revoked()
+    {
+        var exit = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int checks = 0;
+        bool accepted = await WindowsUiActionService.WaitWhileAuthorizedAsync(
+            exit.Task, () => ++checks < 2, CancellationToken.None);
+        Assert.False(accepted);
+        Assert.False(exit.Task.IsCompleted);
+    }
+
+    [Fact]
+    public async Task Completed_uia_process_is_not_accepted_after_revocation()
+    {
+        Assert.False(await WindowsUiActionService.WaitWhileAuthorizedAsync(
+            Task.CompletedTask, () => false, CancellationToken.None));
+    }
     [Theory]
     [InlineData("btn-save-a1b2", true)]
     [InlineData("txt-input_0", true)]

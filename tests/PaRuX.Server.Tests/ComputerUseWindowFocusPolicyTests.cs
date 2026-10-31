@@ -10,8 +10,8 @@ public sealed class ComputerUseWindowFocusPolicyTests
 {
     private static string Exe(string name) => Path.Combine(Path.GetTempPath(), "parux-fixture", name);
     private static ComputerUseWindowFocusPolicy.Candidate Window(
-        string title, int pid, long handle, string? path) =>
-        new(title, pid, handle, path);
+        string title, int pid, long handle, string? path, long processStartTimeUtcTicks = 1) =>
+        new(title, pid, handle, path, processStartTimeUtcTicks);
 
     [Fact]
     public void An_unapproved_process_cannot_impersonate_an_approved_app_by_title()
@@ -97,7 +97,20 @@ public sealed class ComputerUseWindowFocusPolicyTests
             original, Window("Title", 41, 200, Exe("Editor.exe"))));
         Assert.False(ComputerUseWindowFocusPolicy.IsUnchanged(
             original, Window("Title", 41, 100, Exe("Other.exe"))));
+        Assert.False(ComputerUseWindowFocusPolicy.IsUnchanged(
+            original, Window("Title", 41, 100, Exe("Editor.exe"), processStartTimeUtcTicks: 2)));
         Assert.False(ComputerUseWindowFocusPolicy.IsUnchanged(original, null));
+    }
+
+    [Fact]
+    public void Missing_process_instance_identity_fails_closed()
+    {
+        Assert.False(ComputerUseWindowFocusPolicy.IsInScope(
+            Window("Title", 41, 100, Exe("Editor.exe"), processStartTimeUtcTicks: 0),
+            41, Array.Empty<string>()));
+        Assert.False(ComputerUseWindowFocusPolicy.IsUnchanged(
+            Window("Title", 41, 100, Exe("Editor.exe"), processStartTimeUtcTicks: 0),
+            Window("Title", 41, 100, Exe("Editor.exe"))));
     }
 
     [Fact]

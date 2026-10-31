@@ -2,9 +2,78 @@
 
 Last executive refresh: **2026-10-31**.
 
+## GOS — PaRuX AI & Gaming OS
+
+Added 2026-10-31. PaRuX remains a Windows application; OS describes its integrated experience, not a replacement operating system. Existing tracks and their acceptance gates remain in force. Starting checkout: `1fa1b24169e1aa5cf4536407f4f2a2831ac959a0`, with pre-existing uncommitted work; preserve it. GOS status describes this initiative, not a claim that existing capabilities are absent. `NOT STARTED`, `IN PROGRESS`, `SOURCE IMPLEMENTED`, `TESTED`, `WINDOWS VERIFIED` and `BLOCKED` describe only the explicitly scoped GOS work. No physical acceptance or performance result is implied by source changes.
+
+**Baseline observations:** the WinUI shell uses `src/PaRuX.App/Styles/Theme.xaml`, `MainWindow.xaml` and existing Orbit assets. Gaming has a server-side `WorkloadOrchestrator`, profiles and optional launcher/input providers; native input currently has no mapping logic. Existing Gaming hard-off, security, local-only operation, data compatibility and Chat-first workflows are regression boundaries. Existing documentation says local game exit does not automatically return from Gaming; verify current code and real behavior before changing it. The exact full UI and physical-device audit is still outstanding.
+
+**Common gates for each track:** preserve existing behavior, user data and IT/EN, cancellation, security and accessibility; test errors and disabled-module paths. Run targeted build/tests first, then relevant integration and Windows UI gates. Physical controller, display, GPU and streaming verification cannot be replaced by mocks. Record actual results, not historical tests as fresh GOS evidence. GOS checks: focused AccessibilityTests passed 32/32 (these do not validate rendered theme resources); WinUI app Release build passed with 0 errors and 8 warnings after the final theme edit. Visual, physical and broad regression gates remain NOT RUN. No FPS or VRAM target is certified.
+
+### GOS-00 — Baseline, audit and migration — IN PROGRESS
+- Files: `PARUX_EXECUTION_PLAN.md`, `README.md`, `docs/ARCHITECTURE.md`, `docs/WORKLOAD_ORCHESTRATOR.md`, existing tests and configuration stores. Dependencies: current code and existing release tracks.
+- Risk: dirty checkout and private data; stale docs; migration regressions. Planned: inventory screens, state formats, features, local gates and migration paths. Implemented: this initial baseline and track inventory; comprehensive audit remains open.
+- Required tests/acceptance: repeatable clean baseline and compatibility/migration tests; compare real UI and behavior. Executed: read-only source/document inspection, no executable tests. Open: full screen inventory, migration matrix, current binary identity and independent acceptance.
+
+### GOS-01 — Rebranding and assets — IN PROGRESS
+- Files: `src/PaRuX.App/Assets/`, shell, installer and README assets; identity specification. Depends on GOS-00/02. Risk: unclear small-size mark, incompatible identity migration and cached icon references.
+- Planned: reproducible original geometric identity with light/dark/mono/compact variants, verified raster and Windows assets, staged compatibility. Implemented: existing Orbit assets identified; window/tray display name and README updated; identity specification written. No new asset has been produced or certified.
+- Required tests/acceptance: inspect 16/32 px, contrast and each target surface, verify installer/tray and no broken resources. Executed: asset inventory only. Open: design, export, integration, visual and trademark review.
+
+### GOS-02 — Design System — IN PROGRESS
+- Files: `src/PaRuX.App/Styles/Theme.xaml`, `App.xaml`, `docs/DESIGN_SYSTEM.md`. Depends on GOS-00. Risk: resource references, WinUI templates, contrast and high-contrast regressions.
+- Planned: central palette, type, spacing, geometry and interaction tokens; maintain light and system/high-contrast behavior. Implemented: dark semantic palette and shared navigation/control resources updated, with 32/48/64 spacing tokens; HighContrast dictionary retained and light semantic resources harmonized; rendered high contrast remains unverified. Pressed text contrast calculated at 5.04:1; actual rendered states require verification.
+- Required tests/acceptance: resource resolution/build, WCAG contrast, keyboard/focus, high contrast and DPI checks. Executed: AccessibilityTests 32/32, ThemeResourceRegressionTests 13/13, XML parse and independent source review; these do not establish rendered WCAG compliance. Open: live theme/keyboard/DPI checks, complete hardcoded-color inventory and screen-by-screen migration.
+
+### GOS-03 — Desktop UI/UX Refresh — IN PROGRESS
+- Files: `MainWindow.xaml`, `MainWindow.*`, `Views/ChatView.xaml`, other `Views/`; GOS-02. Risk: losing advanced functions, localization or accessibility during restructuring.
+- Planned: shared controls, navigation and Chat-first Home first, then audited workflows with intact advanced features. Implemented: initial shared navigation palette and shell display name; Chat remains the existing Home. No screen-by-screen refresh claimed.
+- Required tests/acceptance: IT/EN, keyboard, scaling, layout and functional regression across all requested screens. Executed: isolated FlaUI real-window title smoke 1/1; full visual, keyboard, DPI and workflow tests NOT RUN. Open: actual visual audit and per-screen tracking.
+
+### GOS-04 — Console Shell — NOT STARTED
+- Files: shell/navigation and shared services, to be determined. Depends on GOS-02/03/05/06. Risk: disconnected demo, duplicated business logic and inaccessible focus.
+- Planned: controller-first fullscreen shell over existing services, shared settings and functional flows. Implemented: none for this track.
+- Required tests/acceptance: physical controller, focus, virtual keyboard, return-to-Home and no-mouse normal flows. Executed: NOT RUN. Open: lifecycle and controller architecture.
+
+### GOS-05 — Input Hub — NOT STARTED
+- Files: `src/PaRuX.Server/Orchestration/Gaming/Providers/InputProviders.cs`, provider contracts and gaming tests. Depends on GOS-00/04. Risk: double input, unsupported devices and unmaintained drivers.
+- Planned: native detection and profiles, replaceable opt-in virtual backend and Sunshine deduplication. Implemented: pre-existing native, XOutput and Sunshine providers exist; this does not establish integrated mapping or hardware support.
+- Required tests/acceptance: connection, mapping, deadzone and per-device physical tests, driver consent and remote-input deduplication. Executed: NOT RUN. Open: device/backend evaluation and license review.
+
+### GOS-06 — Game Library and Store — IN PROGRESS
+- Files: gaming orchestration and future versioned provider contracts. Depends on GOS-00/04. Risk: untrusted metadata, platform policy, license/DRM and launcher ownership.
+- Planned: independent library and official/manual discovery providers, explicit community sources and permission boundaries. Implemented: initial manual-library backend and desktop-owner API with versioned local storage; desktop UI offers manual add, list, filter, pagination and confirmed removal. It does not launch, scan or install games; no universal library claimed.
+- Required tests/acceptance: provider failures, import, ownership, metadata and real official-library integrations. Executed: manual-library tests 8/8 including HTTP authorization, write failure and future-file preservation; independent backend and UI source reviews PASS; isolated FlaUI add/remove test 1/1 on the starting checkout, preserving the fixture executable. Open: IT/EN, screen reader, navigation during operations, multi-process concurrency, provider contracts and external reference/license review.
+
+### GOS-07 — Download & Install Manager — NOT STARTED
+- Files: existing download services and future provider adapters. Depends on GOS-06. Risk: unsafe archives/installers, provenance and unintended changes.
+- Planned: separate discovery, transfer, integrity, extraction and consented install, with cancellable operations. Implemented: no GOS install flow claimed.
+- Required tests/acceptance: malicious paths, integrity failure, cancellation, permissions, recovery and explicit execution consent. Executed: NOT RUN. Open: provider capabilities and safe installation model.
+
+### GOS-08 — Display & Streaming — NOT STARTED
+- Files: gaming trigger providers and future display services. Depends on GOS-00/04. Risk: persistent unsupported display changes and disconnection recovery.
+- Planned: capability-checked profiles and consented reversible changes, monitor and streaming recovery. Implemented: existing display/Sunshine triggers are not a complete display manager.
+- Required tests/acceptance: physical displays, HDR/VRR where supported, reconnect and Windows setting restoration. Executed: NOT RUN. Open: hardware capability and restore design.
+
+### GOS-09 — Voice Home and resource lifecycle — NOT STARTED
+- Files: `VoiceConversationController.cs`, speech services and `WorkloadOrchestrator.cs`. Depends on GOS-00/04. Risk: recording during game, leaked resources or broken existing AI recovery.
+- Planned: opt-in push-to-talk in Home, stop/unload during Gaming and lazy restoration. Implemented: existing speech and Gaming transitions need a current lifecycle audit; no GOS guarantee claimed.
+- Required tests/acceptance: cancellation/race and device release, real GPU/VRAM and voice process checks during gaming and return. Executed: NOT RUN. Open: real process/resource ownership evidence.
+
+### GOS-10 — QA, performance, security and release — NOT STARTED
+- Files: `tests/`, local `tools/`, security and release documentation. Depends on each applicable track. Risk: false success, privacy leakage, unsupported performance claims or regression in existing features.
+- Planned: local Windows regression, threat review, privacy review, migration and comparative direct-game baseline. Implemented: existing testing infrastructure only; no new GOS release acceptance.
+- Required tests/acceptance: physical end-to-end hardware matrix, direct-game versus PaRuX FPS/frame-time/CPU/RAM/VRAM and lifecycle measurements, release/package and security checks. Executed: NOT RUN. Open: benchmark protocol, representative games and complete evidence; <2% FPS regression is a target, not a measurement.
+
 ## 2026-10-30 — Universal Agent + App Ecosystem: EXECUTION TRACK (ACTIVE, PARTIAL)
 
 ### 2026-10-31 UAI-07 / Windows multi-app agent and verifiable GUI QA (SOURCE IMPLEMENTED, PARTIAL)
+
+**2026-10-31 Windows continuation — PARTIAL:** An isolated Debug build was exercised in the actual PaRuX UI. Onboarding no longer presents a fixed model as required or preselects one; the bundle summary and initial selection direct users to choose a compatible model in Model Hub. The automatic setup remains opt-in. Presenter tests passed 16/16 and targeted UI tests passed 3/3; independent review found no blocking issue. The installed PaRuX application is a separate binary and was not updated by this test.
+
+The Windows task lease and UIA proof paths now include the OS-observed process creation time when comparing window identities, including fresh checks after UIA awaits and before final proof. Focus/lease/ledger policy tests passed 36/36; independent review found the earlier post-await proof gap resolved. These checks are not atomic OS confinement: click/type/key and WinApp action dispatch still require instance-aware checks at their actual delivery points, and a production-flow replacement test remains outstanding.
+
+Microsoft WinApp CLI 0.7.1 was acquired under ignored project-local `.ai/tools`, with the archive digest and executable signature verified. Native fixture functional, recovery, modeless and modal tests passed; these do not execute the PaRuX agent. The modal harness was fixed for Windows PowerShell's compiler and the syntax gate now recompiles its embedded C# even in a reused host. The real agent live test remains NOT_RUN: a fresh isolated Core failed to bind the fixed control port while the installed PaRuX Core was using it, and a configured isolated model plus user task-scoped approval are still needed. No user process was terminated. A subsequent filtered agent-platform run was FAIL: the test host aborted after 273 tests; syntax and browser JavaScript gates passed. Diagnose the host crash before repeating or claiming the suite passed.
 
 **2026-10-31 Windows baseline on `ab23c4e` — PARTIAL:** The first Release solution build failed with two CS0051 errors in the repair-budget tests; their public xUnit signatures now use integer theory data and convert back to the internal verdict, preserving the seven cases. Three agent-validation scripts also had PowerShell parser errors caused by operators starting continuation lines; the conditions were corrected without changing their logic. `dotnet build PaRuX.sln -c Release --no-restore` subsequently passed (0 errors, 272 warnings); the focused repair-budget tests passed 9/9; the syntax gate passed in Windows PowerShell and PowerShell 7. Independent diff review found no actionable issues. These results do not establish live Computer Use acceptance. WinApp CLI was not found in the checked installation paths and `PARUX_WINAPP_CLI` was unset; native and real-agent GUI gates remain NOT RUN. PID reuse/start-time attestation, real application compatibility, revocation during dispatched native operations, and independent physical acceptance remain open.
 

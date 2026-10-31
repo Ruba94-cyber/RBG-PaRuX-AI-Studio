@@ -26,6 +26,7 @@ public sealed class ComputerUsePointerTests
 
         public List<(int X, int Y)> Moves { get; } = new();
         public List<uint> Events { get; } = new();
+        public List<(ushort Key, uint Flags)> Keys { get; } = new();
 
         public bool MoveCursor(int x, int y)
         {
@@ -40,7 +41,37 @@ public sealed class ComputerUsePointerTests
             return blocked ? 0u : 1u;
         }
 
-        public uint SendKeyboardEvent(ushort virtualKey, ushort scanCode, uint flags) => 1u;
+        public uint SendKeyboardEvent(ushort virtualKey, ushort scanCode, uint flags)
+        {
+            Keys.Add((virtualKey, flags));
+            return 1u;
+        }
+    }
+
+    [Fact]
+    public async Task Revoked_key_combo_releases_the_pressed_modifier_without_sending_the_next_key()
+    {
+        var driver = new FakeDriver();
+        int checks = 0;
+        bool delivered = await ComputerUseKeyboard.PressComboAsync(
+            driver, new ushort[] { 0x11, 0x53 }, () => ++checks == 1, CancellationToken.None);
+        Assert.False(delivered);
+        Assert.Equal(new[] { ((ushort)0x11, 0u), ((ushort)0x11, ComputerUseKeyboard.KeyEventKeyUp) }, driver.Keys);
+    }
+
+    [Fact]
+    public async Task Cancelled_key_combo_releases_the_pressed_modifier()
+    {
+        var driver = new FakeDriver();
+        using var cancellation = new CancellationTokenSource();
+        int checks = 0;
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ComputerUseKeyboard.PressComboAsync(
+            driver, new ushort[] { 0x11, 0x53 }, () =>
+            {
+                if (++checks == 1) cancellation.Cancel();
+                return true;
+            }, cancellation.Token));
+        Assert.Equal(new[] { ((ushort)0x11, 0u), ((ushort)0x11, ComputerUseKeyboard.KeyEventKeyUp) }, driver.Keys);
     }
 
     [Fact]

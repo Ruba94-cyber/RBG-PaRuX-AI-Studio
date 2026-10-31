@@ -193,6 +193,8 @@ if ($SelfTestNativeProcessCapture) {
     if ($failure.ExitCode -ne 23 -or $failure.Output -notmatch 'SENTINEL_STDERR') {
         throw 'Native process capture failed the stderr plus nonzero-exit sentinel.'
     }
+    Write-Output $success.Output
+    Write-Output $failure.Output
     Invoke-Gate -Name 'powershellExceptionSentinel' -LogName 'agent-process-capture-powershell-exception.log' -Action {
         throw 'SENTINEL_PS_EXCEPTION'
     }
@@ -216,10 +218,15 @@ try {
     # browserDomJs is a required gate, not an opt-in one. Without Node its two suites never execute, so the
     # gate must read FAIL (the exit logic below then fails the run) rather than stay NOT_RUN and exit 0.
     Invoke-Gate -Name browserDomJs -LogName 'browser-dom-js.log' -Action {
-        if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+        $nodeCommand = Get-Command node -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -eq $nodeCommand) {
             throw 'Node.js is not on PATH, so tools/test-browser-dom-assertion.mjs and tools/test-browser-agent-fixture.mjs cannot run.'
         }
-        node --test tools/test-browser-dom-assertion.mjs tools/test-browser-agent-fixture.mjs
+        $nodeRun = Invoke-NativeProcessCapture -FilePath $nodeCommand.Source `
+            -Arguments @('--test', 'tools/test-browser-dom-assertion.mjs', 'tools/test-browser-agent-fixture.mjs') `
+            -WorkingDirectory $repo
+        $nodeRun.Output
+        $global:LASTEXITCODE = $nodeRun.ExitCode
     }
     if ($RunReleaseGate) {
         Invoke-Gate -Name releaseGate -LogName 'agent-v2-release-gate.log' -Action {
@@ -240,7 +247,15 @@ try {
             if ([string]::IsNullOrWhiteSpace($BrowserExecutable)) {
                 throw 'RunBrowserE2E requires -BrowserExecutable with an installed Edge/Chrome executable.'
             }
-            node tools/test-browser-cdp-e2e.mjs $BrowserExecutable
+            $nodeCommand = Get-Command node -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($null -eq $nodeCommand) {
+                throw 'Node.js is not on PATH, so tools/test-browser-cdp-e2e.mjs cannot run.'
+            }
+            $nodeRun = Invoke-NativeProcessCapture -FilePath $nodeCommand.Source `
+                -Arguments @('tools/test-browser-cdp-e2e.mjs', $BrowserExecutable) `
+                -WorkingDirectory $repo
+            $nodeRun.Output
+            $global:LASTEXITCODE = $nodeRun.ExitCode
         }
     }
     if ($RunNativeUiE2E) {

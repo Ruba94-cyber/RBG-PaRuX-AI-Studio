@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using PaRuX.Services;
 using Xunit;
 
@@ -11,7 +12,8 @@ public sealed class ComputerUseTaskAppLeaseTests
     private static ForegroundWindowSnapshot Screenshot(int pid = 70, long hwnd = 100) =>
         new(pid, hwnd, "User document title");
     private static ComputerUseWindowFocusPolicy.Candidate Current(
-        string exe, int pid = 70, long hwnd = 100) => new("Untrusted title", pid, hwnd, Exe(exe));
+        string exe, int pid = 70, long hwnd = 100, long processStartTimeUtcTicks = 1) =>
+        new("Untrusted title", pid, hwnd, Exe(exe), processStartTimeUtcTicks);
     private static string[] Approved(params string[] binaries) =>
         Array.ConvertAll(binaries, Exe);
 
@@ -50,6 +52,38 @@ public sealed class ComputerUseTaskAppLeaseTests
         Assert.True(lease.BindVerifiedFocus(Current("Editor.exe", 71, 200), true));
         Assert.Null(lease.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
         Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe"), Approved("Editor.exe", "Excel.exe", "Helper.exe")));
+    }
+
+    [Fact]
+    public void Reused_pid_and_hwnd_for_same_binary_does_not_retain_lease()
+    {
+        var lease = new ComputerUseTaskAppLease();
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe", processStartTimeUtcTicks: 100), true));
+
+        Assert.NotNull(lease.RefusalForAction(
+            Screenshot(), Current("Editor.exe", processStartTimeUtcTicks: 200),
+            Approved("Editor.exe")));
+        Assert.False(lease.BindVerifiedFocus(
+            Current("Editor.exe", processStartTimeUtcTicks: 0), true));
+    }
+
+    [Fact]
+    public async Task Reused_pid_and_hwnd_after_uia_async_boundary_is_refused_before_proof()
+    {
+        var lease = new ComputerUseTaskAppLease();
+        Assert.True(lease.BindVerifiedFocus(
+            Current("Editor.exe", processStartTimeUtcTicks: 100), true));
+        Assert.Null(lease.RefusalForAction(
+            Screenshot(), Current("Editor.exe", processStartTimeUtcTicks: 100),
+            Approved("Editor.exe")));
+
+        await Task.Yield();
+
+        // Models the fresh OS identity observed when the awaited UIA readback
+        // returns after the original process exited and its PID/HWND were reused.
+        Assert.NotNull(lease.RefusalForAction(
+            Screenshot(), Current("Editor.exe", processStartTimeUtcTicks: 200),
+            Approved("Editor.exe")));
     }
 
     [Fact]

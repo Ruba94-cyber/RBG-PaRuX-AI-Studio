@@ -93,7 +93,7 @@ function Run-App {
             if ($appProc -and $appProc.MainWindowHandle -ne 0) {
                 try {
                     $el = [Windows.Automation.AutomationElement]::FromHandle($appProc.MainWindowHandle)
-                    if ($el.Current.Name -eq 'RBG PaRuX AI Studio') {
+                    if ($el.Current.Name -in @('PaRuX AI & Gaming OS', 'RBG PaRuX AI Studio')) {
                         $cond = New-Object Windows.Automation.PropertyCondition ([Windows.Automation.AutomationElement]::ControlTypeProperty), ([Windows.Automation.ControlType]::Edit)
                         $edit = $el.FindFirst([Windows.Automation.TreeScope]::Descendants, $cond)
                         if ($edit -and $edit.Current.IsEnabled) { $interactiveMs = $sw.ElapsedMilliseconds }

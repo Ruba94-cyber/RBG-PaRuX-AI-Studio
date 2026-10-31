@@ -193,10 +193,11 @@ namespace PaRuX.Services
                     return null;
                 using Process process = Process.GetProcessById((int)pid);
                 string? exe = process.MainModule?.FileName;
+                long processStartTimeUtcTicks = process.StartTime.ToUniversalTime().Ticks;
                 if (!ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(exe))
                     return null;
                 return new ComputerUseWindowFocusPolicy.Candidate(
-                    string.Empty, (int)pid, hwnd, exe);
+                    string.Empty, (int)pid, hwnd, exe, processStartTimeUtcTicks);
             }
             catch (ArgumentException) { return null; }
             catch (InvalidOperationException) { return null; }

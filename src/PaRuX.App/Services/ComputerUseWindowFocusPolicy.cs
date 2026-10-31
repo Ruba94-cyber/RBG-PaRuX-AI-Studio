@@ -14,7 +14,8 @@ namespace PaRuX.Services
     internal static class ComputerUseWindowFocusPolicy
     {
         internal sealed record Candidate(
-            string Title, int ProcessId, long WindowHandle, string? ExecutablePath);
+            string Title, int ProcessId, long WindowHandle, string? ExecutablePath,
+            long ProcessStartTimeUtcTicks = 0);
 
         internal const int NotFound = ComputerUseWindowSelectionPolicy.NotFound;
         internal const int Ambiguous = ComputerUseWindowSelectionPolicy.Ambiguous;
@@ -25,6 +26,7 @@ namespace PaRuX.Services
         {
             if (candidate == null || candidate.ProcessId <= 0
                 || candidate.WindowHandle == 0
+                || candidate.ProcessStartTimeUtcTicks <= 0
                 || !ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(
                     candidate.ExecutablePath))
                 return false;
@@ -64,12 +66,14 @@ namespace PaRuX.Services
 
         internal static bool IsUnchanged(Candidate original, Candidate? observedNow)
         {
-            // A PID or window handle may be recycled; require the independently
-            // read executable identity as well as the original PID and HWND.
+            // PID and HWND can both be recycled, even by a new instance of the
+            // same executable. Require its OS-observed process creation time too.
             return observedNow != null
                 && original.ProcessId > 0 && original.WindowHandle != 0
+                && original.ProcessStartTimeUtcTicks > 0
                 && original.ProcessId == observedNow.ProcessId
                 && original.WindowHandle == observedNow.WindowHandle
+                && original.ProcessStartTimeUtcTicks == observedNow.ProcessStartTimeUtcTicks
                 && ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(
                     original.ExecutablePath)
                 && ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(
