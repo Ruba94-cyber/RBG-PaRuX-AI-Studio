@@ -38,12 +38,14 @@ namespace PaRuX.Services
                     || !TryInt(receipt, "finalReadbackFailures", 0, 100, out int failures)
                     || !TryBool(receipt, "readyForIndependentVerifier", out bool ready)
                     || !TryBool(receipt, "guiTestRequired", out bool guiTest)
+                    || !TryBool(receipt, "finalControlReadbackVerified", out bool finalReadback)
                     || !TryString(receipt, "outcome", out string? outcome)
                     || !TryString(receipt, "assurance", out string? assurance)
                     || assurance != "executor-reported-not-independently-attested"
                     || delivered > attempts || failures > checks
                     || (ready && outcome != "ready_for_independent_verifier")
-                    || (!ready && outcome == "ready_for_independent_verifier"))
+                    || (!ready && outcome == "ready_for_independent_verifier")
+                    || (ready && guiTest && (!finalReadback || passed == 0 || checks == 0)))
                     return null;
 
                 string status = outcome switch
