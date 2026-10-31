@@ -101,7 +101,9 @@ public sealed class WorkloadOrchestrator : BackgroundService
         Func<CancellationToken, Task<bool>>? runtimeHealthCheck = null,
         Func<CancellationToken, Task>? restoreRuntimeToReady = null,
         IEnumerable<IGamingResumable>? resumables = null,
-        Action? cancelEvaluations = null)
+        Action? cancelEvaluations = null,
+        IReadOnlyCollection<IGamingTriggerProvider>? triggerProviders = null,
+        IReadOnlyCollection<IGameSuspendProvider>? suspendProviders = null)
     {
         _resumables = resumables?.ToList() ?? new List<IGamingResumable>();
         _runtime = runtime;
@@ -113,7 +115,7 @@ public sealed class WorkloadOrchestrator : BackgroundService
         _runtimeHealthCheck = runtimeHealthCheck ?? runtime.IsHealthyAsync;
         _restoreRuntimeToReady = restoreRuntimeToReady ?? runtime.EnsureReadyAsync;
         _cancelEvaluations = cancelEvaluations;
-        _triggerProviders = new()
+        _triggerProviders = triggerProviders?.ToList() ?? new()
         {
             new ManualTriggerProvider(),
             new WindowsDisplayTriggerProvider(),
@@ -133,7 +135,7 @@ public sealed class WorkloadOrchestrator : BackgroundService
             new SunshineInputProvider(),
             new CustomExecutableInputProvider()
         };
-        _suspendProviders = new()
+        _suspendProviders = suspendProviders?.ToList() ?? new()
         {
             new WindowsNativeSuspendProvider(),
             new NyrnaGameSuspendProvider(),

@@ -281,6 +281,7 @@
         <!-- ==================== Empty state ==================== -->
         <StackPanel
             x:Name="EmptyState"
+            Loaded="EmptyState_Loaded"
             Grid.Row="1"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
@@ -297,12 +298,17 @@
 
             <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
                 <TextBlock
+                    x:Name="HomeHeadline"
                     Text="Ask PaRuX anything"
+                    TextWrapping="Wrap"
                     Style="{StaticResource PaRuXDisplayTextStyle}"
                     HorizontalAlignment="Center"
                     TextAlignment="Center" />
                 <TextBlock
-                    Text="Running entirely on your machine, through your local Qwen model. Nothing leaves this PC."
+                    x:Name="HomeDescription"
+                    AutomationProperties.AutomationId="Chat_Home_Description_Text"
+                    Text="Start a conversation with PaRuX."
+                    TextWrapping="Wrap"
                     Style="{StaticResource PaRuXCaptionTextStyle}"
                     HorizontalAlignment="Center"
                     TextAlignment="Center"
@@ -312,75 +318,87 @@
             <!-- Starters. These only prefill the composer; they never send. -->
             <StackPanel Spacing="{StaticResource PaRuXSpaceS}" Margin="0,8,0,0">
                 <Button
+                    x:Name="HomeCodeSuggestion"
                     Click="Suggestion_Click"
+                    AutomationProperties.AutomationId="Chat_Home_Code_Button"
                     AutomationProperties.Name="Improve this codebase"
                     Tag="Improve the code in this project:"
                     HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Left"
-                    Height="40"
+                    HorizontalContentAlignment="Stretch"
+                    MinHeight="40"
                     Padding="12,0,12,0"
                     CornerRadius="{StaticResource PaRuXRadiusMedium}"
                     Background="{ThemeResource PaRuXSurfaceCardBrush}"
                     BorderBrush="{ThemeResource PaRuXStrokeBrush}"
                     BorderThickness="1">
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceM}" VerticalAlignment="Center">
+                    <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}" VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                         <FontIcon Glyph="&#xE943;" FontSize="14" Foreground="{ThemeResource PaRuXBrandTextBrush}" />
-                        <TextBlock Text="Improve this codebase" Style="{StaticResource PaRuXBodyTextStyle}" />
-                    </StackPanel>
+                        <TextBlock Grid.Column="1" x:Name="HomeCodeLabel" Text="Improve this codebase" TextWrapping="Wrap" Style="{StaticResource PaRuXBodyTextStyle}" />
+                    </Grid>
                 </Button>
 
                 <Button
+                    x:Name="HomeAnalysisSuggestion"
                     Click="Suggestion_Click"
+                    AutomationProperties.AutomationId="Chat_Home_Analysis_Button"
                     AutomationProperties.Name="Analyse a problem in depth"
                     Tag="Analyse this problem in depth:"
                     HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Left"
-                    Height="40"
+                    HorizontalContentAlignment="Stretch"
+                    MinHeight="40"
                     Padding="12,0,12,0"
                     CornerRadius="{StaticResource PaRuXRadiusMedium}"
                     Background="{ThemeResource PaRuXSurfaceCardBrush}"
                     BorderBrush="{ThemeResource PaRuXStrokeBrush}"
                     BorderThickness="1">
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceM}" VerticalAlignment="Center">
+                    <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}" VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                         <FontIcon Glyph="&#xE9CE;" FontSize="14" Foreground="{ThemeResource PaRuXBrandTextBrush}" />
-                        <TextBlock Text="Analyse a problem in depth" Style="{StaticResource PaRuXBodyTextStyle}" />
-                    </StackPanel>
+                        <TextBlock Grid.Column="1" x:Name="HomeAnalysisLabel" Text="Analyse a problem in depth" TextWrapping="Wrap" Style="{StaticResource PaRuXBodyTextStyle}" />
+                    </Grid>
                 </Button>
 
                 <Button
+                    x:Name="HomeSummarySuggestion"
                     Click="Suggestion_Click"
+                    AutomationProperties.AutomationId="Chat_Home_Summary_Button"
                     AutomationProperties.Name="Summarise a text into key points"
                     Tag="Summarise this into key points:"
                     HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Left"
-                    Height="40"
+                    HorizontalContentAlignment="Stretch"
+                    MinHeight="40"
                     Padding="12,0,12,0"
                     CornerRadius="{StaticResource PaRuXRadiusMedium}"
                     Background="{ThemeResource PaRuXSurfaceCardBrush}"
                     BorderBrush="{ThemeResource PaRuXStrokeBrush}"
                     BorderThickness="1">
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceM}" VerticalAlignment="Center">
+                    <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}" VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                         <FontIcon Glyph="&#xE8BD;" FontSize="14" Foreground="{ThemeResource PaRuXBrandTextBrush}" />
-                        <TextBlock Text="Summarise a text into key points" Style="{StaticResource PaRuXBodyTextStyle}" />
-                    </StackPanel>
+                        <TextBlock Grid.Column="1" x:Name="HomeSummaryLabel" Text="Summarise a text into key points" TextWrapping="Wrap" Style="{StaticResource PaRuXBodyTextStyle}" />
+                    </Grid>
                 </Button>
 
                 <Button
+                    x:Name="HomeImageSuggestion"
                     Click="Suggestion_Click"
+                    AutomationProperties.AutomationId="Chat_Home_Image_Button"
                     AutomationProperties.Name="Generate an image"
-                    Tag="Generate an image of a futuristic purple landscape, no text"
+                    Tag="Generate an image of a futuristic landscape, no text"
                     HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Left"
-                    Height="40"
+                    HorizontalContentAlignment="Stretch"
+                    MinHeight="40"
                     Padding="12,0,12,0"
                     CornerRadius="{StaticResource PaRuXRadiusMedium}"
                     Background="{ThemeResource PaRuXSurfaceCardBrush}"
                     BorderBrush="{ThemeResource PaRuXStrokeBrush}"
                     BorderThickness="1">
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource PaRuXSpaceM}" VerticalAlignment="Center">
+                    <Grid ColumnSpacing="{StaticResource PaRuXSpaceM}" VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                         <FontIcon Glyph="&#xEB9F;" FontSize="14" Foreground="{ThemeResource PaRuXBrandTextBrush}" />
-                        <TextBlock Text="Generate an image" Style="{StaticResource PaRuXBodyTextStyle}" />
-                    </StackPanel>
+                        <TextBlock Grid.Column="1" x:Name="HomeImageLabel" Text="Generate an image" TextWrapping="Wrap" Style="{StaticResource PaRuXBodyTextStyle}" />
+                    </Grid>
                 </Button>
             </StackPanel>
         </StackPanel>

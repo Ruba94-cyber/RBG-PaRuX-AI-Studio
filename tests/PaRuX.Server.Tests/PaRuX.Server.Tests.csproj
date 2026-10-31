@@ -66,6 +66,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\MaintenancePresenter.cs" Link="Maintenance\MaintenancePresenter.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\WavSilenceDetector.cs" Link="Chat\WavSilenceDetector.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\SpeechTextPreparer.cs" Link="Chat\SpeechTextPreparer.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\VoiceGamingTransition.cs" Link="Chat\VoiceGamingTransition.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\SpeechWarmupCoordinator.cs" Link="Chat\SpeechWarmupCoordinator.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\VoiceRecordingSession.cs" Link="Chat\VoiceRecordingSession.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\VoiceConversationController.cs" Link="Chat\VoiceConversationController.cs" />

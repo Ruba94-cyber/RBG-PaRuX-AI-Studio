@@ -177,6 +177,9 @@ namespace PaRuX.Views
             Unloaded += OnChatUnloadedStopGameMarkerTimer;
             Unloaded -= OnChatUnloadedStopVoice;
             Unloaded += OnChatUnloadedStopVoice;
+            GamingManager.Current.StateChanged -= OnVoiceGamingStateChanged;
+            GamingManager.Current.StateChanged += OnVoiceGamingStateChanged;
+            _voiceGamingTransition.Observe(GamingManager.Current.IsActive);
             PreviewKeyDown -= OnChatPreviewKeyDownVoice;
             PreviewKeyDown += OnChatPreviewKeyDownVoice;
             _ = LoadSkillsAsync();
@@ -2177,6 +2180,8 @@ namespace PaRuX.Views
 
         private void OnChatUnloadedStopVoice(object sender, RoutedEventArgs e)
         {
+            GamingManager.Current.StateChanged -= OnVoiceGamingStateChanged;
+            _voiceGamingTransitionInstance = null;
             try
             {
                 _voiceConversation?.Stop();
@@ -2190,6 +2195,12 @@ namespace PaRuX.Views
         // Voice mode (hands-free conversation). All policy lives in VoiceConversationController.
         // ------------------------------------------------------------------
         private VoiceConversationController? _voiceConversation;
+        private VoiceGamingTransition? _voiceGamingTransitionInstance;
+        private VoiceGamingTransition _voiceGamingTransition =>
+            _voiceGamingTransitionInstance ??= new VoiceGamingTransition(() => _voiceConversation?.Stop());
+
+        private void OnVoiceGamingStateChanged(object? sender, EventArgs e) =>
+            _voiceGamingTransition.Observe(GamingManager.Current.IsActive);
 
         private async void VoiceMode_Click(object sender, RoutedEventArgs e)
         {
