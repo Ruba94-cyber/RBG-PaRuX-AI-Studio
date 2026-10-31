@@ -1,5 +1,13 @@
 # Changelog
 
+### 2026-10-31 — Opt-in live Computer Use agent acceptance with independent WinApp readback (source only)
+
+- Added `parux agent show <taskId> --json` for reliable local CLI task inspection while preserving the ordinary human-readable output. The CLI does not grant desktop privileges.
+- Added `tools/test-agent-live-computer-use.ps1`: requires an explicit user opt-in, builds a disposable WinForms app, obtains native HWND/PID and control identities, confirms initial PENDING, creates a genuine `computer-use` task through the existing Core, waits for manually granted one-task authorization, and checks completed Core verifier PASS, a real desktop worker receipt and a fresh external WinApp CLI value on the original fixture.
+- The Windows master acceptance script now has an independent `-RunLiveComputerUseE2E -CliPath <parux.exe>` opt-in gate (`liveComputerUseAgent=PASS/FAIL/NOT_RUN`), and its PowerShell parser gate covers the new script. The sanitized report contains no raw model or screenshot text; only the script-owned task and disposable app are cancelled/closed on failure.
+- **No PowerShell, .NET, xUnit, Windows GUI or actual LLM task was executed in this environment.** This is a runnable acceptance path awaiting a physical Windows run, not a certified agent result or universal application compatibility.
+
+
 ### 2026-10-31 — Bounded GUI test repair and native Windows recovery gate (source only)
 
 - Computer Use GUI tests can now recover from up to two real `DifferentValue`, `MissingTarget` or `MissingProperty` UIA assertion failures with remaining steps, but each additional recovery requires a successfully delivered UI mutation. Ambiguous, invalid or fabricated observations still stop the task, and old proof is discarded.
