@@ -322,12 +322,18 @@ namespace PaRuX.Services
                     // After a registered app launch, do not send an action or report
                     // completion against an unrelated foreground program. UIA and
                     // screenshots alone do not establish app/process ownership.
-                    if (appLease.IsActive && action.Action is not ("open_app" or "focus_window" or "wait"))
+                    if (appLease.IsActive && action.Action is not ("open_app" or "wait"))
                     {
+                        string[] liveApprovedPaths = (SettingsStore.Current.Data.ComputerApps
+                            ?? new List<ComputerAppShortcut>())
+                            .Select(a => a.ExecutablePath).ToArray();
                         ComputerUseWindowFocusPolicy.Candidate? freshIdentity =
+                            action.Action == "focus_window" ? null :
                             DesktopAutomationService.CaptureWindowFocusIdentity(
                                 new IntPtr(pin.Pinned.WindowHandle));
-                        string? appRefusal = appLease.RefusalForAction(pin.Pinned, freshIdentity);
+                        string? appRefusal = action.Action == "focus_window"
+                            ? appLease.RefusalForCurrentApproval(liveApprovedPaths)
+                            : appLease.RefusalForAction(pin.Pinned, freshIdentity, liveApprovedPaths);
                         if (appRefusal != null)
                         {
                             onStep?.Invoke("Step " + step + ": " + appRefusal);
@@ -813,6 +819,8 @@ namespace PaRuX.Services
                         ?? new List<ComputerAppShortcut>())
                         .Where(a => ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(a.ExecutablePath))
                         .Select(a => a.ExecutablePath).ToArray();
+                    if (appLease.RefusalForCurrentApproval(approvedPaths) is { } revokedScope)
+                        return revokedScope;
                     var candidates = windows.Select(w => new ComputerUseWindowFocusPolicy.Candidate(
                         w.Title, w.ProcessId, w.Handle.ToInt64(), w.ExecutablePath)).ToArray();
 
@@ -852,7 +860,16 @@ namespace PaRuX.Services
                     // Bind inside the same independently selected-and-confirmed
                     // focus operation: never grab a later arbitrary foreground
                     // window and treat that unrelated PID as approved.
-                    bool explicitlyApproved = approvedPaths.Any(path =>
+                    // Settings can be changed while SetForegroundWindow runs.
+                    // Re-read the app allowlist at the last possible pre-bind
+                    // point rather than trusting the pre-focus snapshot.
+                    string[] currentlyApprovedPaths = (SettingsStore.Current.Data.ComputerApps
+                        ?? new List<ComputerAppShortcut>())
+                        .Where(a => ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(a.ExecutablePath))
+                        .Select(a => a.ExecutablePath).ToArray();
+                    if (appLease.RefusalForCurrentApproval(currentlyApprovedPaths) is { } revokedDuringFocus)
+                        return revokedDuringFocus;
+                    bool explicitlyApproved = currentlyApprovedPaths.Any(path =>
                         string.Equals(path, afterIdentity!.ExecutablePath,
                             StringComparison.OrdinalIgnoreCase));
                     if ((appLease.IsActive || explicitlyApproved)
