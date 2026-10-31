@@ -45,6 +45,30 @@ public sealed class ComputerUseGuiReceiptPresenterTests
         Assert.DoesNotContain("selector", line, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Only_authoritative_completed_verifier_status_can_be_shown_as_a_reported_pass()
+    {
+        string? pending = ComputerUseGuiReceiptPresenter.BuildLine(
+            "computer-use", Receipt(), "verifying", null);
+        Assert.NotNull(pending);
+        Assert.Contains("independent goal verification required", pending);
+
+        string? passed = ComputerUseGuiReceiptPresenter.BuildLine(
+            "computer-use", Receipt(), "completed", "pass");
+        Assert.NotNull(passed);
+        Assert.Contains("goal verifier reports PASS", passed);
+
+        string? failed = ComputerUseGuiReceiptPresenter.BuildLine(
+            "computer-use", Receipt(), "failed", "fail");
+        Assert.NotNull(failed);
+        Assert.Contains("goal verification did not pass", failed);
+
+        string? unverified = ComputerUseGuiReceiptPresenter.BuildLine(
+            "computer-use", Receipt(), "completed", "unverified");
+        Assert.NotNull(unverified);
+        Assert.DoesNotContain("reports PASS", unverified);
+    }
+
     [Theory]
     [InlineData("unverified", "GUI result unverified")]
     [InlineData("incomplete", "GUI task incomplete")]
