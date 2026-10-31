@@ -1,0 +1,100 @@
+using System;
+using System.Text.Json;
+
+namespace PaRuX.Services
+{
+    /// <summary>
+    /// Human-facing presentation of an executor-reported GUI receipt.
+    /// Reads only a fixed, schema-validated numeric/enum subset of task JSON.
+    /// Neither model-authored strings nor native app content reach the UI line.
+    /// The server's real task status remains the only completion state.
+    /// </summary>
+    internal static class ComputerUseGuiReceiptPresenter
+    {
+        private const int MaxResultCharacters = 32_768;
+
+        internal static string? BuildLine(string? role, string? resultJson)
+        {
+            if (!string.Equals(role, "computer-use", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(resultJson)
+                || resultJson.Length > MaxResultCharacters)
+                return null;
+
+            try
+            {
+                using JsonDocument parsed = JsonDocument.Parse(resultJson);
+                JsonElement root = parsed.RootElement;
+                if (root.ValueKind != JsonValueKind.Object
+                    || !root.TryGetProperty("guiRunReceipt", out JsonElement receipt)
+                    || receipt.ValueKind != JsonValueKind.Object
+                    || !TryInt(receipt, "schemaVersion", 1, 1, out _)
+                    || !TryInt(receipt, "actionsAttempted", 0, 100, out int attempts)
+                    || !TryInt(receipt, "actionsDelivered", 0, 100, out int delivered)
+                    || !TryInt(receipt, "uiAssertionsPassed", 0, 100, out int passed)
+                    || !TryInt(receipt, "uiAssertionsFailed", 0, 100, out int failed)
+                    || !TryInt(receipt, "finalReadbackChecks", 0, 100, out int checks)
+                    || !TryInt(receipt, "finalReadbackFailures", 0, 100, out int failures)
+                    || !TryBool(receipt, "readyForIndependentVerifier", out bool ready)
+                    || !TryBool(receipt, "guiTestRequired", out bool guiTest)
+                    || !TryString(receipt, "outcome", out string? outcome)
+                    || !TryString(receipt, "assurance", out string? assurance)
+                    || assurance != "executor-reported-not-independently-attested"
+                    || delivered > attempts || failures > checks
+                    || (ready && outcome != "ready_for_independent_verifier")
+                    || (!ready && outcome == "ready_for_independent_verifier"))
+                    return null;
+
+                string status = outcome switch
+                {
+                    "ready_for_independent_verifier" =>
+                        "GUI evidence captured; independent goal verification required",
+                    "unverified" => "GUI result unverified",
+                    "incomplete" => "GUI task incomplete",
+                    "cancelled" => "GUI task cancelled",
+                    "not_started" => "GUI task not started",
+                    _ => string.Empty
+                };
+                if (status.Length == 0) return null;
+                if (!guiTest)
+                    status = ready ? "Computer Use reported completion; goal verification required"
+                        : "Computer Use did not complete";
+
+                return status + " · UIA " + passed + " passed, " + failed + " failed"
+                    + " · final checks " + checks + " (" + failures + " failed)"
+                    + " · delivered actions " + delivered + "/" + attempts;
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        private static bool TryInt(JsonElement value, string key, int min, int max, out int result)
+        {
+            result = 0;
+            return value.TryGetProperty(key, out JsonElement field)
+                && field.ValueKind == JsonValueKind.Number
+                && field.TryGetInt32(out result) && result >= min && result <= max;
+        }
+
+        private static bool TryBool(JsonElement value, string key, out bool result)
+        {
+            result = false;
+            if (!value.TryGetProperty(key, out JsonElement field)
+                || field.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                return false;
+            result = field.GetBoolean();
+            return true;
+        }
+
+        private static bool TryString(JsonElement value, string key, out string? result)
+        {
+            result = null;
+            if (!value.TryGetProperty(key, out JsonElement field)
+                || field.ValueKind != JsonValueKind.String)
+                return false;
+            result = field.GetString();
+            return result != null && result.Length <= 96;
+        }
+    }
+}
