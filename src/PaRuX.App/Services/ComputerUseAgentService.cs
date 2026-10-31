@@ -103,6 +103,7 @@ namespace PaRuX.Services
             // transcripts are untrusted and may contain arbitrary test wording.
             var guiTestGate = new ComputerUseGuiTestEvidenceGate(originalGoal ?? goal);
             ComputerUseGuiFinalProof? lastGuiProof = null;
+            var guiRepairBudget = new ComputerUseGuiRepairBudget();
             // Scoped to this invocation; no user-wide permissions are inferred from a process launch.
             var appLease = new ComputerUseTaskAppLease();
             string? lastRepeatKey = null;
@@ -559,12 +560,29 @@ namespace PaRuX.Services
                         actionLog.Add("UIA assertion: " + status);
                         trace.RecordAssertion(verdict == WindowsUiAssertionPolicy.Verdict.Verified);
                         if (verdict != WindowsUiAssertionPolicy.Verdict.Verified)
+                        {
+                            guiTestGate.InvalidateExternalChange();
+                            lastGuiProof = null;
+                            if (guiRepairBudget.TryReserve(
+                                verdict, step, MaxSteps, guiTestGate.RequiresAssertion))
+                            {
+                                // One failed postcondition can lead to bounded
+                                // authorized repair, not to a model-invented PASS.
+                                // Repeated failures require a delivered mutation
+                                // and consume the finite retry/step budget.
+                                onStep?.Invoke("Step " + step
+                                    + ": GUI mismatch; a limited repair is allowed, but a fresh assertion is still required.");
+                                actionLog.Add("GUI mismatch requires a real UI change and a new exact assertion; "
+                                    + "no completion proof was recorded.");
+                                continue;
+                            }
                             return new ComputerUseAgentResult
                             {
                                 StepsTaken = step,
                                 Summary = "UI test failed: fresh foreground control did not match expected state ("
-                                    + status + "). No successful assertion was recorded."
+                                    + status + "). Recovery is unavailable or its budget was exhausted."
                             };
+                        }
                         guiTestGate.RecordVerifiedAssertion();
                         lastGuiProof = ComputerUseGuiFinalProof.FromVerifiedAssertion(
                             fresh.ProcessId, fresh.WindowHandle,
@@ -679,6 +697,7 @@ namespace PaRuX.Services
                         }
                     }
                     trace.RecordActionDelivered();
+                    guiRepairBudget.RecordDeliveredAction(action.Action);
                     guiTestGate.RecordDeliveredAction(action.Action);
                     if (!guiTestGate.VerifiedAfterLatestMutation)
                         lastGuiProof = null;
