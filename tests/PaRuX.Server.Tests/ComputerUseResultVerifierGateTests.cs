@@ -40,6 +40,7 @@ public sealed class ComputerUseResultVerifierGateTests
                 uiAssertionsFailed = 0,
                 finalReadbackChecks = finalChecks,
                 finalReadbackFailures = 0,
+                finalDistinctControlsVerified = gui ? 1 : 0,
                 stepsTaken = 4
             }
         });
@@ -142,4 +143,25 @@ public sealed class ComputerUseResultVerifierGateTests
         Assert.True(ComputerUseResultVerifierGate.Evaluate("coding", GuiGoal, "not json").Allowed);
         Assert.True(ComputerUseResultVerifierGate.Evaluate("ui-verification", GuiGoal, null).Allowed);
     }
+    [Theory]
+    [InlineData("0")]
+    [InlineData("2")]
+    [InlineData("9")]
+    [InlineData("-1")]
+    public void Distinct_final_control_count_must_be_bounded_and_agree_with_assertions(string raw)
+    {
+        string modified = Alter(Fixture(), "finalDistinctControlsVerified", JsonNode.Parse(raw));
+        Assert.False(ComputerUseResultVerifierGate.Evaluate(
+            "computer-use", GuiGoal, modified).Allowed);
+    }
+
+    [Fact]
+    public void Legacy_v1_receipt_without_additive_control_count_is_still_parseable()
+    {
+        var json = JsonNode.Parse(Fixture())!.AsObject();
+        json["guiRunReceipt"]!.AsObject().Remove("finalDistinctControlsVerified");
+        Assert.True(ComputerUseResultVerifierGate.Evaluate(
+            "computer-use", GuiGoal, json.ToJsonString()).Allowed);
+    }
+
 }
