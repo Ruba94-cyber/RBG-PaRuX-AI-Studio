@@ -37,8 +37,130 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 }
 New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
 $OutputRoot = (Resolve-Path -LiteralPath $OutputRoot).Path
+# Record the actual checked-out source, never a historical branch label.
+# A PASS from the wrong revision must not be mistaken for acceptance of main.
+$currentBranch = 'UNKNOWN'
+$currentCommit = 'UNKNOWN'
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    try {
+        $foundBranch = (& git -C $repo rev-parse --abbrev-ref HEAD 2>$null | Select-Object -First 1)
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($foundBranch)) {
+            $currentBranch = $foundBranch.Trim()
+        }
+        $foundCommit = (& git -C $repo rev-parse HEAD 2>$null | Select-Object -First 1)
+        if ($LASTEXITCODE -eq 0 -and $foundCommit -match '^[a-f0-9]{40}
+    unit = 'NOT_RUN'
+    browserDomJs = 'NOT_RUN'
+    releaseGate = 'NOT_RUN'
+    flaui = 'NOT_RUN'
+    nativeUiFunctional = 'NOT_RUN'
+    browserCdpFunctional = 'NOT_RUN'
+    winappUia = 'NOT_RUN'
+    physicalGpuAndLongContext = 'NOT_RUN'
+    selfImprovementDogfood = 'NOT_RUN'
+}
+
+function Invoke-Gate {
+    param([string]$Name, [scriptblock]$Action, [string]$LogName)
+    $log = Join-Path $OutputRoot $LogName
+    try {
+        $global:LASTEXITCODE = 0
+        & $Action *>&1 | Out-File -FilePath $log -Encoding UTF8
+        if ($LASTEXITCODE -ne 0) {
+            $results[$Name] = 'FAIL'
+            return
+        }
+        $results[$Name] = 'PASS'
+    }
+    catch {
+        $results[$Name] = 'FAIL'
+        $_ | Out-String | Out-File -FilePath $log -Append -Encoding UTF8
+    }
+}
+
+try {
+    Invoke-Gate -Name unit -LogName 'agent-v2-xunit.log' -Action {
+        dotnet test tests\PaRuX.Server.Tests\PaRuX.Server.Tests.csproj -c Debug --filter 'FullyQualifiedName~CodingAgentPromptBudgetPolicyTests|FullyQualifiedName~CodingAgentCheckpointStoreTests|FullyQualifiedName~CodingWorkspaceVerificationFingerprintTests|FullyQualifiedName~CodingWorkspaceGitLayoutPolicyTests|FullyQualifiedName~CodingRepositoryAliasPolicyTests|FullyQualifiedName~CodingBrowserPostconditionPolicyTests|FullyQualifiedName~CodingVerificationCommandPolicyTests|FullyQualifiedName~CodingVerificationManifestPolicyTests|FullyQualifiedName~CodingVerificationDiscoveryTests|FullyQualifiedName~CodingTaskApplyAdmissionPolicyTests|FullyQualifiedName~CodingAgentObservationPolicyTests|FullyQualifiedName~OpenCodeLocalProbeTests|FullyQualifiedName~WindowsUiActionServiceTests|FullyQualifiedName~WindowsUiAssertionPolicyTests|FullyQualifiedName~ComputerUseAppSelectionPolicyTests|FullyQualifiedName~ComputerUseAppLaunchPolicyTests|FullyQualifiedName~ComputerUseRunningAppDiscoveryTests|FullyQualifiedName~ComputerUseGuiTestEvidenceGateTests|FullyQualifiedName~ComputerUseWindowSelectionPolicyTests|FullyQualifiedName~ComputerUseWindowFocusPolicyTests|FullyQualifiedName~ComputerUseTaskAppLeaseTests|FullyQualifiedName~ComputerUseSensitiveActionPolicyTests|FullyQualifiedName~WindowsUiTreeObservationServiceTests|FullyQualifiedName~UiCaptureProvenancePolicyTests|FullyQualifiedName~UiVerificationEvidenceGateTests|FullyQualifiedName~CodingResultVerifierGateTests|FullyQualifiedName~VerifierServiceTests|FullyQualifiedName~ComputerUseActionParserTests|FullyQualifiedName~ComputerUseCompletionGateTests|FullyQualifiedName~LocalSearxngSearchProviderTests|FullyQualifiedName~CodingWebSearchPolicyTests|FullyQualifiedName~CodingWebSearchEvidenceFormatterTests|FullyQualifiedName~CodingWebSearchEndpointTests|FullyQualifiedName~OpenCodeSessionObserverTests|FullyQualifiedName~OpenCodeSessionEndpointTests|FullyQualifiedName~CodingAgentBackendSelectionPolicyTests|FullyQualifiedName~BrowserDevToolsEvaluationPolicyTests|FullyQualifiedName~WindowsUiActionResultPolicyTests|FullyQualifiedName~CodingRenderedPromptCountContractTests|FullyQualifiedName~CodingPromptTokenCountEndpointTests|FullyQualifiedName~RuntimeTokenCounterTests|FullyQualifiedName~BrowserRedirectObservationPolicyTests|FullyQualifiedName~BrowserRequestAdmissionPolicyTests|FullyQualifiedName~BrowserLiteralAddressPolicyTests|FullyQualifiedName~BrowserAttachedTargetPolicyTests|FullyQualifiedName~BrowserDevToolsNavigationResultPolicyTests|FullyQualifiedName~BrowserNetworkEvidencePolicyTests|FullyQualifiedName~CodingCompletionClaimPolicyTests|FullyQualifiedName~CodingAgentProactiveContextPolicyTests|FullyQualifiedName~CodingProjectInstructionResolverTests|FullyQualifiedName~CodingStepStageReporterTests|FullyQualifiedName~BrowserDomActionScriptBuilderTests|FullyQualifiedName~BrowserDomActionResultPolicyTests|FullyQualifiedName~BrowserDomAssertionPolicyTests|FullyQualifiedName~BrowserDomAssertionResultPolicyTests|FullyQualifiedName~BrowserUiMutationPolicyTests|FullyQualifiedName~BrowserTaskOwnerLeaseTests|FullyQualifiedName~CodingTaskRunLeaseTests|FullyQualifiedName~CodeWorktreeApplyServiceTests|FullyQualifiedName~MultiRepositoryApplyServiceTests|FullyQualifiedName~ShadowWorkspaceServiceTests|FullyQualifiedName~ShadowApplyTransactionTests|FullyQualifiedName~ShadowApplyRecoveryInspectorTests|FullyQualifiedName~ShadowApplyRecoveryServiceTests|FullyQualifiedName~ShadowRecoveryDialogModelTests|FullyQualifiedName~ShadowApplyPathPolicyTests'
+    }
+    # browserDomJs is a required gate, not an opt-in one. Without Node its two suites never execute, so the
+    # gate must read FAIL (the exit logic below then fails the run) rather than stay NOT_RUN and exit 0.
+    Invoke-Gate -Name browserDomJs -LogName 'browser-dom-js.log' -Action {
+        if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            throw 'Node.js is not on PATH, so tools/test-browser-dom-assertion.mjs and tools/test-browser-agent-fixture.mjs cannot run.'
+        }
+        node --test tools/test-browser-dom-assertion.mjs tools/test-browser-agent-fixture.mjs
+    }
+    if ($RunReleaseGate) {
+        Invoke-Gate -Name releaseGate -LogName 'agent-v2-release-gate.log' -Action {
+            & (Join-Path $repo 'tools\release-gate.ps1') -Restore
+        }
+    }
+    if ($RunFlaUI) {
+        Invoke-Gate -Name flaui -LogName 'agent-v2-flaui.log' -Action {
+            if ([string]::IsNullOrWhiteSpace($AppPath)) {
+                & (Join-Path $repo 'tools\test-ui.ps1') -Suite Regression
+            } else {
+                & (Join-Path $repo 'tools\test-ui.ps1') -Suite Regression -AppPath $AppPath
+            }
+        }
+    }
+    if ($RunBrowserE2E) {
+        Invoke-Gate -Name browserCdpFunctional -LogName 'browser-cdp-functional.log' -Action {
+            if ([string]::IsNullOrWhiteSpace($BrowserExecutable)) {
+                throw 'RunBrowserE2E requires -BrowserExecutable with an installed Edge/Chrome executable.'
+            }
+            node tools/test-browser-cdp-e2e.mjs $BrowserExecutable
+        }
+    }
+    if ($RunNativeUiE2E) {
+        Invoke-Gate -Name nativeUiFunctional -LogName 'native-ui-functional.log' -Action {
+            & (Join-Path $repo 'tools\test-agent-native-ui-e2e.ps1') -ConfirmFunctionalTest `
+                -WinAppCli $WinAppCli -OutputRoot (Join-Path $OutputRoot 'native-ui')
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($WinAppTarget)) {
+        Invoke-Gate -Name winappUia -LogName 'agent-v2-winapp-ui.log' -Action {
+            $parameters = @{
+                AppName = $WinAppTarget
+                OutputRoot = (Join-Path $OutputRoot 'winapp-evidence')
+            }
+            if ($CaptureWinAppScreenshot) { $parameters.CaptureScreenshot = $true }
+            & (Join-Path $repo 'tools\test-winapp-ui.ps1') @parameters
+        }
+    }
+}
+finally {
+    $results.executedUtc = [DateTime]::UtcNow.ToString('o')
+    $path = Join-Path $OutputRoot 'validation-status.json'
+    $results | ConvertTo-Json -Depth 5 | Out-File -FilePath $path -Encoding UTF8
+    Write-Output ('Agent Platform V2 validation report: ' + $path)
+    foreach ($key in @('unit', 'browserDomJs', 'releaseGate', 'flaui', 'nativeUiFunctional', 'browserCdpFunctional', 'winappUia', 'physicalGpuAndLongContext', 'selfImprovementDogfood')) {
+        Write-Output ($key + ': ' + $results[$key])
+    }
+}
+
+if ($results.unit -ne 'PASS' -or
+    $results.browserDomJs -eq 'FAIL' -or
+    ($RunReleaseGate -and $results.releaseGate -ne 'PASS') -or
+    ($RunFlaUI -and $results.flaui -ne 'PASS') -or
+    ($RunNativeUiE2E -and $results.nativeUiFunctional -ne 'PASS') -or
+    ($RunBrowserE2E -and $results.browserCdpFunctional -ne 'PASS') -or
+    (-not [string]::IsNullOrWhiteSpace($WinAppTarget) -and $results.winappUia -ne 'PASS')) {
+    exit 1
+}
+exit 0
+) {
+            $currentCommit = $foundCommit
+        }
+    }
+    catch {
+        # A Git checkout is not required merely to run test binaries; unknown
+        # source provenance must remain explicit rather than invented.
+    }
+}
 $results = [ordered]@{
-    branch = 'feature/parux-agent-platform-v2'
+    branch = $currentBranch
+    commit = $currentCommit
     executedUtc = [DateTime]::UtcNow.ToString('o')
     unit = 'NOT_RUN'
     browserDomJs = 'NOT_RUN'
