@@ -4,6 +4,16 @@ Manual procedures for the owner to run on a real Windows PC and phone. Every pro
 
 ## Computer Use across Windows applications (NOT RUN)
 
+### 2026-10-31 Core-side Computer Use receipt gate and Agents task card (NOT RUN)
+
+1. Create a disposable, user-approved GUI test task and make its desktop worker submit a valid v1 receipt. Verify `VerifierService` admits it for **independent** evaluation, but the task remains `Verifying` until the actual verifier responds.
+2. On an isolated Core test instance, intentionally replace the receipt with missing/malformed fields, inconsistent counts, a false `readyForIndependentVerifier`, an incorrect `guiTestRequired` value, or an incorrect root readback flag. Core must reject the task **before** asking its LLM verifier to vote PASS.
+3. Confirm an original goal such as "Testa questa applicazione" is classified as GUI-testing by both desktop and Core. Add untrusted delegated context containing "test UI" to an ordinary "Open Notepad" goal and verify it cannot change the mandatory proof rule.
+4. In Settings → Agents, inspect a `Verifying` task, a `Failed` task and a `Completed` task. Only the actual independent `verificationStatus=pass` and completed Core state may cause the UI to say the verifier reported PASS. The receipt itself must never be displayed as a goal-level PASS, and private raw ResultJson/text must not appear in the receipt line.
+5. Test a mixed-version old desktop worker that submits no v1 receipt: Core must refuse verification, not silently accept it. Record the compatibility/migration impact. Run `ComputerUseResultVerifierGateTests` and `ComputerUseGuiReceiptPresenterTests` with the local xUnit suite; capture commit-specific PASS/FAIL/NOT RUN.
+
+**Status:** Core gate/UI/schema/fixture source only, Windows/WinUI/FlaUI/executable acceptance NOT RUN. Metadata integrity checking is not a signed native UI-event attestation.
+
 ### 2026-10-31 redacted GUI run receipt, truth-in-verification (NOT RUN)
 
 On a disposable Windows test profile and exact checked-out commit, configure a fake WinUI application with non-sensitive test controls and independently run the UIA/FlaUI acceptance scenarios:
