@@ -4,6 +4,24 @@ Manual procedures for the owner to run on a real Windows PC and phone. Every pro
 
 ## Computer Use across Windows applications (NOT RUN)
 
+### 2026-10-31 process-instance authorization and owned dialog acceptance (NOT RUN)
+
+The app lease now treats a registered executable launched by `open_app` as **provisional**, never as proof of the current PID. Explicit `focus_window` must observe a unique authorized title, then verify OS HWND/PID/EXE before/after focusing and bind that specific PID *inside the verified focus operation*. A different running copy of the same EXE must not receive later UIA or keyboard actions. Another top-level form or owned popup in the same verified process is allowed; a distinct helper PID requires its own user-configured executable approval and an explicit new focus. Test an unapproved secondary EXE, two same-title windows, a revoked app approval and STOP/Gaming Mode refusal. Do not count path equality or the model's assertion as proof.
+
+**Opt-in native WinApp dialog fixture, separate from the LLM-driven test:** On a disposable Windows interactive development PC, with .NET 8 SDK and WinApp CLI installed, run from the repo root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunNativeDialogE2E -WinAppCli winapp
+```
+
+The fixture starts as a child process with nonce-bound main window and an explicitly observed Run action. The extra `Open dialog` creates a native modeless WinForms window owned by that main HWND. The native acceptance must discover **one** dialog with the exact title, original PID and Win32 `GW_OWNER` relationship; capture its WinApp UIA tree under the **dialog's** HWND; invoke a uniquely observed Confirm selector; then observe the `DIALOG-ACCEPTED-<nonce>` value in the **main window** using a new UIA wait-for. Confirm the process's original main HWND remains unchanged. The report `native-dialog-status.json` contains only stage statuses and `realAgentOrchestration=NOT_RUN`; the master report tracks `nativeUiDialog` separately from `liveComputerUseAgent` and `nativeUiRecovery`. Failure of any required stage must prevent PASS. All artifacts stay in ignored `artifacts/validation`.
+
+**Full Computer Use agent acceptance:** Repeat the workflow through a user-approved PaRuX `computer-use` task, checking its exact on-screen foreground identity and independent final receipt. The deterministic WinApp script is **not** that agent test. The app must still be approved explicitly. Check a cross-PID dialog via a helper that is **not** user approved: it must be refused without implicit authorization from the parent process. Repeat only with the helper executable independently approved and a unique explicit focus. Record physical observations, actual model/runtime, commit and PASS/FAIL/NOT_RUN.
+
+**Status:** source, fixture, tests and scripts added; actual Windows .NET/xUnit/PowerShell AST/WinApp/FlaUI and live multi-window LLM runs **NOT EXECUTED**. This does not establish universal Windows multi-app compatibility.
+
+
+
 ### 2026-10-31 real PaRuX Computer Use agent + native HWND postcondition (NOT RUN)
 
 This is the **first explicitly runnable agent-driven** Windows fixture acceptance lane, separate from direct WinApp CLI action tests. Use an isolated disposable Windows test account/desktop, with PaRuX Windows and a functioning local model running and WinApp CLI configured for the PaRuX Windows process (`PARUX_WINAPP_CLI` = its explicit native EXE path). Do not run on an active workstation containing sensitive documents or business applications: this is user-approved desktop automation, **not** an OS sandbox.
