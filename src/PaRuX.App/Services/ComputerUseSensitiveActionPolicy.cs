@@ -125,7 +125,7 @@ namespace PaRuX.Services
 
         private static bool IsKnownAction(string kind) => kind is
             "click" or "double_click" or "right_click" or "move" or "type" or "key" or "scroll"
-            or "focus_window" or "wait" or "ui_invoke" or "ui_set_value" or "ui_wait_for" or "ui_assert" or "done";
+            or "focus_window" or "open_app" or "wait" or "ui_invoke" or "ui_set_value" or "ui_wait_for" or "ui_assert" or "done";
 
         private static bool CanActivateTarget(string kind) => kind is
             "click" or "double_click" or "right_click" or "key" or "type" or "ui_invoke" or "ui_set_value";
