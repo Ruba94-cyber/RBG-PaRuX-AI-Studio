@@ -1,5 +1,14 @@
 # Changelog
 
+### 2026-10-31 — Recheck ALL GUI postconditions, not just the final assertion (source only)
+
+- The desktop Computer Use agent now records up to eight distinct, exact verified UIA controls in a private `ComputerUseGuiProofLedger` after the last GUI mutation. A subsequent mutation or focus, a conflicting expectation, a new HWND/PID or failed assertion invalidates the batch. On `done`, ONE fresh foreground WinApp readback must verify **every** control; a stale earlier control can no longer be obscured by a later successful one.
+- The bounded schema-v1 worker receipt adds an optional `finalDistinctControlsVerified` integer without exposing selectors, expected values, executable paths, titles or screenshots. Core validates it when present; legacy receipts remain readable. Settings → Agents shows the number of distinct controls rechecked, not just aggregate assertions.
+- Pure xUnit tests cover multiple controls, stale-first-control regression, duplicate/conflicting selectors, capped capacity, HWND/PID change, redacted receipts, cross-policy recovery and negative Core/UI receipt validations.
+- The explicit live PaRuX Computer Use acceptance fixture now requires TWO independent UIA assertions and external native readbacks of both the fixture Input `ready` and Result `ACCEPTED-<nonce>`, plus at least two distinct final worker-rechecked controls. No test self-authorizes or enables permanent Full Computer Use.
+- **No physical Windows .NET/xUnit/PowerShell/WinApp/FlaUI or model-driven E2E run executed here**. This is not independent native-action attestation, full cross-window goal verification or universal application compatibility. No GitHub Actions or personal data introduced.
+
+
 ### 2026-10-31 — Live Computer Use app-revocation enforcement and true modal-dialog fixture (source only)
 
 - A PID-bound app lease now continuously validates the **current** executable allowlist, not just the permission snapshot taken when the app was first focused. Removing an app in Computer Use Settings blocks later GUI input and completion, including same-PID dialogs and separately approved helper processes. The existing STOP/Gaming Mode callback checks app revocation between model steps, waits and typed characters; focus rechecks the allowlist after the actual foreground switch.
