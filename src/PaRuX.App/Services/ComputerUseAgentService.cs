@@ -451,6 +451,24 @@ namespace PaRuX.Services
                                 continue;
                             }
                         }
+                        // Model inference and the final UIA readback are both
+                        // asynchronous. STOP/Gaming/revocation wins even if they
+                        // occur just before the completion claim is published.
+                        ct.ThrowIfCancellationRequested();
+                        string? finalStopReason = stopReason();
+                        if (finalStopReason != null)
+                            return new ComputerUseAgentResult
+                            {
+                                StepsTaken = step,
+                                Summary = "Stopped before completion: " + finalStopReason
+                            };
+                        if (guiTestGate.RequiresAssertion && pin.RefusalIfChanged() != null)
+                            return new ComputerUseAgentResult
+                            {
+                                StepsTaken = step,
+                                Summary = "GUI test did not complete: foreground changed after the final readback."
+                            };
+
                         return new ComputerUseAgentResult
                         {
                             GoalReported = true,
