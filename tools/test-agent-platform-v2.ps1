@@ -64,6 +64,7 @@ $results = [ordered]@{
     branch = $currentBranch
     commit = $currentCommit
     executedUtc = [DateTime]::UtcNow.ToString('o')
+    scriptSyntax = 'NOT_RUN'
     unit = 'NOT_RUN'
     browserDomJs = 'NOT_RUN'
     releaseGate = 'NOT_RUN'
@@ -95,6 +96,9 @@ function Invoke-Gate {
 }
 
 try {
+    Invoke-Gate -Name scriptSyntax -LogName 'agent-script-syntax.log' -Action {
+        & (Join-Path $repo 'tools\test-agent-validation-syntax.ps1')
+    }
     Invoke-Gate -Name unit -LogName 'agent-v2-xunit.log' -Action {
         dotnet test tests\PaRuX.Server.Tests\PaRuX.Server.Tests.csproj -c Debug --filter 'FullyQualifiedName~CodingAgentPromptBudgetPolicyTests|FullyQualifiedName~CodingAgentCheckpointStoreTests|FullyQualifiedName~CodingWorkspaceVerificationFingerprintTests|FullyQualifiedName~CodingWorkspaceGitLayoutPolicyTests|FullyQualifiedName~CodingRepositoryAliasPolicyTests|FullyQualifiedName~CodingBrowserPostconditionPolicyTests|FullyQualifiedName~CodingVerificationCommandPolicyTests|FullyQualifiedName~CodingVerificationManifestPolicyTests|FullyQualifiedName~CodingVerificationDiscoveryTests|FullyQualifiedName~CodingTaskApplyAdmissionPolicyTests|FullyQualifiedName~CodingAgentObservationPolicyTests|FullyQualifiedName~OpenCodeLocalProbeTests|FullyQualifiedName~WindowsUiActionServiceTests|FullyQualifiedName~WindowsUiAssertionPolicyTests|FullyQualifiedName~ComputerUseAppSelectionPolicyTests|FullyQualifiedName~ComputerUseAppLaunchPolicyTests|FullyQualifiedName~ComputerUseRunningAppDiscoveryTests|FullyQualifiedName~ComputerUseGuiTestEvidenceGateTests|FullyQualifiedName~ComputerUseGuiFinalProofTests|FullyQualifiedName~ComputerUseGuiRepairBudgetTests|FullyQualifiedName~ComputerUseGuiRunTraceTests|FullyQualifiedName~ComputerUseGuiReceiptPresenterTests|FullyQualifiedName~ComputerUseResultVerifierGateTests|FullyQualifiedName~ComputerUseWindowSelectionPolicyTests|FullyQualifiedName~ComputerUseWindowFocusPolicyTests|FullyQualifiedName~ComputerUseTaskAppLeaseTests|FullyQualifiedName~ComputerUseSensitiveActionPolicyTests|FullyQualifiedName~WindowsUiTreeObservationServiceTests|FullyQualifiedName~UiCaptureProvenancePolicyTests|FullyQualifiedName~UiVerificationEvidenceGateTests|FullyQualifiedName~CodingResultVerifierGateTests|FullyQualifiedName~VerifierServiceTests|FullyQualifiedName~ComputerUseActionParserTests|FullyQualifiedName~ComputerUseCompletionGateTests|FullyQualifiedName~LocalSearxngSearchProviderTests|FullyQualifiedName~CodingWebSearchPolicyTests|FullyQualifiedName~CodingWebSearchEvidenceFormatterTests|FullyQualifiedName~CodingWebSearchEndpointTests|FullyQualifiedName~OpenCodeSessionObserverTests|FullyQualifiedName~OpenCodeSessionEndpointTests|FullyQualifiedName~CodingAgentBackendSelectionPolicyTests|FullyQualifiedName~BrowserDevToolsEvaluationPolicyTests|FullyQualifiedName~WindowsUiActionResultPolicyTests|FullyQualifiedName~CodingRenderedPromptCountContractTests|FullyQualifiedName~CodingPromptTokenCountEndpointTests|FullyQualifiedName~RuntimeTokenCounterTests|FullyQualifiedName~BrowserRedirectObservationPolicyTests|FullyQualifiedName~BrowserRequestAdmissionPolicyTests|FullyQualifiedName~BrowserLiteralAddressPolicyTests|FullyQualifiedName~BrowserAttachedTargetPolicyTests|FullyQualifiedName~BrowserDevToolsNavigationResultPolicyTests|FullyQualifiedName~BrowserNetworkEvidencePolicyTests|FullyQualifiedName~CodingCompletionClaimPolicyTests|FullyQualifiedName~CodingAgentProactiveContextPolicyTests|FullyQualifiedName~CodingProjectInstructionResolverTests|FullyQualifiedName~CodingStepStageReporterTests|FullyQualifiedName~BrowserDomActionScriptBuilderTests|FullyQualifiedName~BrowserDomActionResultPolicyTests|FullyQualifiedName~BrowserDomAssertionPolicyTests|FullyQualifiedName~BrowserDomAssertionResultPolicyTests|FullyQualifiedName~BrowserUiMutationPolicyTests|FullyQualifiedName~BrowserTaskOwnerLeaseTests|FullyQualifiedName~CodingTaskRunLeaseTests|FullyQualifiedName~CodeWorktreeApplyServiceTests|FullyQualifiedName~MultiRepositoryApplyServiceTests|FullyQualifiedName~ShadowWorkspaceServiceTests|FullyQualifiedName~ShadowApplyTransactionTests|FullyQualifiedName~ShadowApplyRecoveryInspectorTests|FullyQualifiedName~ShadowApplyRecoveryServiceTests|FullyQualifiedName~ShadowRecoveryDialogModelTests|FullyQualifiedName~ShadowApplyPathPolicyTests'
     }
@@ -157,12 +161,13 @@ finally {
     $path = Join-Path $OutputRoot 'validation-status.json'
     $results | ConvertTo-Json -Depth 5 | Out-File -FilePath $path -Encoding UTF8
     Write-Output ('Agent Platform V2 validation report: ' + $path)
-    foreach ($key in @('unit', 'browserDomJs', 'releaseGate', 'flaui', 'nativeUiFunctional', 'nativeUiRecovery', 'browserCdpFunctional', 'winappUia', 'physicalGpuAndLongContext', 'selfImprovementDogfood')) {
+    foreach ($key in @('scriptSyntax', 'unit', 'browserDomJs', 'releaseGate', 'flaui', 'nativeUiFunctional', 'nativeUiRecovery', 'browserCdpFunctional', 'winappUia', 'physicalGpuAndLongContext', 'selfImprovementDogfood')) {
         Write-Output ($key + ': ' + $results[$key])
     }
 }
 
-if ($results.unit -ne 'PASS' -or
+if ($results.scriptSyntax -ne 'PASS' -or
+    $results.unit -ne 'PASS' -or
     $results.browserDomJs -eq 'FAIL' -or
     ($RunReleaseGate -and $results.releaseGate -ne 'PASS') -or
     ($RunFlaUI -and $results.flaui -ne 'PASS') -or
