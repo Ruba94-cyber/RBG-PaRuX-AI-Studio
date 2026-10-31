@@ -4,6 +4,24 @@ Manual procedures for the owner to run on a real Windows PC and phone. Every pro
 
 ## Computer Use across Windows applications (NOT RUN)
 
+### 2026-10-31 modal dialog and live executable-permission revocation (NOT RUN)
+
+**Mandatory negative safety acceptance:** With one user-approved disposable GUI app and a task-scoped Computer Use grant, explicitly focus the unique app window, then remove the app's EXE from Computer Use Settings before its next click, typed character, UIA invoke, final assertion, or focus_window. Every subsequent action must be refused, including a modal dialog in the same process. Repeat during a long synthetic text entry and a bounded wait: the existing STOP callback must see the revoked app list and stop at its next checkpoint. Re-add the app only through the ordinary user settings flow and explicitly reselect the correct window. Repeat with an approved helper executable, then revoke the helper while leaving the parent approved: helper input remains forbidden. These checks are **not** proof that a native WinApp subprocess can be interrupted between every OS instruction; this remains an acceptance limitation.
+
+**New opt-in TRUE modal native Windows fixture** (different from the existing modeless `-RunNativeDialogE2E` test):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunNativeModalE2E -WinAppCli winapp
+```
+
+The fixture first exposes its original nonce-bound main HWND and native process ID, together with a uniquely observed `parux-fixture-open-modal` UIA button. Opening the modal must create a **new** HWND with a proven Win32 `GW_OWNER` relation and the **same PID**, with its parent **disabled** (`IsWindowEnabled=false`). The modeless dialog must NOT satisfy this modal gate. The harness then independently discovers the `parux-fixture-modal-confirm` UIA selector inside the modal HWND, invokes it, checks the main HWND becomes **enabled** again, verifies unchanged process/main HWND and independently re-reads `MODAL-ACCEPTED-<nonce>` from the main result UIA selector. Only then is `nativeUiModal` PASS. Outputs are under ignored `artifacts/validation/.../native-ui-modal/native-modal-status.json` with `realAgentOrchestration=NOT_RUN`, never included in the live PaRuX agent PASS count.
+
+**Stale screenshot safety:** While an agent is analyzing an image of the main window, open/close the modal to force a foreground HWND change; previously chosen screenshot coordinates and old UIA selectors MUST be refused for that step. Only a new screenshot and new foreground-scoped UIA tree can authorize input to the modal or returned main window. Repeat with a cross-PID helper dialog: it must not inherit the parent PID's action authority. Run `ComputerUseInputPinTests` and `ComputerUseTaskAppLeaseTests` using the local xUnit suite, record the actual commit hash, OS, WinApp CLI version, exit status and the distinction between native fixture and live agent gates.
+
+**Status:** code and acceptance scripts committed; real Windows PowerShell parsing, .NET compilation, xUnit, WinApp, FlaUI and full agent acceptance NOT RUN. UAI-07 remains PARTIAL.
+
+
+
 ### 2026-10-31 process-instance authorization and owned dialog acceptance (NOT RUN)
 
 The app lease now treats a registered executable launched by `open_app` as **provisional**, never as proof of the current PID. Explicit `focus_window` must observe a unique authorized title, then verify OS HWND/PID/EXE before/after focusing and bind that specific PID *inside the verified focus operation*. A different running copy of the same EXE must not receive later UIA or keyboard actions. Another top-level form or owned popup in the same verified process is allowed; a distinct helper PID requires its own user-configured executable approval and an explicit new focus. Test an unapproved secondary EXE, two same-title windows, a revoked app approval and STOP/Gaming Mode refusal. Do not count path equality or the model's assertion as proof.
