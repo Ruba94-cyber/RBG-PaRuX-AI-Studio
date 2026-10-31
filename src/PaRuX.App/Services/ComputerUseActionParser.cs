@@ -18,6 +18,7 @@ namespace PaRuX.Services
         [JsonPropertyName("property")] public string? Property { get; set; }
         [JsonPropertyName("expected")] public string? Expected { get; set; }
         [JsonPropertyName("title")] public string? Title { get; set; }
+        [JsonPropertyName("app")] public string? App { get; set; }
         [JsonPropertyName("ms")] public int? Ms { get; set; }
         [JsonPropertyName("summary")] public string? Summary { get; set; }
     }
@@ -60,7 +61,7 @@ namespace PaRuX.Services
           "properties": {
             "action": {
               "type": "string",
-              "enum": ["click","double_click","right_click","move","type","key","scroll","focus_window","wait","ui_invoke","ui_set_value","ui_wait_for","ui_assert","done"]
+              "enum": ["click","double_click","right_click","move","type","key","scroll","focus_window","open_app","wait","ui_invoke","ui_set_value","ui_wait_for","ui_assert","done"]
             },
             "x": { "type": "integer" },
             "y": { "type": "integer" },
@@ -72,6 +73,7 @@ namespace PaRuX.Services
             "property": { "type": "string", "enum": ["name","value","text"] },
             "expected": { "type": "string", "maxLength": 512 },
             "title": { "type": "string" },
+            "app": { "type": "string", "maxLength": 80 },
             "ms": { "type": "integer" },
             "summary": { "type": "string" }
           }
@@ -87,7 +89,7 @@ namespace PaRuX.Services
         {
             string name = (action ?? string.Empty).Trim().ToLowerInvariant();
             return name is "click" or "double_click" or "right_click" or "move" or "type" or "key" or "scroll"
-                or "focus_window" or "wait" or "ui_invoke" or "ui_set_value" or "ui_wait_for" or "ui_assert" or "done"
+                or "focus_window" or "open_app" or "wait" or "ui_invoke" or "ui_set_value" or "ui_wait_for" or "ui_assert" or "done"
                 ? name
                 : null;
         }
@@ -144,6 +146,8 @@ namespace PaRuX.Services
             if (name == null)
                 return "The action is not one PaRuX can perform. Nothing was sent.";
             string kind = name;
+            if (kind == "open_app" && !ComputerUseAppSelectionPolicy.IsValidName(action.App))
+                return "The app launch needs one valid approved application name. No program was started.";
             if (kind == "ui_assert" && !WindowsUiAssertionPolicy.IsValidRequest(
                     action.Selector, action.Property, action.Expected))
                 return "The UI assertion requires a valid observed selector, property and bounded expected value. Nothing was verified.";
@@ -236,6 +240,7 @@ namespace PaRuX.Services
             "scroll" => "scroll " + a.Lines + " lines at (" + a.X + "," + a.Y + ")",
             // A window title may contain a document name or private account details.
             "focus_window" => "focus window (title: " + (a.Title?.Length ?? 0) + " chars, redacted)",
+            "open_app" => "open approved app (name: " + (a.App?.Length ?? 0) + " chars, redacted)",
             "wait" => "wait " + a.Ms + " ms",
             "ui_invoke" => "invoke UIA control " + Truncate(a.Selector),
             "ui_set_value" => "set UIA value on " + Truncate(a.Selector),
@@ -257,6 +262,6 @@ namespace PaRuX.Services
         internal static string RepeatKey(ComputerUseAction a) => string.Join("\u001f",
             (a.Action ?? string.Empty).Trim().ToLowerInvariant(),
             a.X, a.Y, a.Button, a.Text, a.Combo, a.Lines, a.Selector, a.Title, a.Ms, a.Summary,
-            a.Property, a.Expected);
+            a.Property, a.Expected, a.App);
     }
 }
