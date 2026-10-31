@@ -49,6 +49,7 @@ public sealed class ComputerUseGuiTestEvidenceGateTests
     [InlineData("ui_invoke")]
     [InlineData("ui_set_value")]
     [InlineData("focus_window")]
+    [InlineData("open_app")]
     public void Any_later_effect_or_target_switch_invalidates_previous_ui_proof(string action)
     {
         var gate = new ComputerUseGuiTestEvidenceGate("Test the app interface");
