@@ -263,4 +263,48 @@ public sealed class ComputerUseInputPinTests
 
         Assert.NotNull(pin.RefusalForUiaObservation(Notepad.ProcessId, Notepad.WindowHandle));
     }
+    [Fact]
+    public void Modal_dialog_foreground_invalidates_old_main_screenshot_even_same_PID()
+    {
+        var modal = new ForegroundWindowSnapshot(
+            Notepad.ProcessId, 0x5000, "Owned modal dialog");
+        var owners = new Dictionary<long, long> { [modal.WindowHandle] = Notepad.WindowHandle };
+        ForegroundWindowSnapshot foreground = Notepad;
+        var oldMainPin = new ComputerUseInputPin(
+            Notepad, () => foreground, (x, y) => modal, OwnerLookup(owners));
+
+        // A modal can open between screenshot and dispatch. Even though it is
+        // a valid owned child, old main-window coordinates and UIA are stale.
+        foreground = modal;
+        Assert.NotNull(oldMainPin.RefusalIfChanged());
+        Assert.False(oldMainPin.IsStillForegroundAt(10, 10));
+        Assert.NotNull(oldMainPin.RefusalForUiaObservation(modal.ProcessId, modal.WindowHandle));
+
+        // The NEXT independently captured screenshot may pin that modal, and
+        // only then allow an observed control of its exact HWND.
+        var freshModalPin = new ComputerUseInputPin(
+            modal, () => foreground, (x, y) => modal, OwnerLookup(owners));
+        Assert.Null(freshModalPin.RefusalIfChanged());
+        Assert.True(freshModalPin.IsStillForegroundAt(10, 10));
+        Assert.Null(freshModalPin.RefusalForUiaObservation(modal.ProcessId, modal.WindowHandle));
+
+        // Closing the modal returns focus to its owner and invalidates
+        // the dialog's own screenshot in exactly the same way.
+        foreground = Notepad;
+        Assert.NotNull(freshModalPin.RefusalIfChanged());
+        Assert.NotNull(freshModalPin.RefusalForUiaObservation(Notepad.ProcessId, Notepad.WindowHandle));
+    }
+
+    [Fact]
+    public void Helper_process_modal_cannot_inherit_the_parent_screenshot_scope()
+    {
+        var helper = new ForegroundWindowSnapshot(5001, 0x8000, "External helper modal");
+        var owners = new Dictionary<long, long> { [helper.WindowHandle] = Notepad.WindowHandle };
+        var mainPin = new ComputerUseInputPin(
+            Notepad, () => Notepad, (x, y) => helper, OwnerLookup(owners));
+        Assert.False(mainPin.IsStillForegroundAt(42, 42));
+        Assert.NotNull(mainPin.RefusalIfPointNotOwned(42, 42));
+        Assert.NotNull(mainPin.RefusalForUiaObservation(helper.ProcessId, helper.WindowHandle));
+    }
+
 }
