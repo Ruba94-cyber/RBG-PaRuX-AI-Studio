@@ -186,16 +186,22 @@ try {
     $owner = Read-BoundedWinAppTree -Hwnd $window
     $run = @(Find-ControlsByAutomationId -Elements $owner.elements -AutomationId 'parux-fixture-run')
     $result = @(Find-ControlsByAutomationId -Elements $owner.elements -AutomationId 'parux-fixture-result')
-    if ($run.Count -ne 1 -or $result.Count -ne 1 -or
+    $inputControl = @(Find-ControlsByAutomationId -Elements $owner.elements -AutomationId 'parux-fixture-input')
+    if ($run.Count -ne 1 -or $result.Count -ne 1 -or $inputControl.Count -ne 1 -or
         [string]::IsNullOrWhiteSpace([string]$run[0].selector) -or
-        [string]::IsNullOrWhiteSpace([string]$result[0].selector)) {
+        [string]::IsNullOrWhiteSpace([string]$result[0].selector) -or
+        [string]::IsNullOrWhiteSpace([string]$inputControl[0].selector)) {
         throw 'Fixture must expose unique Run and Result selectors.'
     }
     $selector = [string]$result[0].selector
-    if ($selector -notmatch '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$') {
+    $inputSelector = [string]$inputControl[0].selector
+    if ($selector -notmatch '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$'
+        -or $inputSelector -notmatch '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$'
+        -or $selector -ceq $inputSelector) {
         throw 'Result selector was not valid for Computer Use.'
     }
-    if ((Read-OneResultValue -Hwnd $window -AutomationId 'parux-fixture-result' -Selector $selector) -cne 'PENDING') {
+    if ((Read-OneResultValue -Hwnd $window -AutomationId 'parux-fixture-result' -Selector $selector) -cne 'PENDING'
+        -or (Read-OneResultValue -Hwnd $window -AutomationId 'parux-fixture-input' -Selector $inputSelector) -cne 'ready') {
         throw 'The fixture must start with PENDING; no agent mutation may predate task creation.'
     }
     $report.originalGuiControlNegative = 'PASS'
@@ -217,10 +223,11 @@ try {
     $goal = 'Test ONLY the already running disposable Windows application titled PaRuX Disposable UI Acceptance ' + $nonce +
         '. If this window is not in the foreground, use focus_window with the exact title ' +
         'PaRuX Disposable UI Acceptance ' + $nonce +
-        ' (this app must already be user-approved). Press its Run acceptance action button, ' +
-        'then use ui_assert on the observed result selector ' + $selector +
-        ' with property value and exact expected value ' + $expected +
-        '. Report done only after the exact UI assertion passes. ' +
+        ' (this app must already be user-approved). Press its Run acceptance action button. ' +
+        'After the LAST mutation, run TWO separate ui_assert actions on the SAME foreground window: ' +
+        'first selector ' + $inputSelector + ' with property value, expected ready; ' +
+        'second selector ' + $selector + ' with property value, expected ' + $expected +
+        '. Both must be verified before done; do not modify or switch windows between assertions and done. ' +
         'Do not open apps, use browser or shell, or interact with unrelated windows and private content.'
     $global:LASTEXITCODE = 0
     $createLines = @(& $cli agent run $goal --role computer-use --max-repair 0 --detach 2>&1)
@@ -275,7 +282,7 @@ try {
         -or $receipt.guiTestRequired -cne $true
         -or $receipt.readyForIndependentVerifier -cne $true
         -or $receipt.finalControlReadbackVerified -cne $true
-        -or $receipt.uiAssertionsPassed -lt 1
+        -or $receipt.uiAssertionsPassed -lt 2
         -or $receipt.finalReadbackChecks -lt 1
         -or $receipt.actionsDelivered -lt 1
         -or $receipt.actionsDelivered -gt $receipt.actionsAttempted
@@ -289,7 +296,8 @@ try {
     if ($fixture.HasExited -or $fixture.MainWindowHandle.ToInt64() -ne $window) {
         throw 'Disposable test process/window changed before independent postcondition readback.'
     }
-    if ((Read-OneResultValue -Hwnd $window -AutomationId 'parux-fixture-result' -Selector $selector) -cne $expected) {
+    if ((Read-OneResultValue -Hwnd $window -AutomationId 'parux-fixture-result' -Selector $selector) -cne $expected
+        -or (Read-OneResultValue -Hwnd $window -AutomationId 'parux-fixture-input' -Selector $inputSelector) -cne 'ready') {
         throw 'Independent WinApp CLI readback did not confirm the result in the original fixture window.'
     }
     $report.nativePostcondition = 'PASS'
