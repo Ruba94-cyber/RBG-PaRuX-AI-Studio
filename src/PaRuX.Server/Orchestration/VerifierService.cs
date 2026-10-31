@@ -127,6 +127,26 @@ public sealed class VerifierService
             return;
         }
 
+        // Do not let a model verdict promote a desktop Computer Use
+        // completion without the same deterministic, goal-derived GUI proof
+        // requirements enforced by the Windows worker.
+        ComputerUseResultVerifierGate.Decision computerUseEvidence =
+            ComputerUseResultVerifierGate.Evaluate(task.Role, task.Goal, task.ResultJson);
+        if (!computerUseEvidence.Allowed)
+        {
+            string feedback = "Computer Use evidence rejected: " + computerUseEvidence.Reason;
+            _tasks.AppendLog(task.Id, feedback);
+            if (!TryStartRepair(task, feedback))
+                _tasks.UpdateStatus(task.Id, new UpdateAgentTaskStatusRequest
+                {
+                    Status = AgentTaskStatus.Failed,
+                    Stage = "Computer Use evidence rejected",
+                    Error = feedback,
+                    VerificationStatus = "fail"
+                });
+            return;
+        }
+
         if (string.Equals(task.Role, "ui-verification", StringComparison.OrdinalIgnoreCase))
         {
             UiVerificationEvidenceGate.Decision retained;
