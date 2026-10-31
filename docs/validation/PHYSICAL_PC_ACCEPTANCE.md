@@ -4,6 +4,21 @@ Manual procedures for the owner to run on a real Windows PC and phone. Every pro
 
 ## Computer Use across Windows applications (NOT RUN)
 
+### 2026-10-31 multi-step application launch and GUI-test completion gate (NOT RUN)
+
+The exact `main` candidate must additionally prove, using a disposable Windows test installation:
+
+- Register a test app in PaRuX's existing Computer Use allowlist. Ask Chat to **open that registered app, enter a safe test value, and verify the GUI**. The agent should use `open_app` (exact app name, no executable path) then UIA actions and fresh `ui_assert`; no green completion based only on `done`.
+- Attempt unknown, duplicate alias, or injected command-like app names; verify **no process launched**. Attempt the same against an app installed but **not** approved in Settings; verify refusal. Test Notepad/Calculator built-in separately.
+- Request `done` before a fresh assertion and immediately after another UI mutation: the test must remain incomplete; the model must either run a successful fresh assertion or exhaust its bounded steps with an unverified result.
+- Confirm a non-test task is not accidentally blocked by the app-test gate. Compare actual UIA tree labels and fresh HWND/PID with the screenshot. Revoke the task while an app starts; verify no additional privileged input. Document that already launched user apps may remain open.
+- Run `ComputerUseAppSelectionPolicyTests`, `ComputerUseGuiTestEvidenceGateTests`, `ComputerUseActionParserTests`, `WindowsUiAssertionPolicyTests`, `WindowsUiActionServiceTests` and the real FlaUI/WinApp app tests; retain pass/fail/NOT RUN by exact commit. Neither static checks nor unit fixtures alone are production acceptance.
+- With WinApp CLI unavailable, show the blocked UIA capability truthfully; do not claim screenshot-only click/type is permitted when the current sensitive-action policy refuses unlabelled targets.
+
+**Status:** implementation source + hermetic tests committed; actual .NET compilation, WinUI, FlaUI, WinApp CLI, app launch, Windows 10/11 and enterprise-app acceptance **NOT RUN**.
+
+
+
 **Objective:** prove a user-approved local AI agent can *actually test* one or more disposable Windows applications, not merely press keys, produce screenshots or claim a successful result.
 
 1. On a clean Windows x64 development install with **WinApp CLI explicitly configured by the operator**, launch a disposable WinUI test app and Notepad. Confirm per-task Computer Use approval, then collect the actual foreground HWND/PID and UIA control selectors.
