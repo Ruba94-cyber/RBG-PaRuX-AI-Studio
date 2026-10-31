@@ -1,5 +1,12 @@
 # Changelog
 
+### 2026-10-31 — Computer Use discovery and explicit app approval (source only)
+
+- Computer Use Settings can scan already-open Windows GUI applications when the user requests it, display the exact executable path, and register one selected app only after explicit approval; the scan itself is read-only and cannot auto-authorize a process.
+- Manual EXE selection, chat fast-path app launch and pre-execution revalidation share the allowlist executable restrictions; scripts, interpreters, UNC launchers and duplicate registration are refused.
+- Hermetic running-app inventory tests are added to the local agent-v2 test gate. Windows UI, .NET/xUnit, FlaUI and physical-PC acceptance have **not** been run.
+
+
 All notable changes to RBG PaRuX AI Studio are recorded here. The canonical engineering record is
 [`PARUX_EXECUTION_PLAN.md`](PARUX_EXECUTION_PLAN.md); this file is the user-facing summary.
 
