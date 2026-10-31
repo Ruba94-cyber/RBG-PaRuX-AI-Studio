@@ -62,7 +62,6 @@ namespace PaRuX.Services
         public const string DownloadableCudaId = "llama-server-cuda";
         public const string DownloadableComfyUiId = "comfyui";
 
-        public const long DefaultStarterModelSizeBytes = 2_400_000_000L; // ~2.2 GB typical Q4_K_M starter
         public const long CudaRuntimeSizeBytes = 420_000_000L;          // ~400 MB CUDA pack
         public const long ComfyUiSizeBytes = 1_600_000_000L;            // ~1.5 GB ComfyUI pack
 
@@ -91,7 +90,7 @@ namespace PaRuX.Services
                     Category = "Text Runtime",
                     BundledSizeText = "~45 MB",
                     IsStaged = vulkanDetected,
-                    Description = "Included llama.cpp Vulkan engine. No separate runtime download is needed, but a chat model must still be installed and verified."
+                    Description = "Included llama.cpp Vulkan engine. No separate runtime download is needed; choose a compatible chat model in Model Hub and verify a local answer."
                 },
                 new()
                 {
@@ -114,26 +113,8 @@ namespace PaRuX.Services
             };
 
             // Downloaded items (only when chosen by user, with estimated sizes)
-            string modelTitle = "Recommended Chat Model";
-            long modelSizeBytes = DefaultStarterModelSizeBytes;
-            FirstModelCandidate? candidate = modelAdvice?.Candidates.FirstOrDefault(c => c.Model.Id == modelAdvice.RecommendedId)
-                ?? modelAdvice?.Candidates.FirstOrDefault();
-            if (candidate?.Model != null)
-            {
-                RecommendedModel m = candidate.Model;
-                if (!string.IsNullOrWhiteSpace(m.Title))
-                {
-                    modelTitle = m.Title;
-                    if (!string.IsNullOrWhiteSpace(m.ApproxParams) || !string.IsNullOrWhiteSpace(m.QuantHint))
-                    {
-                        modelTitle += $" ({m.ApproxParams ?? string.Empty} {m.QuantHint ?? string.Empty})".Trim();
-                    }
-                }
-                if (m.EstimatedSizeBytes > 0)
-                {
-                    modelSizeBytes = m.EstimatedSizeBytes;
-                }
-            }
+            const string modelTitle = "Compatible Chat Model";
+            const string modelSizeText = "Varies by model";
 
             var downloadableList = new List<DownloadableComponentItem>
             {
@@ -142,11 +123,11 @@ namespace PaRuX.Services
                     Id = DownloadableModelId,
                     DisplayName = modelTitle,
                     Category = "Model Weights (GGUF)",
-                    EstimatedSizeBytes = modelSizeBytes,
-                    EstimatedSizeText = FormatSize(modelSizeBytes),
+                    EstimatedSizeBytes = 0,
+                    EstimatedSizeText = modelSizeText,
                     IsRequired = true,
-                    WhenDownloaded = "Downloaded only when you choose 'Get this model' or select a model in Model Hub.",
-                    Description = "Weights are stored in your LocalAI models folder. Nothing downloads until you choose it."
+                    WhenDownloaded = "Choose a compatible model in Model Hub; nothing downloads until you choose a file.",
+                    Description = "Model weights are stored in your LocalAI models folder. Size depends on the model and quantization you choose."
                 },
                 new()
                 {
@@ -174,15 +155,15 @@ namespace PaRuX.Services
 
             bool hasWorkingTextPath = vulkanDetected || cudaDetected;
             string headline = hasWorkingTextPath
-                ? "Included text engine detected — download a chat model next"
+                ? "Included text engine detected — choose a compatible chat model in Model Hub"
                 : components == null
                     ? "Checking the included text engine and package tools…"
                     : "Text engine not detected — review Components to set it up";
 
             string subhead = hasWorkingTextPath
                 ? (cudaDetected && !vulkanDetected
-                    ? "The included CUDA 13.4 runtime is detected. Download a chat model, then verify a real local answer before entering Chat."
-                    : "The included Vulkan runtime is detected. Download a chat model, then verify a real local answer before entering Chat.")
+                    ? "The included CUDA 13.4 runtime is detected. Choose a compatible chat model in Model Hub, then verify a real local answer before entering Chat."
+                    : "The included Vulkan runtime is detected. Choose a compatible chat model in Model Hub, then verify a real local answer before entering Chat.")
                 : "The installer is designed to include the Vulkan engine, a CUDA 13.4 engine for supported NVIDIA GPUs, and package tooling. If detection fails, repair or locate the runtime in Components.";
 
             string guidance = $"Verify installer integrity: run '{PowerShellVerificationCommand}' in PowerShell and compare with SHA256SUMS.txt. See {DocumentationPath} for details.";

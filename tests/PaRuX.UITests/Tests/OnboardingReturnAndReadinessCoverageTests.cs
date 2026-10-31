@@ -40,7 +40,7 @@ public sealed class OnboardingReturnAndReadinessCoverageTests
 
             var installButton = page.FirstModelInstallButton;
             Assert.NotNull(installButton);
-            Assert.Contains("in Model Hub", installButton.Name, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("Browse models in Model Hub", installButton.Name);
 
             page.TriggerModelHubHandoff();
 

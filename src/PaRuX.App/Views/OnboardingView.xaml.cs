@@ -776,7 +776,9 @@ namespace PaRuX.Views
                     itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
                     var textStack = new StackPanel { Spacing = 2 };
-                    string reqPrefix = item.IsRequired ? "Required for chat: " : "Optional: ";
+                    string reqPrefix = item.Id == BundledRuntimeOverviewPresenter.DownloadableModelId
+                        ? "Choose for chat: "
+                        : item.IsRequired ? "Required for chat: " : "Optional: ";
                     var titleBlock = new TextBlock
                     {
                         Text = reqPrefix + item.DisplayName,

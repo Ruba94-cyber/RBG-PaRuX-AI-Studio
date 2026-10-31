@@ -12,12 +12,7 @@ using PaRuX.Services;
 namespace PaRuX.Views
 {
     /// <summary>
-    /// The first-run answer to "which model do I download?".
-    ///
-    /// Onboarding previously finished with a runtime installed, no model, and a line pointing at
-    /// Model Hub - which is only actionable if you already know what to look for. Core now ranks its
-    /// curated list against the actual GPU and memory, so this screen can name one model, say in a
-    /// sentence why it suits this machine, and start it.
+    /// Provides a neutral first-run route to Model Hub and optional task-based model exploration.
     /// </summary>
     public sealed partial class OnboardingView
     {
@@ -29,7 +24,7 @@ namespace PaRuX.Views
         /// the shell can open Model Hub already searching for it.</summary>
         public event Action<string>? FindModelRequested;
 
-        /// <summary>Quantization recommended for the current first-model handoff.</summary>
+        /// <summary>Quantization hint for a model the user explicitly selected from task options.</summary>
         public string? SuggestedQuantHintForHandoff { get; private set; }
 
         private async Task RefreshFirstModelAdviceAsync()
@@ -119,7 +114,7 @@ namespace PaRuX.Views
                 _modelAdvice = new FirstModelAdvice
                 {
                     HardwareSummary = "UI test hardware fixture",
-                    Headline = "UI test general-chat starter candidate",
+                    Headline = "Choose a compatible chat model in Model Hub.",
                     RecommendedId = model.Id,
                     Candidates = candidates,
                     CapabilityGroups = CreateFirstModelCapabilityFixture(generalCandidate, codingCandidate,
@@ -156,9 +151,9 @@ namespace PaRuX.Views
             {
                 Log.Write("RefreshFirstModelAdviceAsync failed: " + ex.Message);
                 FirstModelHardwareText.Text =
-                    "PaRuX couldn't read this machine's hardware, so it can't suggest a model yet. "
-                    + "You can still choose one in Model Hub.";
-                ShowFirstModelActions(installable: false);
+                    "PaRuX couldn't read this machine's hardware, so it can't estimate model fit. "
+                    + "You can still choose a compatible model in Model Hub.";
+                ShowFirstModelActions(installable: true);
             }
 
             try
@@ -177,15 +172,15 @@ namespace PaRuX.Views
         {
             FirstModelHardwareText.Text = advice.HardwareSummary;
 
-            if (_selectedFirstModelId == null
-                || !advice.Candidates.Any(candidate => candidate.Model.Id == _selectedFirstModelId))
-                _selectedFirstModelId = advice.RecommendedId;
+            if (_selectedFirstModelId != null
+                && !advice.Candidates.Any(candidate => candidate.Model.Id == _selectedFirstModelId))
+                _selectedFirstModelId = null;
 
             FirstModelCandidate? selected = advice.Candidates
                 .FirstOrDefault(candidate => candidate.Model.Id == _selectedFirstModelId);
             FirstModelHeadlineText.Text = selected == null
-                ? advice.Headline
-                : "General-chat starter: " + selected.Model.Title + ". " + selected.Reason
+                ? "Choose a compatible chat model in Model Hub."
+                : "Selected model: " + selected.Model.Title + ". " + selected.Reason
                   + " This is a fit estimate, not a task-quality winner; coding, vision, image and video tasks may use different models.";
             FirstModelHeadlineText.Visibility = Visibility.Visible;
 
@@ -199,14 +194,18 @@ namespace PaRuX.Views
                 }.Where(part => !string.IsNullOrWhiteSpace(part)));
                 FirstModelDetailText.Visibility = Visibility.Visible;
                 if (FirstModelInstallButton != null)
-                    FirstModelInstallButton.Content = "Find " + selected.Model.Title + " in Model Hub";
+                    FirstModelInstallButton.Content = "Open selected model in Model Hub";
             }
             else
             {
                 FirstModelDetailText.Visibility = Visibility.Collapsed;
             }
 
-            ShowFirstModelActions(installable: selected != null);
+            if (FirstModelInstallButton != null)
+                FirstModelInstallButton.Content = selected == null
+                    ? "Browse models in Model Hub"
+                    : "Open selected model in Model Hub";
+            ShowFirstModelActions(installable: true);
             ApplyFirstModelStorage(_modelBudget);
             RenderBundledOverview(BundledRuntimeOverviewPresenter.BuildOverview(_lastComponents, _modelAdvice));
         }
@@ -254,7 +253,17 @@ namespace PaRuX.Views
         {
             FirstModelCandidate? best = _modelAdvice?.Candidates
                 .FirstOrDefault(c => c.Model.Id == _selectedFirstModelId);
-            if (best == null) return;
+            if (best == null)
+            {
+                SuggestedQuantHintForHandoff = null;
+                if (FirstModelStatusText != null)
+                {
+                    FirstModelStatusText.Text = "Opening Model Hub. Choose a compatible model for your tasks and hardware; nothing downloads until you choose a file.";
+                    FirstModelStatusText.Visibility = Visibility.Visible;
+                }
+                FindModelRequested?.Invoke(string.Empty);
+                return;
+            }
 
             string repoId = best.Model.HuggingFaceRepoId;
             if (!_stateMachine.TryHandoffToModelHub(repoId))
@@ -275,8 +284,8 @@ namespace PaRuX.Views
             if (FirstModelStatusText != null)
             {
                 FirstModelStatusText.Text =
-                    "Opening Model Hub with " + repoId + " searched. "
-                    + "Pick the file matching \"" + best.Model.QuantHint + "\" and choose Download. Return to Setup when ready.";
+                    "Opening Model Hub with your selected model searched. "
+                    + "Choose a compatible file and select Download. Return to Setup when ready.";
                 FirstModelStatusText.Visibility = Visibility.Visible;
             }
             SuggestedQuantHintForHandoff = best.Model.QuantHint;
@@ -363,7 +372,7 @@ namespace PaRuX.Views
                         Content = !canSelect
                             ? "Not a fit for this PC"
                             : isStandardGeneralChat
-                                ? "Use as general-chat starter"
+                                ? "Select for general chat"
                                 : "Find " + routeRole + " candidate in Model Hub",
                         IsEnabled = canSelect && (isStandardGeneralChat
                             || !string.IsNullOrWhiteSpace(candidate.Model.HuggingFaceRepoId)),
@@ -380,7 +389,7 @@ namespace PaRuX.Views
                             if (FirstModelStatusText != null)
                             {
                                 FirstModelStatusText.Text = "Opening Model Hub to inspect " + candidate.Model.Title + ". "
-                                    + "This does not download the model or change the general-chat starter. "
+                                    + "This does not download the model or change your general-chat selection. "
                                     + "After choosing a file, add it to the " + routeRole
                                     + " role in Model Intelligence & Routing if you want to use it there.";
                                 FirstModelStatusText.Visibility = Visibility.Visible;

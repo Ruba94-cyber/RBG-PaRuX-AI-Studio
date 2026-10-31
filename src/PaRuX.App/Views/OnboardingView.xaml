@@ -169,20 +169,19 @@
                     </Border>
                 </StackPanel>
 
-                <!-- The step that was missing. Onboarding used to end with a runtime installed, no
-                     model, and a sentence telling the user to go and find one in Model Hub - which
-                     only helps somebody who already knows what to search for. -->
+                <!-- Give a neutral Model Hub entry point; model choice stays with the user. -->
                 <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
-                    <TextBlock Text="YOUR FIRST MODEL" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
+                    <TextBlock Text="CHOOSE A MODEL" Style="{StaticResource PaRuXSectionHeaderTextStyle}" Margin="4,0,0,0" />
                     <Border Style="{StaticResource PaRuXCardStyle}">
                         <StackPanel Spacing="{StaticResource PaRuXSpaceS}">
                             <TextBlock
-                                Text="Choose a starter for general chat. PaRuX estimates hardware fit, but fit alone does not prove answer quality or speed. Coding, vision, image/video work and an uncensored content preference can use different models; nothing downloads until you choose it."
+                                Text="Choose a model that fits your hardware and the tasks you want to do. Browse compatible options in Model Hub. PaRuX can estimate hardware fit, but fit alone does not prove answer quality or speed; some tasks may use different models. Nothing downloads until you choose it."
                                 TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
                             <TextBlock x:Name="FirstModelHardwareText" Text="Checking your hardware…"
                                        TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />
                             <TextBlock x:Name="FirstModelHeadlineText"
-                                       AutomationProperties.AutomationId="FirstModelHeadlineText" Visibility="Collapsed"
+                                       AutomationProperties.AutomationId="FirstModelHeadlineText" Visibility="Visible"
+                                       Text="Choose a compatible chat model in Model Hub."
                                        TextWrapping="Wrap" Style="{StaticResource PaRuXBodyTextStyle}" />
                             <TextBlock x:Name="FirstModelDetailText" Visibility="Collapsed"
                                        AutomationProperties.AutomationId="FirstModelDetailText"
@@ -193,12 +192,12 @@
                                        Style="{StaticResource PaRuXCaptionTextStyle}" />
                             <StackPanel x:Name="FirstModelActions" Orientation="Horizontal"
                                         Spacing="{StaticResource PaRuXSpaceS}" Visibility="Collapsed">
-                                <Button x:Name="FirstModelInstallButton" Content="Get this model"
+                                <Button x:Name="FirstModelInstallButton" Content="Browse models in Model Hub"
                                         AutomationProperties.AutomationId="FirstModelInstallButton"
                                         Style="{StaticResource AccentButtonStyle}" Click="FirstModelInstall_Click" />
                                 <Button x:Name="FirstModelOtherButton"
                                         AutomationProperties.AutomationId="FirstModelOtherButton"
-                                        Content="Choose by task" Click="FirstModelOther_Click" />
+                                        Content="View options by task" Click="FirstModelOther_Click" />
                             </StackPanel>
                             <TextBlock x:Name="FirstModelStatusText" Visibility="Collapsed"
                                        TextWrapping="Wrap" Style="{StaticResource PaRuXCaptionTextStyle}" />

@@ -1873,16 +1873,17 @@ public sealed class SmokeTests
     }
 
     [Fact, Trait("Category", "Regression"), Trait("Category", "Models"), Trait("Category", "Accessibility")]
-    public void First_model_storage_advice_keeps_estimate_quota_and_volume_space_distinct()
+    public void First_model_guidance_is_neutral_and_storage_quota_and_volume_space_are_distinct()
     {
-        string testName = nameof(First_model_storage_advice_keeps_estimate_quota_and_volume_space_distinct);
+        string testName = nameof(First_model_guidance_is_neutral_and_storage_quota_and_volume_space_are_distinct);
         using var app = new UiTestApplication(testName, enableFirstModelStorageFixture: true);
         try
         {
-            var detail = UiWait.ById(app.MainWindow, "FirstModelDetailText", ControlType.Text);
-            UiWait.For(() => detail.Name.Contains("selected file may differ", StringComparison.OrdinalIgnoreCase),
-                "approximate first-model download estimate");
-            Assert.Contains("About 5 GB download", detail.Name, StringComparison.OrdinalIgnoreCase);
+            var headline = UiWait.ById(app.MainWindow, "FirstModelHeadlineText", ControlType.Text);
+            UiWait.For(() => headline.Name.Contains("compatible chat model in Model Hub", StringComparison.OrdinalIgnoreCase),
+                "neutral model selection guidance");
+            Assert.DoesNotContain("Qwen", headline.Name, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("starter", headline.Name, StringComparison.OrdinalIgnoreCase);
 
             var storage = UiWait.ById(app.MainWindow, "FirstModelStorageText", ControlType.Text);
             UiWait.For(() => storage.Name.Contains("456 GB", StringComparison.Ordinal),
@@ -1905,9 +1906,10 @@ public sealed class SmokeTests
         using var app = new UiTestApplication(testName, enableFirstModelSelectionStorageFixture: true);
         try
         {
-            var detail = UiWait.ById(app.MainWindow, "FirstModelDetailText", ControlType.Text);
-            UiWait.For(() => detail.Name.Contains("About 5 GB download", StringComparison.Ordinal),
-                "initial general-chat candidate size");
+            var headline = UiWait.ById(app.MainWindow, "FirstModelHeadlineText", ControlType.Text);
+            UiWait.For(() => headline.Name.Contains("compatible chat model in Model Hub", StringComparison.OrdinalIgnoreCase),
+                "neutral model guidance before explicit selection");
+            Assert.DoesNotContain("Storage fixture model", headline.Name, StringComparison.Ordinal);
             var storage = UiWait.ById(app.MainWindow, "FirstModelStorageText", ControlType.Text);
             UiWait.For(() => storage.Name.Contains("6 GB", StringComparison.Ordinal),
                 "fixture destination free space");
@@ -1918,6 +1920,7 @@ public sealed class SmokeTests
             UiWait.ById(app.MainWindow, "FirstModelUseCandidateButton_larger-general-fixture", ControlType.Button)
                 .Patterns.Invoke.Pattern.Invoke();
 
+            var detail = UiWait.ById(app.MainWindow, "FirstModelDetailText", ControlType.Text);
             UiWait.For(() => detail.Name.Contains("About 7 GB download", StringComparison.Ordinal),
                 "selected general-chat candidate size");
             UiWait.For(() => storage.Name.Contains("below the approximate selected download size", StringComparison.Ordinal),
