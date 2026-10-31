@@ -75,8 +75,11 @@ namespace PaRuX.Services
             CancellationToken ct,
             Func<bool>? persistentAuthorizationStillValid = null,
             ComputerUseRunGate.Lease? heldLease = null,
-            string? originalGoal = null)
+            string? originalGoal = null,
+            ComputerUseGuiRunTrace? trace = null)
         {
+            // Optional reporter; no UI values or model-supplied content are captured.
+            trace ??= new ComputerUseGuiRunTrace();
             // The mouse and keyboard are one shared device, so only one run may hold them. A run that cannot
             // take the gate is refused before it sends any input, and the caller decides whether to retry.
             // Gaming Mode is a hard-off at every entry. It is checked before the gate is taken, so a refused run holds nothing.
@@ -297,6 +300,7 @@ namespace PaRuX.Services
                     }
 
                     string description = ComputerUseActionParser.Describe(action);
+                    trace.RecordActionAttempt();
 
                     string? refusedPayload = ComputerUseActionParser.ValidateExecutable(
                         action, new ScreenBounds(bounds.Left, bounds.Top, bounds.Width, bounds.Height));
@@ -436,6 +440,7 @@ namespace PaRuX.Services
                                 && pin.RefusalForUiaObservation(
                                     finalReadback.ProcessId, finalReadback.WindowHandle) == null
                                 && lastGuiProof.Recheck(finalReadback);
+                            trace.RecordFinalReadback(finalReadbackVerified);
                             if (!finalReadbackVerified)
                             {
                                 // A changed/unavailable independent control
@@ -552,6 +557,7 @@ namespace PaRuX.Services
                             ? "verified" : verdict.ToString();
                         onStep?.Invoke("Step " + step + ": UIA assertion " + status + ".");
                         actionLog.Add("UIA assertion: " + status);
+                        trace.RecordAssertion(verdict == WindowsUiAssertionPolicy.Verdict.Verified);
                         if (verdict != WindowsUiAssertionPolicy.Verdict.Verified)
                             return new ComputerUseAgentResult
                             {
@@ -672,6 +678,7 @@ namespace PaRuX.Services
                             appLease.BindApprovedExecutable(actual.ExecutablePath);
                         }
                     }
+                    trace.RecordActionDelivered();
                     guiTestGate.RecordDeliveredAction(action.Action);
                     if (!guiTestGate.VerifiedAfterLatestMutation)
                         lastGuiProof = null;
