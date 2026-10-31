@@ -1,5 +1,14 @@
 # Changelog
 
+### 2026-10-31 — OS-attested cross-window exact GUI verification (source only)
+
+- Computer Use can now retain up to eight exact control assertions across multiple **explicitly focused and currently user-approved OS windows**. Legacy/unattested assertions remain strict to one window. Verified focus transitions do not erase older read-only proofs; data changes, app launch, failed assertions and stale readbacks still invalidate the whole batch.
+- A new read-only `CaptureVerifiedWindowAsync` inspects an already OS-attested background HWND with WinApp CLI while independently checking PID/HWND/executable identity before and after, without focusing the window or accepting model-provided native handles. The `done` path checks all previously asserted app windows with a live executable allowlist check; missing or mismatched evidence fails rather than upgrading model text into a completion.
+- Typed redacted GUI receipt adds an optional `finalDistinctWindowsVerified` count (0–8). Core validates counts and Agents UI displays the number of verified windows separately from distinct controls. Old v1 task results without additive fields remain readable.
+- The opt-in live acceptance script supports `-RunCrossWindowScenario`: a genuine task-scoped PaRuX agent must interact with TWO independently launched disposable Windows processes, revisit and assert both results and provide a Core verifier-approved worker receipt. The Windows master script exposes `-RunLiveMultiWindowE2E` as a separate gate; it cannot pass based on a one-window fixture or an unrun WinApp script. Original single-window acceptance is preserved.
+- Added unit-policy regressions and documented negative acceptance for revoked/exited/replaced process, stale first-app control, missing native background inspection and unapproved helper. **No local Windows build, PowerShell parse, xUnit, FlaUI, WinApp or live model run was performed here.** This is sequential control-state verification, not atomic multi-app persistence proof, nor evidence of Outlook/Excel interoperability. No GitHub Actions or private machine data introduced.
+
+
 ### 2026-10-31 — Recheck ALL GUI postconditions, not just the final assertion (source only)
 
 - The desktop Computer Use agent now records up to eight distinct, exact verified UIA controls in a private `ComputerUseGuiProofLedger` after the last GUI mutation. A subsequent mutation or focus, a conflicting expectation, a new HWND/PID or failed assertion invalidates the batch. On `done`, ONE fresh foreground WinApp readback must verify **every** control; a stale earlier control can no longer be obscured by a later successful one.
