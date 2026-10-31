@@ -173,7 +173,8 @@ namespace PaRuX.Services
                     effectiveGoal,
                     line => { _ = AgentOrchestratorClient.Current.AppendLogAsync(task.Id, line, CancellationToken.None); },
                     tracked.Cts.Token,
-                    persistentAuthorization).ConfigureAwait(false);
+                    persistentAuthorization,
+                    originalGoal: task.Goal).ConfigureAwait(false);
 
                 if (result.NotStarted)
                 {
@@ -211,7 +212,9 @@ namespace PaRuX.Services
                 // actionable failure and never interpret a mere execution transcript as
                 // successful task completion. Explicit "done" still proceeds to the
                 // independent verifier, which must decide whether the claim is true.
-                if (!ComputerUseCompletionGate.MayRequestVerification(result.GoalReported, result.Cancelled))
+                if (!ComputerUseCompletionGate.MayRequestVerification(
+                    result.GoalReported, result.Cancelled,
+                    result.GuiTestProofRequired, result.GuiTestProofSatisfied))
                 {
                     await AgentOrchestratorClient.Current.AppendLogAsync(task.Id,
                         "Computer Use did not report its goal complete: " + result.Summary,
@@ -231,6 +234,9 @@ namespace PaRuX.Services
                     response = result.Summary,
                     result.GoalReported,
                     result.StepsTaken,
+                    guiTestProofRequired = result.GuiTestProofRequired,
+                    guiTestProofSatisfied = result.GuiTestProofSatisfied,
+                    uiAssertionsPassed = result.VerifiedUiAssertions,
                     executor = "windows-computer-use",
                     authorization = remoteTaskApproval ? "task-scoped-remote-approval" : "windows-full-computer-use",
                     evidenceMode = dependencyEvidence.DependencyCount > 0 ? "bounded-predecessor-results" : "task-only"
