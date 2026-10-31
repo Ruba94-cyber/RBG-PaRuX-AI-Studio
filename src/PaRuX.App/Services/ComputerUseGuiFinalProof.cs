@@ -45,6 +45,23 @@ namespace PaRuX.Services
                 processId, windowHandle, selector!, property!, expected!);
         }
 
+        /// <summary>Used only by the in-memory proof ledger. Neither values,
+        /// selectors nor OS window identities are exposed in logs/receipts.</summary>
+        internal bool SameControlAs(ComputerUseGuiFinalProof? other) =>
+            other != null
+            && _processId == other._processId
+            && _windowHandle == other._windowHandle
+            && string.Equals(_selector, other._selector, StringComparison.Ordinal)
+            && string.Equals(_property, other._property, StringComparison.Ordinal);
+
+        internal bool SameExpectationAs(ComputerUseGuiFinalProof? other) =>
+            SameControlAs(other)
+            && string.Equals(_expected, other!._expected, StringComparison.Ordinal);
+
+        internal bool SameWindowAs(ComputerUseGuiFinalProof? other) =>
+            other != null && _processId == other._processId
+            && _windowHandle == other._windowHandle;
+
         /// <summary>
         /// The caller is responsible for obtaining a NEW OS foreground UIA
         /// observation, for checking user authorization/STOP, and for ensuring
