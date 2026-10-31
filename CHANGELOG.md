@@ -1,5 +1,13 @@
 # Changelog
 
+### 2026-10-31 — Process-instance authorization and owned-window Computer Use acceptance (source only)
+
+- Registered `open_app` now creates a provisional, non-actionable executable lease. `focus_window` verifies exact native HWND/PID/EXE and binds the actual OS process before subsequent UIA, typing and completion. An unrelated second process using the same approved exe no longer automatically inherits the launched app's authority. Same-PID dialogs remain in scope; separate helper processes require their own approved executable and explicit focus.
+- Eliminated the race between successful focus and later lease reassignment by performing the binding within the independently verified focus action. Agent prompts identify provisional app state and tell the model to focus the correct observed window first.
+- Extended the disposable WinForms fixture with a separately owned modeless dialog and a new WinApp `-RunDialogScenario` that checks distinct HWND, same OS PID, `GW_OWNER`, independently observed dialog Confirm and the changed main-window result. The master runner adds opt-in `-RunNativeDialogE2E`, tracked independently from real-agent and recovery tests.
+- Expanded task-local lease regressions and updated the execution plan and physical-PC acceptance procedures. **No real Windows/.NET/xUnit/WinApp/FlaUI/agent run was executed here; no broad Windows multi-app support or OS sandbox guarantee is claimed.**
+
+
 ### 2026-10-31 — Opt-in live Computer Use agent acceptance with independent WinApp readback (source only)
 
 - Added `parux agent show <taskId> --json` for reliable local CLI task inspection while preserving the ordinary human-readable output. The CLI does not grant desktop privileges.
