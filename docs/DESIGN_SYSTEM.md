@@ -14,6 +14,8 @@ Use the full display name **PaRuX AI & Gaming OS**, with **PaRuX** as the short 
 
 A reproducible starting construction for review, not an approved or produced logo: on a 64 × 64 square grid draw a single-color upright P using an outer path `M 14 8 H 37 C 49 8 54 15 54 25 C 54 35 49 42 37 42 H 26 V 56 H 14 Z`; subtract an inner opening `M 26 19 V 31 H 37 C 41 31 43 29 43 25 C 43 21 41 19 37 19 Z`. Inspect and adjust the silhouette, optical alignment and counters at 16 and 32 px before approval. This construction is a design proposal, not a trademark clearance or a claim that production vector/raster files exist.
 
+An unapproved alternative geometric study is available in `docs/branding/concept-01/`, with SVG variants and a raster preview. It has not replaced application assets.
+
 Deliverables still required: reviewed editable vector master; light, dark, monochrome, compact icon and full lockup variants; raster exports at actual Windows sizes; tray, splash, installer and README applications. Verify contrast, silhouette and recognizable rendering against both themes and high contrast before replacing existing assets.
 
 ## Semantic colors
