@@ -17,6 +17,7 @@ namespace PaRuX.Services
         internal int UiAssertionsFailed { get; private set; }
         internal int FinalReadbackChecks { get; private set; }
         internal int FinalReadbackFailures { get; private set; }
+        internal bool LastFinalReadbackPassed { get; private set; }
 
         internal void RecordActionAttempt()
         {
@@ -39,6 +40,7 @@ namespace PaRuX.Services
 
         internal void RecordFinalReadback(bool verified)
         {
+            LastFinalReadbackPassed = verified;
             if (FinalReadbackChecks < MaxEvents) FinalReadbackChecks++;
             if (!verified && FinalReadbackFailures < MaxEvents) FinalReadbackFailures++;
         }
@@ -56,7 +58,7 @@ namespace PaRuX.Services
             bool verified = !guiTestRequired || (guiProofSatisfied
                 && finalReadbackVerified && consistentAssertionCount
                 && UiAssertionsPassed > 0 && FinalReadbackChecks > 0
-                && FinalReadbackFailures == 0);
+                && LastFinalReadbackPassed);
             string outcome = notStarted ? "not_started"
                 : cancelled ? "cancelled"
                 : !goalReported ? "incomplete"
@@ -67,7 +69,7 @@ namespace PaRuX.Services
                 : !goalReported ? "no_valid_completion"
                 : guiTestRequired && !consistentAssertionCount ? "assertion_count_conflict"
                 : guiTestRequired && UiAssertionsPassed == 0 ? "missing_ui_assertion"
-                : guiTestRequired && (!finalReadbackVerified || FinalReadbackFailures > 0)
+                : guiTestRequired && (!finalReadbackVerified || !LastFinalReadbackPassed)
                     ? "final_readback_unverified"
                 : guiTestRequired && !guiProofSatisfied ? "stale_assertion"
                 : verified ? "handoff_only" : "evidence_incomplete";
