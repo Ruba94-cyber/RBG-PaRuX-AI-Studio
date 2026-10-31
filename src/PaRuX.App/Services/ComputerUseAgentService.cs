@@ -95,6 +95,8 @@ namespace PaRuX.Services
             // requirement. Delegated context, browser content and predecessor
             // transcripts are untrusted and may contain arbitrary test wording.
             var guiTestGate = new ComputerUseGuiTestEvidenceGate(originalGoal ?? goal);
+            // Scoped to this invocation; no user-wide permissions are inferred from a process launch.
+            var appLease = new ComputerUseTaskAppLease();
             string? lastRepeatKey = null;
             int repeats = 0;
             string tempImagePath = Path.Combine(Path.GetTempPath(), "parux-computeruse-" + Guid.NewGuid().ToString("N") + ".png");
@@ -302,6 +304,26 @@ namespace PaRuX.Services
                             StepsTaken = step,
                             Summary = "Stopped: " + refusedPayload
                         };
+                    }
+
+                    // After a registered app launch, do not send an action or report
+                    // completion against an unrelated foreground program. UIA and
+                    // screenshots alone do not establish app/process ownership.
+                    if (appLease.IsActive && action.Action is not ("open_app" or "focus_window" or "wait"))
+                    {
+                        ComputerUseWindowFocusPolicy.Candidate? freshIdentity =
+                            DesktopAutomationService.CaptureWindowFocusIdentity(
+                                new IntPtr(pin.Pinned.WindowHandle));
+                        string? appRefusal = appLease.RefusalForAction(pin.Pinned, freshIdentity);
+                        if (appRefusal != null)
+                        {
+                            onStep?.Invoke("Step " + step + ": " + appRefusal);
+                            return new ComputerUseAgentResult
+                            {
+                                StepsTaken = step,
+                                Summary = "Stopped: " + appRefusal
+                            };
+                        }
                     }
 
                     // Pixel coordinates have no target-to-control mapping in the current observation,
@@ -518,6 +540,33 @@ namespace PaRuX.Services
                                 StepsTaken = step,
                                 Summary = "Stopped: " + withheldReason
                             };
+                        }
+                    }
+                    // Re-arm the executable scope only after a successfully
+                    // dispatched, explicitly allowed launcher or focus action.
+                    if (string.Equals(action.Action, "open_app", StringComparison.Ordinal))
+                    {
+                        ComputerActionPlan? launchedPlan = ComputerUseService.TryPlanAllowedApp(action.App);
+                        if (launchedPlan is { BuiltIn: false })
+                            appLease.BindApprovedExecutable(launchedPlan.Executable);
+                        // Built-in shell/UWP launches have no reliable executable
+                        // attestation here; never replace an existing lease with one.
+                    }
+                    else if (string.Equals(action.Action, "focus_window", StringComparison.Ordinal))
+                    {
+                        ForegroundWindowSnapshot focused = DesktopAutomationService.CaptureForegroundWindow();
+                        ComputerUseWindowFocusPolicy.Candidate? actual =
+                            DesktopAutomationService.CaptureWindowFocusIdentity(
+                                new IntPtr(focused.WindowHandle));
+                        if (actual != null && actual.ProcessId == focused.ProcessId
+                            && actual.WindowHandle == focused.WindowHandle
+                            && (SettingsStore.Current.Data.ComputerApps
+                                ?? new List<ComputerAppShortcut>()).Any(a =>
+                                ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(a.ExecutablePath)
+                                && string.Equals(a.ExecutablePath, actual.ExecutablePath,
+                                    StringComparison.OrdinalIgnoreCase)))
+                        {
+                            appLease.BindApprovedExecutable(actual.ExecutablePath);
                         }
                     }
                     guiTestGate.RecordDeliveredAction(action.Action);
