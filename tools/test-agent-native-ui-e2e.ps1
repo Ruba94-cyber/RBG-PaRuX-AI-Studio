@@ -305,37 +305,7 @@ namespace PaRuXTestOnly {
         if ($dialogNodes.Count -ne 1) { throw 'Dialog UIA evidence did not match its native HWND.' }
         $confirm = Find-FixtureSelector -Elements $dialogNodes[0].elements -AutomationId 'parux-fixture-dialog-confirm'
         if ([string]::IsNullOrWhiteSpace($confirm) -or
-            $confirm -notmatch '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}
-    Write-Output ('NATIVE UIA E2E PASS: bound fixture PID=' + $process.Id + '; HWND=' +
-        $window + '; expected nonce=' + $nonce + '; recovery=' + [bool]$RunRecoveryScenario +
-        '; evidence=' + $OutputRoot)
-    if ($RunRecoveryScenario) {
-        Write-Output 'The WinApp CLI fixture recovery passed, NOT the autonomous PaRuX agent loop.'
-    }
-}
-catch {
-    Write-Error ('NATIVE UIA E2E FAIL: ' + $_.Exception.Message + '; evidence=' + $OutputRoot)
-    exit 1
-}
-finally {
-    if ($RunRecoveryScenario) {
-        $recovery.executedUtc = [DateTime]::UtcNow.ToString('o')
-        $recovery | ConvertTo-Json -Depth 4 |
-            Out-File -FilePath (Join-Path $OutputRoot 'native-recovery-status.json') -Encoding UTF8
-    }
-    if ($null -ne $process) {
-        try {
-            $process.Refresh()
-            if (-not $process.HasExited) {
-                Stop-Process -Id $process.Id -Force -ErrorAction Stop
-                $null = $process.WaitForExit(5000)
-            }
-        }
-        catch { Write-Warning 'Disposable test process cleanup needs manual inspection.' }
-        finally { $process.Dispose() }
-    }
-}
-) {
+            $confirm -notmatch '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$') {
             throw 'The owned-dialog Confirm selector was not independently observed.'
         }
         $global:LASTEXITCODE = 0
@@ -380,6 +350,11 @@ catch {
     exit 1
 }
 finally {
+    if ($RunDialogScenario) {
+        $dialogReport.executedUtc = [DateTime]::UtcNow.ToString('o')
+        $dialogReport | ConvertTo-Json -Depth 4 |
+            Out-File -FilePath (Join-Path $OutputRoot 'native-dialog-status.json') -Encoding UTF8
+    }
     if ($RunRecoveryScenario) {
         $recovery.executedUtc = [DateTime]::UtcNow.ToString('o')
         $recovery | ConvertTo-Json -Depth 4 |
