@@ -11,6 +11,8 @@ powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunRe
 .EXAMPLE
 powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunNativeUiRecovery
 .EXAMPLE
+powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunNativeDialogE2E
+.EXAMPLE
 powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunLiveComputerUseE2E -CliPath C:\tools\parux.exe
 #>
 [CmdletBinding()]
@@ -19,6 +21,7 @@ param(
     [switch]$RunFlaUI,
     [switch]$RunNativeUiE2E,
     [switch]$RunNativeUiRecovery,
+    [switch]$RunNativeDialogE2E,
     [switch]$RunLiveComputerUseE2E,
     [string]$CliPath,
     [switch]$RunBrowserE2E,
@@ -75,6 +78,7 @@ $results = [ordered]@{
     flaui = 'NOT_RUN'
     nativeUiFunctional = 'NOT_RUN'
     nativeUiRecovery = 'NOT_RUN'
+    nativeUiDialog = 'NOT_RUN'
     liveComputerUseAgent = 'NOT_RUN'
     browserCdpFunctional = 'NOT_RUN'
     winappUia = 'NOT_RUN'
@@ -150,6 +154,13 @@ try {
                 -OutputRoot (Join-Path $OutputRoot 'native-ui-recovery')
         }
     }
+    if ($RunNativeDialogE2E) {
+        Invoke-Gate -Name nativeUiDialog -LogName 'native-ui-dialog.log' -Action {
+            & (Join-Path $repo 'tools\test-agent-native-ui-e2e.ps1') -ConfirmFunctionalTest `
+                -RunDialogScenario -WinAppCli $WinAppCli `
+                -OutputRoot (Join-Path $OutputRoot 'native-ui-dialog')
+        }
+    }
     if ($RunLiveComputerUseE2E) {
         Invoke-Gate -Name liveComputerUseAgent -LogName 'live-computer-use-agent.log' -Action {
             if ($results.scriptSyntax -ne 'PASS') {
@@ -179,7 +190,7 @@ finally {
     $path = Join-Path $OutputRoot 'validation-status.json'
     $results | ConvertTo-Json -Depth 5 | Out-File -FilePath $path -Encoding UTF8
     Write-Output ('Agent Platform V2 validation report: ' + $path)
-    foreach ($key in @('scriptSyntax', 'unit', 'browserDomJs', 'releaseGate', 'flaui', 'nativeUiFunctional', 'nativeUiRecovery', 'liveComputerUseAgent', 'browserCdpFunctional', 'winappUia', 'physicalGpuAndLongContext', 'selfImprovementDogfood')) {
+    foreach ($key in @('scriptSyntax', 'unit', 'browserDomJs', 'releaseGate', 'flaui', 'nativeUiFunctional', 'nativeUiRecovery', 'nativeUiDialog', 'liveComputerUseAgent', 'browserCdpFunctional', 'winappUia', 'physicalGpuAndLongContext', 'selfImprovementDogfood')) {
         Write-Output ($key + ': ' + $results[$key])
     }
 }
@@ -191,6 +202,7 @@ if ($results.scriptSyntax -ne 'PASS' -or
     ($RunFlaUI -and $results.flaui -ne 'PASS') -or
     ($RunNativeUiE2E -and $results.nativeUiFunctional -ne 'PASS') -or
     ($RunNativeUiRecovery -and $results.nativeUiRecovery -ne 'PASS') -or
+    ($RunNativeDialogE2E -and $results.nativeUiDialog -ne 'PASS') -or
     ($RunLiveComputerUseE2E -and $results.liveComputerUseAgent -ne 'PASS') -or
     ($RunBrowserE2E -and $results.browserCdpFunctional -ne 'PASS') -or
     (-not [string]::IsNullOrWhiteSpace($WinAppTarget) -and $results.winappUia -ne 'PASS')) {
