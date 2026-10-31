@@ -48,6 +48,18 @@ namespace PaRuX.Services
                     || (ready && guiTest && (!finalReadback || passed == 0 || checks == 0)))
                     return null;
 
+                // Older v1 receipts may lack this additive field. Newly
+                // emitted receipts show the number of DISTINCT controls, not
+                // just how many times ui_assert was invoked.
+                int finalControls = 0;
+                bool hasFinalControls = receipt.TryGetProperty("finalDistinctControlsVerified", out _);
+                if (hasFinalControls && (!TryInt(receipt, "finalDistinctControlsVerified",
+                        0, 8, out finalControls)
+                    || finalControls > passed
+                    || (ready && guiTest && finalControls == 0)
+                    || (!guiTest && finalControls != 0)))
+                    return null;
+
                 string status = outcome switch
                 {
                     "ready_for_independent_verifier" =>
@@ -75,6 +87,8 @@ namespace PaRuX.Services
                         : "Computer Use did not complete";
 
                 return status + " · UIA " + passed + " passed, " + failed + " failed"
+                    + (hasFinalControls && guiTest
+                        ? " · distinct controls " + finalControls : string.Empty)
                     + " · final checks " + checks + " (" + failures + " failed)"
                     + " · delivered actions " + delivered + "/" + attempts;
             }
