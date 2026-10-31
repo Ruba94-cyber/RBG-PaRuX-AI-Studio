@@ -10,6 +10,8 @@ powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1
 powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunReleaseGate -RunFlaUI -WinAppTarget PaRuX
 .EXAMPLE
 powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunNativeUiRecovery
+.EXAMPLE
+powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunLiveComputerUseE2E -CliPath C:\tools\parux.exe
 #>
 [CmdletBinding()]
 param(
@@ -17,6 +19,8 @@ param(
     [switch]$RunFlaUI,
     [switch]$RunNativeUiE2E,
     [switch]$RunNativeUiRecovery,
+    [switch]$RunLiveComputerUseE2E,
+    [string]$CliPath,
     [switch]$RunBrowserE2E,
     [string]$BrowserExecutable,
     [string]$WinAppCli = 'winapp',
@@ -71,6 +75,7 @@ $results = [ordered]@{
     flaui = 'NOT_RUN'
     nativeUiFunctional = 'NOT_RUN'
     nativeUiRecovery = 'NOT_RUN'
+    liveComputerUseAgent = 'NOT_RUN'
     browserCdpFunctional = 'NOT_RUN'
     winappUia = 'NOT_RUN'
     physicalGpuAndLongContext = 'NOT_RUN'
@@ -145,6 +150,16 @@ try {
                 -OutputRoot (Join-Path $OutputRoot 'native-ui-recovery')
         }
     }
+    if ($RunLiveComputerUseE2E) {
+        Invoke-Gate -Name liveComputerUseAgent -LogName 'live-computer-use-agent.log' -Action {
+            if ([string]::IsNullOrWhiteSpace($CliPath)) {
+                throw '-RunLiveComputerUseE2E requires -CliPath pointing to parux.exe.'
+            }
+            & (Join-Path $repo 'tools\test-agent-live-computer-use.ps1') `
+                -ConfirmLiveAgentTest -CliPath $CliPath -WinAppCli $WinAppCli `
+                -OutputRoot (Join-Path $OutputRoot 'live-agent-gui')
+        }
+    }
     if (-not [string]::IsNullOrWhiteSpace($WinAppTarget)) {
         Invoke-Gate -Name winappUia -LogName 'agent-v2-winapp-ui.log' -Action {
             $parameters = @{
@@ -161,7 +176,7 @@ finally {
     $path = Join-Path $OutputRoot 'validation-status.json'
     $results | ConvertTo-Json -Depth 5 | Out-File -FilePath $path -Encoding UTF8
     Write-Output ('Agent Platform V2 validation report: ' + $path)
-    foreach ($key in @('scriptSyntax', 'unit', 'browserDomJs', 'releaseGate', 'flaui', 'nativeUiFunctional', 'nativeUiRecovery', 'browserCdpFunctional', 'winappUia', 'physicalGpuAndLongContext', 'selfImprovementDogfood')) {
+    foreach ($key in @('scriptSyntax', 'unit', 'browserDomJs', 'releaseGate', 'flaui', 'nativeUiFunctional', 'nativeUiRecovery', 'liveComputerUseAgent', 'browserCdpFunctional', 'winappUia', 'physicalGpuAndLongContext', 'selfImprovementDogfood')) {
         Write-Output ($key + ': ' + $results[$key])
     }
 }
@@ -173,6 +188,7 @@ if ($results.scriptSyntax -ne 'PASS' -or
     ($RunFlaUI -and $results.flaui -ne 'PASS') -or
     ($RunNativeUiE2E -and $results.nativeUiFunctional -ne 'PASS') -or
     ($RunNativeUiRecovery -and $results.nativeUiRecovery -ne 'PASS') -or
+    ($RunLiveComputerUseE2E -and $results.liveComputerUseAgent -ne 'PASS') -or
     ($RunBrowserE2E -and $results.browserCdpFunctional -ne 'PASS') -or
     (-not [string]::IsNullOrWhiteSpace($WinAppTarget) -and $results.winappUia -ne 'PASS')) {
     exit 1
