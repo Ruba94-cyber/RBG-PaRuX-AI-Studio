@@ -6132,6 +6132,23 @@ namespace PaRuX.Views
 
             stack.Children.Add(header);
 
+            // Never display model-authored app values or raw ResultJson. The
+            // presenter accepts only a fixed, redacted worker receipt schema
+            // and explicitly does NOT call the goal independently verified.
+            string? guiReceiptLine = ComputerUseGuiReceiptPresenter.BuildLine(
+                task.Role, task.ResultJson);
+            if (guiReceiptLine != null)
+            {
+                var evidenceLine = new TextBlock
+                {
+                    Text = guiReceiptLine,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 3, 0, 0)
+                };
+                ApplyCaptionStyle(evidenceLine);
+                stack.Children.Add(evidenceLine);
+            }
+
             if (!string.IsNullOrEmpty(task.Error))
             {
                 var errorBlock = new TextBlock { Text = task.Error, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) };
