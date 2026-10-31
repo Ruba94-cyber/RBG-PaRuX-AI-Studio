@@ -169,12 +169,14 @@ namespace PaRuX.Services
                 if (!string.IsNullOrWhiteSpace(task.RepairContext))
                     effectiveGoal += "\n\nINDEPENDENT VERIFIER REPAIR FEEDBACK:\n" + task.RepairContext.Trim();
 
+                var guiRunTrace = new ComputerUseGuiRunTrace();
                 ComputerUseAgentResult result = await ComputerUseAgentService.RunAsync(
                     effectiveGoal,
                     line => { _ = AgentOrchestratorClient.Current.AppendLogAsync(task.Id, line, CancellationToken.None); },
                     tracked.Cts.Token,
                     persistentAuthorization,
-                    originalGoal: task.Goal).ConfigureAwait(false);
+                    originalGoal: task.Goal,
+                    trace: guiRunTrace).ConfigureAwait(false);
 
                 if (result.NotStarted)
                 {
@@ -197,12 +199,27 @@ namespace PaRuX.Services
                     return;
                 }
 
+                // The original user goal, not delegated/repair/web text or the
+                // agent's self-report, determines whether GUI proof is mandatory.
+                bool guiTestRequired = ComputerUseGuiTestEvidenceGate.IsGuiTestGoal(task.Goal);
+                ComputerUseGuiRunReceipt receipt = guiRunTrace.Build(
+                    guiTestRequired, result.NotStarted,
+                    result.GoalReported, result.Cancelled || tracked.Cts.IsCancellationRequested,
+                    result.GuiTestProofSatisfied, result.GuiFinalReadbackVerified,
+                    result.VerifiedUiAssertions, result.StepsTaken);
+                // This receipt is an executor-produced event summary. It contains
+                // no free-form task text, UI values or executable paths, and does
+                // not itself claim that an independent verifier passed the goal.
+                string receiptJson = JsonSerializer.Serialize(
+                    new { guiRunReceipt = receipt }, JsonOptions);
+
                 if (result.Cancelled || tracked.Cts.IsCancellationRequested)
                 {
                     await AgentOrchestratorClient.Current.UpdateStatusAsync(task.Id, new UpdateAgentTaskStatusRequest
                     {
                         Status = AgentTaskStatus.Cancelled,
-                        Stage = "Computer Use stopped"
+                        Stage = "Computer Use stopped",
+                        ResultJson = receiptJson
                     }, CancellationToken.None).ConfigureAwait(false);
                     return;
                 }
@@ -212,10 +229,11 @@ namespace PaRuX.Services
                 // actionable failure and never interpret a mere execution transcript as
                 // successful task completion. Explicit "done" still proceeds to the
                 // independent verifier, which must decide whether the claim is true.
-                if (!ComputerUseCompletionGate.MayRequestVerification(
-                    result.GoalReported, result.Cancelled,
-                    result.GuiTestProofRequired, result.GuiTestProofSatisfied,
-                    result.VerifiedUiAssertions, result.GuiFinalReadbackVerified))
+                if (!receipt.ReadyForIndependentVerifier
+                    || !ComputerUseCompletionGate.MayRequestVerification(
+                        result.GoalReported, result.Cancelled,
+                        guiTestRequired, result.GuiTestProofSatisfied,
+                        result.VerifiedUiAssertions, result.GuiFinalReadbackVerified))
                 {
                     await AgentOrchestratorClient.Current.AppendLogAsync(task.Id,
                         "Computer Use did not report its goal complete: " + result.Summary,
@@ -225,7 +243,8 @@ namespace PaRuX.Services
                         {
                             Status = AgentTaskStatus.Failed,
                             Stage = "Computer Use stopped before completion",
-                            Error = result.Summary
+                            Error = result.Summary,
+                            ResultJson = receiptJson
                         }, CancellationToken.None).ConfigureAwait(false);
                     return;
                 }
@@ -233,9 +252,10 @@ namespace PaRuX.Services
                 string resultJson = JsonSerializer.Serialize(new
                 {
                     response = result.Summary,
+                    guiRunReceipt = receipt,
                     result.GoalReported,
                     result.StepsTaken,
-                    guiTestProofRequired = result.GuiTestProofRequired,
+                    guiTestProofRequired = guiTestRequired,
                     guiTestProofSatisfied = result.GuiTestProofSatisfied,
                     guiFinalReadbackVerified = result.GuiFinalReadbackVerified,
                     uiAssertionsPassed = result.VerifiedUiAssertions,
