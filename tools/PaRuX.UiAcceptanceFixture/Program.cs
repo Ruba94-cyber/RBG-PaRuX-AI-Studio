@@ -31,6 +31,8 @@ internal sealed class FixtureForm : Form
     internal const string ResetAutomationId = "parux-fixture-reset";
     internal const string DialogAutomationId = "parux-fixture-open-dialog";
     internal const string DialogConfirmAutomationId = "parux-fixture-dialog-confirm";
+    internal const string ModalAutomationId = "parux-fixture-open-modal";
+    internal const string ModalConfirmAutomationId = "parux-fixture-modal-confirm";
 
     internal FixtureForm(string nonce)
     {
@@ -92,6 +94,50 @@ internal sealed class FixtureForm : Form
             result.AccessibleDescription = "State changed by an actual button invocation";
         };
 
+        var openModal = new Button
+        {
+            Name = ModalAutomationId,
+            AccessibleName = "Open owned modal test dialog",
+            Text = "Open modal",
+            Location = new Point(215, 209),
+            Width = 180, Height = 36
+        };
+        openModal.Click += (_, _) =>
+        {
+            // BeginInvoke lets the WinApp InvokePattern call return before
+            // ShowDialog enters its modal message loop. The parent is then
+            // genuinely disabled by WinForms until Confirm dismisses the modal.
+            BeginInvoke(new Action(() =>
+            {
+                using var modal = new Form
+                {
+                    Name = "parux-fixture-owned-modal",
+                    Text = "PaRuX Fixture Modal " + nonce,
+                    StartPosition = FormStartPosition.CenterParent,
+                    FormBorderStyle = FormBorderStyle.FixedDialog,
+                    ClientSize = new Size(340, 120),
+                    MaximizeBox = false,
+                    MinimizeBox = false
+                };
+                var confirm = new Button
+                {
+                    Name = ModalConfirmAutomationId,
+                    AccessibleName = "Confirm owned modal test dialog",
+                    Text = "Confirm modal",
+                    Location = new Point(75, 43),
+                    Width = 180,
+                    Height = 36
+                };
+                confirm.Click += (_, _) =>
+                {
+                    result.Text = "MODAL-ACCEPTED-" + nonce;
+                    modal.Close();
+                };
+                modal.Controls.Add(confirm);
+                modal.ShowDialog(this);
+            }));
+        };
+
         var openDialog = new Button
         {
             Name = DialogAutomationId,
@@ -133,6 +179,6 @@ internal sealed class FixtureForm : Form
             dialog.Show(this);
         };
 
-        Controls.AddRange(new Control[] { instruction, input, run, reset, result, openDialog });
+        Controls.AddRange(new Control[] { instruction, input, run, reset, result, openDialog, openModal });
     }
 }
