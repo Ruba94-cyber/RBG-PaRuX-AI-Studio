@@ -179,6 +179,30 @@ namespace PaRuX.Services
             }
         }
 
+        // Keep this OS identity check self-contained: the shared xUnit
+        // policy project links this read-only service without the production
+        // DesktopAutomationService and its Win32 input dependencies.
+        private static ComputerUseWindowFocusPolicy.Candidate? ReadOsWindowIdentity(long hwnd)
+        {
+            if (!OperatingSystem.IsWindows() || hwnd == 0) return null;
+            try
+            {
+                IntPtr handle = new IntPtr(hwnd);
+                if (GetWindowThreadProcessId(handle, out uint pid) == 0
+                    || pid == 0 || pid > int.MaxValue)
+                    return null;
+                using Process process = Process.GetProcessById((int)pid);
+                string? exe = process.MainModule?.FileName;
+                if (!ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(exe))
+                    return null;
+                return new ComputerUseWindowFocusPolicy.Candidate(
+                    string.Empty, (int)pid, hwnd, exe);
+            }
+            catch (ArgumentException) { return null; }
+            catch (InvalidOperationException) { return null; }
+            catch (System.ComponentModel.Win32Exception) { return null; }
+        }
+
         /// <summary>
         /// Read-only final QA inspection of a window ALREADY observed and
         /// authorized through focus_window/ui_assert. This method does not
@@ -196,8 +220,7 @@ namespace PaRuX.Services
                 return new Observation("not_windows", string.Empty);
             if (original == null
                 || !ComputerUseWindowFocusPolicy.IsUnchanged(original,
-                    DesktopAutomationService.CaptureWindowFocusIdentity(
-                        new IntPtr(original.WindowHandle))))
+                    ReadOsWindowIdentity(original.WindowHandle)))
                 return new Observation("window_identity_changed", string.Empty);
 
             string? executable = Environment.GetEnvironmentVariable("PARUX_WINAPP_CLI");
@@ -234,8 +257,7 @@ namespace PaRuX.Services
                 if (process.ExitCode != 0)
                     return new Observation("winapp_failed", string.Empty);
                 if (!ComputerUseWindowFocusPolicy.IsUnchanged(original,
-                    DesktopAutomationService.CaptureWindowFocusIdentity(
-                        new IntPtr(original.WindowHandle))))
+                    ReadOsWindowIdentity(original.WindowHandle)))
                     return new Observation("window_identity_changed", string.Empty);
 
                 return ValidateJsonEvidence(await output.ConfigureAwait(false),
