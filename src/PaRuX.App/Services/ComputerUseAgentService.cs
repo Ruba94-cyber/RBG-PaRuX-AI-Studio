@@ -547,8 +547,26 @@ namespace PaRuX.Services
                     if (string.Equals(action.Action, "open_app", StringComparison.Ordinal))
                     {
                         ComputerActionPlan? launchedPlan = ComputerUseService.TryPlanAllowedApp(action.App);
-                        if (launchedPlan is { BuiltIn: false })
-                            appLease.BindApprovedExecutable(launchedPlan.Executable);
+                        if (launchedPlan == null)
+                        {
+                            // Settings may be changed while an already-started app
+                            // initializes. Never silently continue without the
+                            // post-launch authorization needed to bind its scope.
+                            return new ComputerUseAgentResult
+                            {
+                                StepsTaken = step,
+                                Summary = "Stopped: app authorization changed during launch."
+                            };
+                        }
+                        if (!launchedPlan.BuiltIn
+                            && !appLease.BindApprovedExecutable(launchedPlan.Executable))
+                        {
+                            return new ComputerUseAgentResult
+                            {
+                                StepsTaken = step,
+                                Summary = "Stopped: the approved app executable could not be scoped."
+                            };
+                        }
                         // Built-in shell/UWP launches have no reliable executable
                         // attestation here; never replace an existing lease with one.
                     }
