@@ -227,14 +227,21 @@ namespace PaRuX.Services
             }
             else
             {
-                ComputerAppShortcut? allowed = (SettingsStore.Current.Data.ComputerApps ?? new List<ComputerAppShortcut>())
-                    .FirstOrDefault(a => string.Equals(a.ExecutablePath, plan.Executable, StringComparison.OrdinalIgnoreCase));
-                if (allowed == null
-                    || !ComputerUseAppSelectionPolicy.IsValidName(allowed.Name)
-                    || !ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(allowed.ExecutablePath)
-                    || !File.Exists(allowed.ExecutablePath))
-                    return new ComputerActionResult { Message = "That app is no longer in the Computer Use allowlist." };
-                plan.Arguments = allowed.Arguments;
+                ComputerAppShortcut[] matching = (SettingsStore.Current.Data.ComputerApps
+                    ?? new List<ComputerAppShortcut>())
+                    .Where(a => string.Equals(a.ExecutablePath, plan.Executable,
+                            StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(a.Name, plan.Name, StringComparison.OrdinalIgnoreCase))
+                    .Take(2).ToArray();
+                // A stored launch is revoked when the approved app is removed,
+                // renamed or duplicated. Do not rebind it to a different label
+                // solely because an executable path happens to match.
+                if (matching.Length != 1
+                    || !ComputerUseAppSelectionPolicy.IsValidName(matching[0].Name)
+                    || !ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(matching[0].ExecutablePath)
+                    || !File.Exists(matching[0].ExecutablePath))
+                    return new ComputerActionResult { Message = "That exact app approval is no longer valid." };
+                plan.Arguments = matching[0].Arguments;
             }
 
             try
