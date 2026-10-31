@@ -29,13 +29,15 @@ internal sealed class FixtureForm : Form
     internal const string ResultAutomationId = "parux-fixture-result";
     internal const string InputAutomationId = "parux-fixture-input";
     internal const string ResetAutomationId = "parux-fixture-reset";
+    internal const string DialogAutomationId = "parux-fixture-open-dialog";
+    internal const string DialogConfirmAutomationId = "parux-fixture-dialog-confirm";
 
     internal FixtureForm(string nonce)
     {
         Text = "PaRuX Disposable UI Acceptance " + nonce;
         Name = "parux-fixture-window";
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(490, 230);
+        ClientSize = new Size(490, 270);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -90,6 +92,47 @@ internal sealed class FixtureForm : Form
             result.AccessibleDescription = "State changed by an actual button invocation";
         };
 
-        Controls.AddRange(new Control[] { instruction, input, run, reset, result });
+        var openDialog = new Button
+        {
+            Name = DialogAutomationId,
+            AccessibleName = "Open owned test dialog",
+            Text = "Open dialog",
+            Location = new Point(20, 209),
+            Width = 180, Height = 36
+        };
+        openDialog.Click += (_, _) =>
+        {
+            // This is a separate native HWND owned by the main window,
+            // inside the SAME Windows process. It is intentionally modeless:
+            // WinApp InvokePattern can return without waiting for dismissal.
+            var dialog = new Form
+            {
+                Name = "parux-fixture-owned-dialog",
+                Text = "PaRuX Fixture Dialog " + nonce,
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                ClientSize = new Size(340, 120),
+                MaximizeBox = false,
+                MinimizeBox = false
+            };
+            var confirm = new Button
+            {
+                Name = DialogConfirmAutomationId,
+                AccessibleName = "Confirm owned test dialog",
+                Text = "Confirm",
+                Location = new Point(75, 43),
+                Width = 180,
+                Height = 36
+            };
+            confirm.Click += (_, _) =>
+            {
+                result.Text = "DIALOG-ACCEPTED-" + nonce;
+                dialog.Close();
+            };
+            dialog.Controls.Add(confirm);
+            dialog.Show(this);
+        };
+
+        Controls.AddRange(new Control[] { instruction, input, run, reset, result, openDialog });
     }
 }
