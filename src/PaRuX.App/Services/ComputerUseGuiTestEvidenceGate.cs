@@ -41,7 +41,7 @@ namespace PaRuX.Services
             // Focusing a different application invalidates window-bound proof.
             if (canonicalAction is "click" or "double_click" or "right_click"
                 or "type" or "key" or "scroll" or "ui_invoke" or "ui_set_value"
-                or "focus_window")
+                or "focus_window" or "open_app")
                 VerifiedAfterLatestMutation = false;
         }
 
