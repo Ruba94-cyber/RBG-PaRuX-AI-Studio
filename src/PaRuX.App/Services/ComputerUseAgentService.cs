@@ -84,6 +84,7 @@ namespace PaRuX.Services
             }
 
             var actionLog = new List<string>();
+            var guiTestGate = new ComputerUseGuiTestEvidenceGate(goal);
             string? lastRepeatKey = null;
             int repeats = 0;
             string tempImagePath = Path.Combine(Path.GetTempPath(), "parux-computeruse-" + Guid.NewGuid().ToString("N") + ".png");
@@ -335,6 +336,17 @@ namespace PaRuX.Services
                         lastRepeatKey = repeatKey;
                     }
 
+                    if (string.Equals(action.Action, "done", StringComparison.OrdinalIgnoreCase)
+                        && !guiTestGate.CanReportDone)
+                    {
+                        // For an explicitly requested GUI test, a model's completion
+                        // statement is not evidence. Keep its budgeted loop alive so
+                        // it can inspect and verify the application, or fail honestly.
+                        onStep?.Invoke("Step " + step + ": GUI test needs a fresh exact UIA assertion.");
+                        actionLog.Add(ComputerUseGuiTestEvidenceGate.MissingProofReason);
+                        continue;
+                    }
+
                     onStep?.Invoke("Step " + step + ": " + description);
                     actionLog.Add(description);
 
@@ -424,7 +436,9 @@ namespace PaRuX.Services
                                 Summary = "UI test failed: fresh foreground control did not match expected state ("
                                     + status + "). No successful assertion was recorded."
                             };
-                        // This read-only assertion does not imply the entire task passed.
+                        guiTestGate.RecordVerifiedAssertion();
+                        // An exact control assertion is a prerequisite for an
+                        // app-test completion claim, not the independent goal verdict.
                     }
                     else if ((action.Action ?? string.Empty).StartsWith("ui_", StringComparison.OrdinalIgnoreCase))
                     {
@@ -487,6 +501,7 @@ namespace PaRuX.Services
                             };
                         }
                     }
+                    guiTestGate.RecordDeliveredAction(action.Action);
                     if (visualSnapshot != null)
                     {
                         pendingBeforeSnapshotId = visualSnapshot.Id;
