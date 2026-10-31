@@ -307,7 +307,16 @@ finally {
     # Only cancel this test's own unfinished task; never touch unrelated tasks
     # or persistent authorization settings, even after errors/timeouts.
     if ($null -ne $taskId -and -not $taskTerminal) {
-        try { & $cli agent stop $taskId *> $null } catch { }
+        try {
+            $global:LASTEXITCODE = 0
+            & $cli agent stop $taskId *> $null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning 'The script-owned test task could not be cancelled; inspect PaRuX Agents and STOP it manually.'
+            }
+        }
+        catch {
+            Write-Warning 'The script-owned test task cancellation failed; inspect PaRuX Agents and STOP it manually.'
+        }
     }
     if ($null -ne $fixture) {
         try {
