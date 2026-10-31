@@ -59,6 +59,7 @@ $fixture = $null
 $taskId = $null
 $taskTerminal = $false
 $window = [long]0
+$failureMessage = $null
 $report = [ordered]@{
     scenario = 'real-parux-computer-use-agent-e2e'
     schemaVersion = 1
@@ -236,10 +237,8 @@ try {
     while ([DateTime]::UtcNow -lt $end) {
         [Threading.Thread]::Sleep(1500)
         $task = Get-CoreTask -Id $taskId
-        if ([string]$task.status -ceq 'running' -and
-            [string]$task.stage -ceq 'Desktop Computer Use worker claimed task') {
-            $report.userAuthorization = 'PASS'
-        }
+        # Claiming alone does not prove which authority was used.
+        # Final acceptance requires the worker's per-task approval label.
         if ([string]$task.status -cin @('completed','failed','cancelled','blocked')) {
             $taskTerminal = $true
             break
@@ -254,11 +253,18 @@ try {
         throw 'Core did not independently verify this Computer Use task as completed/pass.'
     }
     $report.coreVerifier = 'PASS'
+    if ([string]$task.goal -cne $goal) {
+        throw 'Core task goal changed during live acceptance.'
+    }
     if ([string]::IsNullOrWhiteSpace([string]$task.resultJson)) {
         throw 'Core recorded no worker execution receipt.'
     }
     try { $resultJson = ConvertFrom-Json -InputObject ([string]$task.resultJson) -ErrorAction Stop }
     catch { throw 'Core stored an invalid worker result JSON.' }
+    if ($resultJson.authorization -cne 'task-scoped-remote-approval') {
+        throw 'Live acceptance requires a specifically approved task; Full Computer Use is not valid test authority.'
+    }
+    $report.userAuthorization = 'PASS'
     $receipt = $resultJson.guiRunReceipt
     if ($null -eq $receipt
         -or $receipt.schemaVersion -ne 1
@@ -293,8 +299,7 @@ try {
 catch {
     $report.outcome = 'FAIL'
     $report.reasonCode = 'required_evidence_missing_or_invalid'
-    Write-Error ('REAL PARUX GUI AGENT E2E FAIL: ' + $_.Exception.Message)
-    exit 1
+    $failureMessage = $_.Exception.Message
 }
 finally {
     # Only cancel this test's own unfinished task; never touch unrelated tasks
@@ -316,4 +321,11 @@ finally {
     $report.executedUtc = [DateTime]::UtcNow.ToString('o')
     $report | ConvertTo-Json -Depth 5 |
         Out-File -FilePath (Join-Path $OutputRoot 'real-agent-acceptance.json') -Encoding UTF8
+}
+
+if ($report.outcome -ne 'PASS') {
+    # Throw only AFTER finally persisted the sanitized status file and stopped
+    # resources owned by this test. Do not print the raw Core task/result.
+    throw ('REAL PARUX GUI AGENT E2E FAIL: ' + $failureMessage +
+        '; sanitized status=' + (Join-Path $OutputRoot 'real-agent-acceptance.json'))
 }
