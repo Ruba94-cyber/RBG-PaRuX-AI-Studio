@@ -4,6 +4,20 @@ Manual procedures for the owner to run on a real Windows PC and phone. Every pro
 
 ## Computer Use across Windows applications (NOT RUN)
 
+### 2026-10-31 completion-time GUI assertion acceptance (NOT RUN)
+
+Use a disposable, non-sensitive Windows WinUI test control and a configured WinApp CLI, with the agent held to an explicit user-approved Computer Use task:
+
+1. Set a test control to a known value; run a fresh `ui_assert` and then `done`. The final new UIA observation must match the same HWND/PID, selector, property and value. Inspect the worker's redacted `guiFinalReadbackVerified` flag, and ensure the independent verifier receives the task only after a positive final readback.
+2. Between a successful assertion and `done`, change the control externally without any PaRuX action. The earlier assertion count must not allow completion. With steps left, a new exact assertion is required; with the budget exhausted, the task must remain incomplete.
+3. Repeat with a different foreground application, same-named control in another window, duplicated selector, missing property, failed WinApp CLI and disconnected/closed target. Nothing may pass based only on a screenshot or previous control evidence.
+4. Cancel the task or turn Gaming Mode on during the final WinApp process. No post-cancellation completion, input or verifier admission is permitted. No raw expected/observed values or selectors may appear in task logs or the worker's serialized result.
+5. Check an ordinary non-GUI task with no assertion: its existing completion/verifier route must remain intact. Run `ComputerUseGuiFinalProofTests`, `ComputerUseGuiTestEvidenceGateTests` and `ComputerUseCompletionGateTests`, plus a real GUI/FlaUI readback fixture. Record commit-specific PASS/FAIL/NOT RUN.
+
+**Status:** implementation and hermetic tests added; Windows compilation, real .NET tests, FlaUI, WinApp CLI, cancellation and physical-PC checks **NOT RUN**. The control readback is independent of the model but is not independent evidence of full goal correctness.
+
+
+
 ### 2026-10-31 process-bound focus and app-lease acceptance (NOT RUN)
 
 Run on a **disposable Windows test profile** using two harmless Win32 applications, separate top-level windows of one of them, and test fixtures only:
