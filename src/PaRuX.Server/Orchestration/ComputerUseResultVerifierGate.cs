@@ -55,6 +55,20 @@ internal static class ComputerUseResultVerifierGate
                 || !ReadInt(receipt, "stepsTaken", 0, 15, out int receiptSteps))
                 return Reject("Computer Use receipt is missing required, valid typed evidence.");
 
+            // Optional additive v1 evidence for newer desktop workers:
+            // previous in-flight tasks retain their valid legacy receipts.
+            // If supplied, the bounded distinct-control count must be
+            // internally consistent; one invalid field must never be ignored.
+            if (receipt.TryGetProperty("finalDistinctControlsVerified", out _))
+            {
+                if (!ReadInt(receipt, "finalDistinctControlsVerified", 0, 8,
+                        out int distinctFinal)
+                    || distinctFinal > passed
+                    || (required && workerReadback && distinctFinal == 0)
+                    || (!required && distinctFinal != 0))
+                    return Reject("Distinct final GUI control counts contradict the worker evidence.");
+            }
+
             if (receiptRequired != required || workerRequired != required)
                 return Reject("GUI testing requirement differs from the original user goal.");
             if (delivered > attempted || attempted > workerSteps || failures > checks
