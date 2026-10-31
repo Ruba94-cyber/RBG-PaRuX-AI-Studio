@@ -41,8 +41,8 @@ if (-not (Test-Path -LiteralPath $cli -PathType Leaf) -or
     throw 'Pass the absolute path of the built native PaRuX CLI executable.'
 }
 $winappCommand = Get-Command -Name $WinAppCli -ErrorAction Stop
-if ($winappCommand.CommandType -ne 'Application'
-    -or -not $winappCommand.Source.EndsWith('.exe', [StringComparison]::OrdinalIgnoreCase)) {
+if ($winappCommand.CommandType -ne 'Application' -or
+    -not $winappCommand.Source.EndsWith('.exe', [StringComparison]::OrdinalIgnoreCase)) {
     throw 'WinApp CLI must be an already installed native .exe.'
 }
 $winapp = $winappCommand.Source
@@ -201,13 +201,13 @@ try {
     }
     $selector = [string]$result[0].selector
     $inputSelector = [string]$inputControl[0].selector
-    if ($selector -notmatch '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$'
-        -or $inputSelector -notmatch '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$'
-        -or $selector -ceq $inputSelector) {
+    if ($selector -notmatch '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$' -or
+        $inputSelector -notmatch '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$' -or
+        $selector -ceq $inputSelector) {
         throw 'Result selector was not valid for Computer Use.'
     }
-    if ((Read-OneResultValue -Hwnd $window -AutomationId 'parux-fixture-result' -Selector $selector) -cne 'PENDING'
-        -or (Read-OneResultValue -Hwnd $window -AutomationId 'parux-fixture-input' -Selector $inputSelector) -cne 'ready') {
+    if ((Read-OneResultValue -Hwnd $window -AutomationId 'parux-fixture-result' -Selector $selector) -cne 'PENDING' -or
+        (Read-OneResultValue -Hwnd $window -AutomationId 'parux-fixture-input' -Selector $inputSelector) -cne 'ready') {
         throw 'The fixture must start with PENDING; no agent mutation may predate task creation.'
     }
     if ($RunCrossWindowScenario) {
@@ -215,8 +215,8 @@ try {
         # DISTINCT PID/HWND. The agent must explicitly focus each instance;
         # executable equality alone may not authorize the process switch.
         $secondaryFixture = Start-Process -FilePath $fixtureExe -ArgumentList @($secondNonce) -PassThru
-        if ($null -eq $secondaryFixture -or $secondaryFixture.Id -le 0
-            -or $secondaryFixture.Id -eq $fixture.Id) {
+        if ($null -eq $secondaryFixture -or $secondaryFixture.Id -le 0 -or
+            $secondaryFixture.Id -eq $fixture.Id) {
             throw 'Could not start an independent second disposable process.'
         }
         $secondDeadline = [DateTime]::UtcNow.AddSeconds(20)
@@ -235,10 +235,10 @@ try {
         $secondTree = Read-BoundedWinAppTree -Hwnd $secondWindow
         $secondResult = @(Find-ControlsByAutomationId -Elements $secondTree.elements -AutomationId 'parux-fixture-result')
         $secondRun = @(Find-ControlsByAutomationId -Elements $secondTree.elements -AutomationId 'parux-fixture-run')
-        if ($secondResult.Count -ne 1 -or $secondRun.Count -ne 1
-            -or [string]::IsNullOrWhiteSpace([string]$secondResult[0].selector)
-            -or [string]::IsNullOrWhiteSpace([string]$secondRun[0].selector)
-            -or [string]$secondResult[0].value -cne 'PENDING') {
+        if ($secondResult.Count -ne 1 -or $secondRun.Count -ne 1 -or
+            [string]::IsNullOrWhiteSpace([string]$secondResult[0].selector) -or
+            [string]::IsNullOrWhiteSpace([string]$secondRun[0].selector) -or
+            [string]$secondResult[0].value -cne 'PENDING') {
             throw 'Second process has no independent Run/Result selectors and initial PENDING.'
         }
         $secondResultSelector = [string]$secondResult[0].selector
@@ -328,22 +328,22 @@ try {
     }
     $report.userAuthorization = 'PASS'
     $receipt = $resultJson.guiRunReceipt
-    if ($null -eq $receipt
-        -or $receipt.schemaVersion -ne 1
-        -or $receipt.outcome -cne 'ready_for_independent_verifier'
-        -or $receipt.assurance -cne 'executor-reported-not-independently-attested'
-        -or $receipt.guiTestRequired -cne $true
-        -or $receipt.readyForIndependentVerifier -cne $true
-        -or $receipt.finalControlReadbackVerified -cne $true
-        -or $receipt.uiAssertionsPassed -lt 2
-        -or $null -eq $receipt.finalDistinctControlsVerified
-        -or $receipt.finalDistinctControlsVerified -lt 2
-        -or ($RunCrossWindowScenario -and $receipt.finalDistinctWindowsVerified -lt 2)
-        -or $receipt.finalReadbackChecks -lt 1
-        -or $receipt.actionsDelivered -lt 1
-        -or $receipt.actionsDelivered -gt $receipt.actionsAttempted
-        -or $receipt.stepsTaken -gt 15
-        -or $resultJson.guiFinalReadbackVerified -cne $true) {
+    if ($null -eq $receipt -or
+        $receipt.schemaVersion -ne 1 -or
+        $receipt.outcome -cne 'ready_for_independent_verifier' -or
+        $receipt.assurance -cne 'executor-reported-not-independently-attested' -or
+        $receipt.guiTestRequired -cne $true -or
+        $receipt.readyForIndependentVerifier -cne $true -or
+        $receipt.finalControlReadbackVerified -cne $true -or
+        $receipt.uiAssertionsPassed -lt 2 -or
+        $null -eq $receipt.finalDistinctControlsVerified -or
+        $receipt.finalDistinctControlsVerified -lt 2 -or
+        ($RunCrossWindowScenario -and $receipt.finalDistinctWindowsVerified -lt 2) -or
+        $receipt.finalReadbackChecks -lt 1 -or
+        $receipt.actionsDelivered -lt 1 -or
+        $receipt.actionsDelivered -gt $receipt.actionsAttempted -or
+        $receipt.stepsTaken -gt 15 -or
+        $resultJson.guiFinalReadbackVerified -cne $true) {
         throw 'Worker receipt did not report actual bounded GUI actions and a final exact control check.'
     }
     $report.workerGuiReceipt = 'PASS'
@@ -357,25 +357,25 @@ try {
     $finalOwner = Read-BoundedWinAppTree -Hwnd $window
     $finalResult = @(Find-ControlsByAutomationId -Elements $finalOwner.elements -AutomationId 'parux-fixture-result')
     $finalInput = @(Find-ControlsByAutomationId -Elements $finalOwner.elements -AutomationId 'parux-fixture-input')
-    if ($finalResult.Count -ne 1 -or $finalInput.Count -ne 1
-        -or [string]$finalResult[0].selector -cne $selector
-        -or [string]$finalInput[0].selector -cne $inputSelector
-        -or [string]$finalResult[0].value -cne $expected
-        -or [string]$finalInput[0].value -cne 'ready') {
+    if ($finalResult.Count -ne 1 -or $finalInput.Count -ne 1 -or
+        [string]$finalResult[0].selector -cne $selector -or
+        [string]$finalInput[0].selector -cne $inputSelector -or
+        [string]$finalResult[0].value -cne $expected -or
+        [string]$finalInput[0].value -cne 'ready') {
         throw 'One independent native WinApp observation did not confirm both controls.'
     }
     if ($RunCrossWindowScenario) {
         $secondaryFixture.Refresh()
         if ($secondaryFixture.HasExited -or
-            $secondaryFixture.MainWindowHandle.ToInt64() -ne $secondWindow
-            -or $secondaryFixture.Id -eq $fixture.Id) {
+            $secondaryFixture.MainWindowHandle.ToInt64() -ne $secondWindow -or
+            $secondaryFixture.Id -eq $fixture.Id) {
             throw 'Second disposable process/window changed identity before external readback.'
         }
         $secondTreeFinal = Read-BoundedWinAppTree -Hwnd $secondWindow
         $secondFinalResult = @(Find-ControlsByAutomationId -Elements $secondTreeFinal.elements -AutomationId 'parux-fixture-result')
-        if ($secondFinalResult.Count -ne 1
-            -or [string]$secondFinalResult[0].selector -cne $secondResultSelector
-            -or [string]$secondFinalResult[0].value -cne ('ACCEPTED-' + $secondNonce)) {
+        if ($secondFinalResult.Count -ne 1 -or
+            [string]$secondFinalResult[0].selector -cne $secondResultSelector -or
+            [string]$secondFinalResult[0].value -cne ('ACCEPTED-' + $secondNonce)) {
             throw 'The external WinApp inspector did not observe the second process result.'
         }
     }

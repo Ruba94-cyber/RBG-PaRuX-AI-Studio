@@ -39,21 +39,21 @@ foreach ($relative in $targets) {
 # The previous agent runner could be accidentally duplicated in one file
 # while keeping balanced syntax. Require exactly one main test declaration.
 $runner = [IO.File]::ReadAllText((Join-Path $repo 'tools\test-agent-platform-v2.ps1'))
-if ($runner.Split([string[]]@('function Invoke-Gate {'), [StringSplitOptions]::None).Length -ne 2
-    -or $runner.Split([string[]]@('$results = [ordered]@{'), [StringSplitOptions]::None).Length -ne 2
-    -or $runner.Split([string[]]@('[CmdletBinding()]'), [StringSplitOptions]::None).Length -ne 2) {
+if ($runner.Split([string[]]@('function Invoke-Gate {'), [StringSplitOptions]::None).Length -ne 2 -or
+    $runner.Split([string[]]@('$results = [ordered]@{'), [StringSplitOptions]::None).Length -ne 2 -or
+    $runner.Split([string[]]@('[CmdletBinding()]'), [StringSplitOptions]::None).Length -ne 2) {
     throw 'PowerShell agent runner contains duplicated or missing structural blocks.'
 }
 # Keep the live-agent acceptance script structurally singular even when
 # a duplicate tail happens to parse: no false green QA report.
 $live = [IO.File]::ReadAllText((Join-Path $repo 'tools\test-agent-live-computer-use.ps1'))
-if ($live.Split([string[]]@('[CmdletBinding()]'), [StringSplitOptions]::None).Length -ne 2
-    -or $live.Split([string[]]@('$report.outcome = ''FAIL'''), [StringSplitOptions]::None).Length -ne 2
-    -or $live.Split([string[]]@("if (`$report.outcome -ne 'PASS')"), [StringSplitOptions]::None).Length -ne 2
-    -or $live.Split([string[]]@('Only cancel this test''s own unfinished task'), [StringSplitOptions]::None).Length -ne 2
-    -or -not $live.Contains('Stop-Process -Id $secondaryFixture.Id')
-    -or -not $live.Contains('$receipt.finalDistinctWindowsVerified -lt 2')
-    -or -not $live.Contains('$secondTreeFinal = Read-BoundedWinAppTree')) {
+if ($live.Split([string[]]@('[CmdletBinding()]'), [StringSplitOptions]::None).Length -ne 2 -or
+    $live.Split([string[]]@('$report.outcome = ''FAIL'''), [StringSplitOptions]::None).Length -ne 2 -or
+    $live.Split([string[]]@("if (`$report.outcome -ne 'PASS')"), [StringSplitOptions]::None).Length -ne 2 -or
+    $live.Split([string[]]@('Only cancel this test''s own unfinished task'), [StringSplitOptions]::None).Length -ne 2 -or
+    -not $live.Contains('Stop-Process -Id $secondaryFixture.Id') -or
+    -not $live.Contains('$receipt.finalDistinctWindowsVerified -lt 2') -or
+    -not $live.Contains('$secondTreeFinal = Read-BoundedWinAppTree')) {
     throw 'Live Computer Use E2E script is duplicated, truncated, or missing required multi-window checks.'
 }
 Write-Output 'PASS: all local agent validation scripts parse and the main runner has one entry point.'

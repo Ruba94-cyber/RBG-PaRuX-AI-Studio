@@ -198,6 +198,8 @@ public sealed class ComputerUseGuiProofLedgerTests
         Assert.False(ledger.RecheckAllWindows(new[] { changedEditor, stillSaved }));
         Assert.False(ledger.RecheckAllWindows(new[] { stillSaved }));
         Assert.False(ledger.RecheckAllWindows(new[] { stillSaved, stillSaved }));
+        Assert.False(ledger.RecheckAllWindows(new[] { Evidence(), null! }));
+        Assert.False(ledger.RecheckAllWindows(new[] { null!, stillSaved }));
         Assert.False(ledger.RecheckAllWindows(new[] {
             Evidence(), Evidence(stillSaved.Tree, 203, 909)
         }));
@@ -224,6 +226,9 @@ public sealed class ComputerUseGuiProofLedgerTests
         Assert.False(ledger.HasProof);
         Assert.Equal(ComputerUseGuiProofLedger.AddResult.Recorded,
             ledger.TryRecordVerifiedWindow(first, OsWindow("Editor.exe", 137, 804)));
+        Assert.Equal(ComputerUseGuiProofLedger.AddResult.InvalidProof,
+            ledger.TryRecordVerifiedWindow(first, null));
+        Assert.Equal(1, ledger.WindowCount);
         Assert.Equal(ComputerUseGuiProofLedger.AddResult.DifferentWindow,
             ledger.TryRecordVerifiedWindow(Proof("txt-secondary", "name", "Confirmed"),
                 OsWindow("AnotherEditor.exe", 137, 804)));

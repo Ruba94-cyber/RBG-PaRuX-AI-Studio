@@ -76,8 +76,8 @@ function Assert-ExpectedNotPresent {
     }
     try { $probe = ConvertFrom-Json -InputObject $rawProbe -ErrorAction Stop }
     catch { throw 'Negative UIA probe did not return structured JSON.' }
-    if ($null -eq $probe -or $probe -is [array] -or $null -ne $probe.error
-        -or $probe.found -cne $false -or $probe.timedOut -cne $true) {
+    if ($null -eq $probe -or $probe -is [array] -or $null -ne $probe.error -or
+        $probe.found -cne $false -or $probe.timedOut -cne $true) {
         throw 'The negative UIA probe was not a genuine observed absence.'
     }
 }
@@ -162,12 +162,12 @@ try {
         throw 'Fixture selectors were not independently observed under the exact HWND.'
     }
     if ($action -ceq $result) { throw 'Action and result controls cannot share a selector.' }
-    if ($RunDialogScenario -and ([string]::IsNullOrWhiteSpace($dialogAction)
-        -or $dialogAction -ceq $action -or $dialogAction -ceq $result)) {
+    if ($RunDialogScenario -and ([string]::IsNullOrWhiteSpace($dialogAction) -or
+        $dialogAction -ceq $action -or $dialogAction -ceq $result)) {
         throw 'Owned-dialog selector was absent or duplicates another control.'
     }
-    if ($RunRecoveryScenario -and ([string]::IsNullOrWhiteSpace($reset)
-        -or $reset -ceq $action -or $reset -ceq $result)) {
+    if ($RunRecoveryScenario -and ([string]::IsNullOrWhiteSpace($reset) -or
+        $reset -ceq $action -or $reset -ceq $result)) {
         throw 'The reset control must be independently observed and distinct.'
     }
 
@@ -221,8 +221,8 @@ try {
                 [IO.File]::ReadAllText((Join-Path $OutputRoot 'final-readback.json'))) -ErrorAction Stop
         }
         catch { throw 'Final independent readback did not return JSON.' }
-        if ($null -eq $final -or $final.found -cne $true -or $final.timedOut -ceq $true
-            -or $null -ne $final.error) {
+        if ($null -eq $final -or $final.found -cne $true -or $final.timedOut -ceq $true -or
+            $null -ne $final.error) {
             throw 'Final independent readback did not confirm the repaired control.'
         }
         $recovery.finalReadback = 'PASS'

@@ -112,6 +112,12 @@ public sealed class WindowsUiAssertionPolicyTests
     [InlineData("not-json")]
     [InlineData("""{"error":{"selector":"lbl-ok","text":"Passed"}}""")]
     [InlineData("""{"windows":[{"hwnd":131906,"elements":"not-an-array"}]}""")]
+    [InlineData("""{"windows":[{"hwnd":131906}]}""")]
+    [InlineData("""{"windows":[{"hwnd":131906,"elements":null}]}""")]
+    [InlineData("""{"windows":[null,{"hwnd":131906,"elements":[{"selector":"lbl-ok","text":"Passed"}]}]}""")]
+    [InlineData("""{"windows":[{"elements":[]},{"hwnd":131906,"elements":[{"selector":"lbl-ok","text":"Passed"}]}]}""")]
+    [InlineData("""{"windows":[{"hwnd":"invalid","elements":[]},{"hwnd":131906,"elements":[{"selector":"lbl-ok","text":"Passed"}]}]}""")]
+    [InlineData("""{"windows":[{"hwnd":98765},{"hwnd":131906,"elements":[{"selector":"lbl-ok","text":"Passed"}]}]}""")]
     public void Error_and_malformed_observations_are_not_success(string raw)
     {
         Assert.Equal(WindowsUiAssertionPolicy.Verdict.InvalidObservation,
