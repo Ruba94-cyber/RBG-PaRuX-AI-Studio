@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using PaRuX.Services;
 using Xunit;
 
@@ -141,4 +142,106 @@ public sealed class ComputerUseGuiProofLedgerTests
         Assert.DoesNotContain("private sensitive password-like expected text",
             ledger.ToString(), StringComparison.Ordinal);
     }
+    private static ComputerUseWindowFocusPolicy.Candidate OsWindow(
+        string file, int pid, long hwnd) =>
+        new("OS title is not evidence", pid, hwnd,
+            Path.Combine(Path.GetTempPath(), "parux-provenance-fixture", file));
+
+    [Fact]
+    public void Two_approved_processes_are_verified_again_from_separate_fresh_trees()
+    {
+        var ledger = new ComputerUseGuiProofLedger();
+        var editor = OsWindow("Editor.exe", 137, 804);
+        var spreadsheet = OsWindow("Spreadsheet.exe", 202, 909);
+        Assert.Equal(ComputerUseGuiProofLedger.AddResult.Recorded,
+            ledger.TryRecordVerifiedWindow(Proof("txt-main", "value", "ready"), editor));
+        Assert.Equal(ComputerUseGuiProofLedger.AddResult.Recorded,
+            ledger.TryRecordVerifiedWindow(
+                Proof("cell-status", "value", "saved", 202, 909), spreadsheet));
+        Assert.Equal(2, ledger.WindowCount);
+        Assert.False(ledger.RecheckAll(Evidence())); // one tree cannot prove two windows
+
+        var currentEditor = Evidence();
+        var currentSpreadsheet = Evidence("""
+            {"windows":[{"hwnd":909,"elements":[
+              {"selector":"cell-status","value":"saved"}
+            ]}]}
+            """, 202, 909);
+        Assert.True(ledger.RecheckAllWindows(
+            new[] { currentEditor, currentSpreadsheet }));
+        Assert.True(ledger.RecheckAllWindows(
+            new[] { currentSpreadsheet, currentEditor }));
+    }
+
+    [Fact]
+    public void Stale_earlier_app_or_missing_second_window_revokes_entire_workflow_proof()
+    {
+        var ledger = new ComputerUseGuiProofLedger();
+        Assert.Equal(ComputerUseGuiProofLedger.AddResult.Recorded,
+            ledger.TryRecordVerifiedWindow(
+                Proof("txt-main", "value", "ready"), OsWindow("Editor.exe", 137, 804)));
+        Assert.Equal(ComputerUseGuiProofLedger.AddResult.Recorded,
+            ledger.TryRecordVerifiedWindow(
+                Proof("cell-status", "value", "saved", 202, 909),
+                OsWindow("Spreadsheet.exe", 202, 909)));
+
+        var changedEditor = Evidence("""
+            {"windows":[{"hwnd":804,"elements":[
+              {"selector":"txt-main","value":"stale"}
+            ]}]}
+            """);
+        var stillSaved = Evidence("""
+            {"windows":[{"hwnd":909,"elements":[
+              {"selector":"cell-status","value":"saved"}
+            ]}]}
+            """, 202, 909);
+        Assert.False(ledger.RecheckAllWindows(new[] { changedEditor, stillSaved }));
+        Assert.False(ledger.RecheckAllWindows(new[] { stillSaved }));
+        Assert.False(ledger.RecheckAllWindows(new[] { stillSaved, stillSaved }));
+        Assert.False(ledger.RecheckAllWindows(new[] {
+            Evidence(), Evidence(stillSaved.Tree, 203, 909)
+        }));
+        Assert.False(ledger.RecheckAllWindows(new[] {
+            Evidence(), Evidence(stillSaved.Tree, 202, 910)
+        }));
+        ledger.Invalidate();
+        Assert.False(ledger.RecheckAllWindows(new[] { Evidence(), stillSaved }));
+        Assert.Equal(0, ledger.WindowCount);
+    }
+
+    [Fact]
+    public void Attested_window_must_match_proof_and_unapproved_process_identity_is_rejected()
+    {
+        var ledger = new ComputerUseGuiProofLedger();
+        var first = Proof("txt-main", "value", "ready");
+        Assert.Equal(ComputerUseGuiProofLedger.AddResult.InvalidProof,
+            ledger.TryRecordVerifiedWindow(first, null));
+        Assert.Equal(ComputerUseGuiProofLedger.AddResult.InvalidProof,
+            ledger.TryRecordVerifiedWindow(first, OsWindow("Editor.exe", 138, 804)));
+        Assert.Equal(ComputerUseGuiProofLedger.AddResult.InvalidProof,
+            ledger.TryRecordVerifiedWindow(first, new(
+                "fake", 137, 804, "relative.exe")));
+        Assert.False(ledger.HasProof);
+        Assert.Equal(ComputerUseGuiProofLedger.AddResult.Recorded,
+            ledger.TryRecordVerifiedWindow(first, OsWindow("Editor.exe", 137, 804)));
+        Assert.Equal(ComputerUseGuiProofLedger.AddResult.DifferentWindow,
+            ledger.TryRecordVerifiedWindow(Proof("txt-secondary", "name", "Confirmed"),
+                OsWindow("AnotherEditor.exe", 137, 804)));
+        Assert.Equal(1, ledger.Count);
+    }
+
+    [Fact]
+    public void Strict_legacy_single_window_mode_does_not_silently_upgrade_to_cross_app()
+    {
+        var ledger = new ComputerUseGuiProofLedger();
+        Assert.Equal(ComputerUseGuiProofLedger.AddResult.Recorded,
+            ledger.TryRecord(Proof("txt-main", "value", "ready")));
+        Assert.Equal(ComputerUseGuiProofLedger.AddResult.DifferentWindow,
+            ledger.TryRecordVerifiedWindow(
+                Proof("cell-status", "value", "saved", 202, 909),
+                OsWindow("Spreadsheet.exe", 202, 909)));
+        Assert.Equal(0, ledger.WindowCount);
+        Assert.True(ledger.RecheckAll(Evidence()));
+    }
+
 }
