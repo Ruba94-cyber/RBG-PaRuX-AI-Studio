@@ -618,7 +618,7 @@ namespace PaRuX.Services
                         return "App name was not uniquely found in the explicit Computer Use allowlist. Nothing was launched.";
 
                     ComputerActionResult launched = await ComputerUseService.ExecuteAsync(
-                        ComputerUseService.SerializePlan(plan)).ConfigureAwait(false);
+                        ComputerUseService.SerializePlan(plan), ct).ConfigureAwait(false);
                     // Do not echo the private path/arguments or process errors
                     // into a model-visible task transcript.
                     return launched.Success ? null
