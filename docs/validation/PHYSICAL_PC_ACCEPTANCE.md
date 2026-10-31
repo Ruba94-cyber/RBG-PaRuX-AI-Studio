@@ -4,6 +4,24 @@ Manual procedures for the owner to run on a real Windows PC and phone. Every pro
 
 ## Computer Use across Windows applications (NOT RUN)
 
+### 2026-10-31 approved cross-window UIA verification: two real processes (NOT RUN)
+
+The Computer Use executor now retains up to eight **OS-attested** exact UIA control postconditions across explicitly focused app windows, if their executable paths are in the LIVE Computer Use Settings allowlist. A verified focus transition preserves previously asserted read-only evidence but requires a new successful `ui_assert` for the current window before `done`. Any real data-changing UI action, app launch, invalid assertion or final readback mismatch clears the batch. A single-window legacy unscoped proof must NOT silently upgrade into multi-app proof. Final verification reads each recorded HWND without changing focus, rechecks native PID/executable identity before and after each read, verifies every control expectation and refuses a changed/remotely closed window or revoked app. This is sequential readback, NOT an atomic distributed transaction or proof that Excel/Outlook saved to their backends.
+
+**On a disposable Windows desktop with PaRuX, local model, same-checkout built `parux.exe`, WinApp CLI and an explicitly authorized fixture EXE**, run the optional two-PID scenario:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunLiveMultiWindowE2E -CliPath "artifacts\validation\cli\parux.exe" -WinAppCli winapp
+```
+
+The script spawns **two tracked WinForms processes of the same test executable**, each with a distinct PID, native main HWND, title, nonce and initially `PENDING` result. It never self-approves the apps or the task. After the human explicitly approves only the disposable EXE in Settings and the individual Core task, the genuine local PaRuX agent must focus and press Run in EACH window, then (after both mutations) explicitly revisit both windows using `focus_window` and `ui_assert` their distinct nonce-bound `ACCEPTED-...` values without further data changes. The Core result must be `completed` with independent `verificationStatus=pass`, worker `authorization=task-scoped-remote-approval`, at least two positive exact assertions and `finalDistinctWindowsVerified >= 2`. The acceptance script then performs independent WinApp inspections of both original HWNDs and confirms each process is still alive and unchanged. A model claim or text-only outcome cannot satisfy PASS.
+
+**Mandatory negatives before acceptance:** remove the first EXE approval after its assertion but before `done`; switch to an unapproved helper process; close/restart the first fixture instance so the PID/HWND changes; change the first result to PENDING after the second result was asserted; create ambiguous same-title windows; make WinApp inspect unavailable on a background HWND. Each condition must fail closed. Specifically test whether your installed WinApp version supports read-only `ui inspect -w <background-HWND>`; failure must produce a truthful FAIL/NOT_RUN, NEVER a green result. STOP/Gaming Mode and task approval checks must still apply between captures. Compare the worker numeric receipt with OS UIA evidence, not a user-supplied process ID or screenshot caption.
+
+This scenario proves two distinct processes of a **single disposable fixture EXE**, not third-party office-suite integration. Subsequent isolated Windows tests should use two separately approved programs (for example test document app plus test spreadsheet app), and explicitly validate filesystem persistence/IPC/server acknowledgements beyond UIA control states. No tests of Excel, Outlook, Gmail or Teams are claimed at this stage. **Status: source implemented; no Windows/.NET/PowerShell AST/xUnit/WinApp/FlaUI/real agent execution observed here; UAI-07 PARTIAL.**
+
+
+
 ### 2026-10-31 multi-control GUI proof and recheck regression (NOT RUN)
 
 The app's GUI-testing path now supports **up to eight independent, exact UIA control postconditions in one foreground window state epoch**; it no longer allows a final `done` based on the last of several previously verified controls while an earlier control is stale. It is a control-state proof for ONE OS-observed PID/HWND per epoch, not a cross-window verification contract. All controls must be asserted **AFTER** the last mutating action or explicit focus. Another mutation/focus clears the entire set. A successful `done` requires a fresh separate WinApp UIA readback verifying **all** distinct control selectors/expected values against the same window. A mismatch, missing/ambiguous control, changed PID/HWND, conflicting expectation, exceeding 8 controls or withdrawn task/app authorization must withhold completion. No private selectors or values enter the final receipt; `finalDistinctControlsVerified` is a fixed integer 0–8.
