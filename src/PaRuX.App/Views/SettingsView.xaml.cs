@@ -2555,11 +2555,23 @@ namespace PaRuX.Views
                 List<ComputerAppShortcut> allowed =
                     SettingsStore.Current.Data.ComputerApps ??= new List<ComputerAppShortcut>();
                 // Avoid duplicate executable grants or ambiguous display names.
-                if (allowed.Any(a => string.Equals(a.ExecutablePath, chosen.ExecutablePath,
-                        StringComparison.OrdinalIgnoreCase))
+                if (allowed.Any(a =>
+                        string.Equals(a.ExecutablePath, chosen.ExecutablePath,
+                            StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(a.Name, chosen.Name,
+                            StringComparison.OrdinalIgnoreCase))
                     || ComputerUseService.GetAllowedAppNames().Any(n =>
                         string.Equals(n, chosen.Name, StringComparison.OrdinalIgnoreCase)))
+                {
+                    await new ContentDialog
+                    {
+                        Title = "App already approved",
+                        Content = "An app with this name or executable is already in the allowlist. Remove that entry first if you want to replace it.",
+                        CloseButtonText = "OK",
+                        XamlRoot = XamlRoot
+                    }.ShowAsync();
                     return;
+                }
 
                 allowed.Add(new ComputerAppShortcut
                 {
