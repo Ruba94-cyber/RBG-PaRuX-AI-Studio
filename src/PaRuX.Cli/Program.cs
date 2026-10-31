@@ -685,7 +685,18 @@ async Task AgentShowAsync(string[] rest, CancellationToken ct)
     if (bootstrap == null) { Environment.ExitCode = 1; return; }
     using HttpClient client = CreateClient(bootstrap);
     AgentTaskDto? task = await GetTaskAsync(client, rest[0], ct);
-    if (task != null) await PrintTaskAsync(client, task, includeResult: true, ct);
+    if (task == null) return;
+    if (rest.Skip(1).Any(arg => string.Equals(arg, "--json", StringComparison.OrdinalIgnoreCase)))
+    {
+        // Machine-readable snapshot of the same Core task; no second execution
+        // path, no approval bypass. Output may contain user text and resultJson:
+        // callers must keep stdout in memory and avoid public logs.
+        Console.WriteLine(JsonSerializer.Serialize(task, jsonOptions));
+    }
+    else
+    {
+        await PrintTaskAsync(client, task, includeResult: true, ct);
+    }
 }
 
 async Task AgentLogsAsync(string[] rest, CancellationToken ct)
@@ -999,7 +1010,7 @@ Agent command center:
                   [--max-repair N] [--detach]
   parux agent <goal>                         Backward-compatible alias for agent run
   parux agent list
-  parux agent show <taskId>
+  parux agent show <taskId> [--json]       Machine-readable local task snapshot
   parux agent logs <taskId> [--follow]
   parux agent stop <taskId>
   parux agent resume <taskId>                Core-authoritative resume of preserved failed/inconclusive state
