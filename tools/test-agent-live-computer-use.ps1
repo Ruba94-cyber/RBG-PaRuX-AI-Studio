@@ -364,6 +364,21 @@ try {
         -or [string]$finalInput[0].value -cne 'ready') {
         throw 'One independent native WinApp observation did not confirm both controls.'
     }
+    if ($RunCrossWindowScenario) {
+        $secondaryFixture.Refresh()
+        if ($secondaryFixture.HasExited -or
+            $secondaryFixture.MainWindowHandle.ToInt64() -ne $secondWindow
+            -or $secondaryFixture.Id -eq $fixture.Id) {
+            throw 'Second disposable process/window changed identity before external readback.'
+        }
+        $secondTreeFinal = Read-BoundedWinAppTree -Hwnd $secondWindow
+        $secondFinalResult = @(Find-ControlsByAutomationId -Elements $secondTreeFinal.elements -AutomationId 'parux-fixture-result')
+        if ($secondFinalResult.Count -ne 1
+            -or [string]$secondFinalResult[0].selector -cne $secondResultSelector
+            -or [string]$secondFinalResult[0].value -cne ('ACCEPTED-' + $secondNonce)) {
+            throw 'The external WinApp inspector did not observe the second process result.'
+        }
+    }
     $report.nativePostcondition = 'PASS'
     $report.outcome = 'PASS'
     $report.reasonCode = 'real_agent_core_and_native_postcondition_verified'
