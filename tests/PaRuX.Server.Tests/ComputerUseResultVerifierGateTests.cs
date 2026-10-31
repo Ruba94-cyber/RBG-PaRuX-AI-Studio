@@ -41,6 +41,7 @@ public sealed class ComputerUseResultVerifierGateTests
                 finalReadbackChecks = finalChecks,
                 finalReadbackFailures = 0,
                 finalDistinctControlsVerified = gui ? 1 : 0,
+                finalDistinctWindowsVerified = gui ? 1 : 0,
                 stepsTaken = 4
             }
         });
@@ -163,5 +164,16 @@ public sealed class ComputerUseResultVerifierGateTests
         Assert.True(ComputerUseResultVerifierGate.Evaluate(
             "computer-use", GuiGoal, json.ToJsonString()).Allowed);
     }
+    [Theory]
+    [InlineData("0")]
+    [InlineData("2")]
+    [InlineData("9")]
+    public void Forged_final_window_count_is_rejected(string count)
+    {
+        string modified = Alter(Fixture(), "finalDistinctWindowsVerified", JsonNode.Parse(count));
+        Assert.False(ComputerUseResultVerifierGate.Evaluate(
+            "computer-use", GuiGoal, modified).Allowed);
+    }
+
 
 }
