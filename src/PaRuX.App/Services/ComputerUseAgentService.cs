@@ -518,7 +518,9 @@ namespace PaRuX.Services
                                         finalReadback.ProcessId, finalReadback.WindowHandle) == null
                                     && guiProofs.RecheckAll(finalReadback);
                             }
-                            trace.RecordFinalReadback(finalReadbackVerified, guiProofs.Count);
+                            trace.RecordFinalReadback(
+                                finalReadbackVerified, guiProofs.Count,
+                                Math.Max(1, guiProofs.WindowCount));
                             if (!finalReadbackVerified)
                             {
                                 // A changed/unavailable independent control
