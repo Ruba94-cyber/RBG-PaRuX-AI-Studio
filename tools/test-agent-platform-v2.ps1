@@ -8,12 +8,15 @@ code as independent PASS/FAIL/NOT_RUN. Never counts an unrun hardware test as su
 powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1
 .EXAMPLE
 powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunReleaseGate -RunFlaUI -WinAppTarget PaRuX
+.EXAMPLE
+powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunNativeUiRecovery
 #>
 [CmdletBinding()]
 param(
     [switch]$RunReleaseGate,
     [switch]$RunFlaUI,
     [switch]$RunNativeUiE2E,
+    [switch]$RunNativeUiRecovery,
     [switch]$RunBrowserE2E,
     [string]$BrowserExecutable,
     [string]$WinAppCli = 'winapp',
@@ -48,108 +51,7 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
             $currentBranch = $foundBranch.Trim()
         }
         $foundCommit = (& git -C $repo rev-parse HEAD 2>$null | Select-Object -First 1)
-        if ($LASTEXITCODE -eq 0 -and $foundCommit -match '^[a-f0-9]{40}
-    unit = 'NOT_RUN'
-    browserDomJs = 'NOT_RUN'
-    releaseGate = 'NOT_RUN'
-    flaui = 'NOT_RUN'
-    nativeUiFunctional = 'NOT_RUN'
-    browserCdpFunctional = 'NOT_RUN'
-    winappUia = 'NOT_RUN'
-    physicalGpuAndLongContext = 'NOT_RUN'
-    selfImprovementDogfood = 'NOT_RUN'
-}
-
-function Invoke-Gate {
-    param([string]$Name, [scriptblock]$Action, [string]$LogName)
-    $log = Join-Path $OutputRoot $LogName
-    try {
-        $global:LASTEXITCODE = 0
-        & $Action *>&1 | Out-File -FilePath $log -Encoding UTF8
-        if ($LASTEXITCODE -ne 0) {
-            $results[$Name] = 'FAIL'
-            return
-        }
-        $results[$Name] = 'PASS'
-    }
-    catch {
-        $results[$Name] = 'FAIL'
-        $_ | Out-String | Out-File -FilePath $log -Append -Encoding UTF8
-    }
-}
-
-try {
-    Invoke-Gate -Name unit -LogName 'agent-v2-xunit.log' -Action {
-        dotnet test tests\PaRuX.Server.Tests\PaRuX.Server.Tests.csproj -c Debug --filter 'FullyQualifiedName~CodingAgentPromptBudgetPolicyTests|FullyQualifiedName~CodingAgentCheckpointStoreTests|FullyQualifiedName~CodingWorkspaceVerificationFingerprintTests|FullyQualifiedName~CodingWorkspaceGitLayoutPolicyTests|FullyQualifiedName~CodingRepositoryAliasPolicyTests|FullyQualifiedName~CodingBrowserPostconditionPolicyTests|FullyQualifiedName~CodingVerificationCommandPolicyTests|FullyQualifiedName~CodingVerificationManifestPolicyTests|FullyQualifiedName~CodingVerificationDiscoveryTests|FullyQualifiedName~CodingTaskApplyAdmissionPolicyTests|FullyQualifiedName~CodingAgentObservationPolicyTests|FullyQualifiedName~OpenCodeLocalProbeTests|FullyQualifiedName~WindowsUiActionServiceTests|FullyQualifiedName~WindowsUiAssertionPolicyTests|FullyQualifiedName~ComputerUseAppSelectionPolicyTests|FullyQualifiedName~ComputerUseAppLaunchPolicyTests|FullyQualifiedName~ComputerUseRunningAppDiscoveryTests|FullyQualifiedName~ComputerUseGuiTestEvidenceGateTests|FullyQualifiedName~ComputerUseGuiFinalProofTests|FullyQualifiedName~ComputerUseGuiRunTraceTests|FullyQualifiedName~ComputerUseGuiReceiptPresenterTests|FullyQualifiedName~ComputerUseResultVerifierGateTests|FullyQualifiedName~ComputerUseWindowSelectionPolicyTests|FullyQualifiedName~ComputerUseWindowFocusPolicyTests|FullyQualifiedName~ComputerUseTaskAppLeaseTests|FullyQualifiedName~ComputerUseSensitiveActionPolicyTests|FullyQualifiedName~WindowsUiTreeObservationServiceTests|FullyQualifiedName~UiCaptureProvenancePolicyTests|FullyQualifiedName~UiVerificationEvidenceGateTests|FullyQualifiedName~CodingResultVerifierGateTests|FullyQualifiedName~VerifierServiceTests|FullyQualifiedName~ComputerUseActionParserTests|FullyQualifiedName~ComputerUseCompletionGateTests|FullyQualifiedName~LocalSearxngSearchProviderTests|FullyQualifiedName~CodingWebSearchPolicyTests|FullyQualifiedName~CodingWebSearchEvidenceFormatterTests|FullyQualifiedName~CodingWebSearchEndpointTests|FullyQualifiedName~OpenCodeSessionObserverTests|FullyQualifiedName~OpenCodeSessionEndpointTests|FullyQualifiedName~CodingAgentBackendSelectionPolicyTests|FullyQualifiedName~BrowserDevToolsEvaluationPolicyTests|FullyQualifiedName~WindowsUiActionResultPolicyTests|FullyQualifiedName~CodingRenderedPromptCountContractTests|FullyQualifiedName~CodingPromptTokenCountEndpointTests|FullyQualifiedName~RuntimeTokenCounterTests|FullyQualifiedName~BrowserRedirectObservationPolicyTests|FullyQualifiedName~BrowserRequestAdmissionPolicyTests|FullyQualifiedName~BrowserLiteralAddressPolicyTests|FullyQualifiedName~BrowserAttachedTargetPolicyTests|FullyQualifiedName~BrowserDevToolsNavigationResultPolicyTests|FullyQualifiedName~BrowserNetworkEvidencePolicyTests|FullyQualifiedName~CodingCompletionClaimPolicyTests|FullyQualifiedName~CodingAgentProactiveContextPolicyTests|FullyQualifiedName~CodingProjectInstructionResolverTests|FullyQualifiedName~CodingStepStageReporterTests|FullyQualifiedName~BrowserDomActionScriptBuilderTests|FullyQualifiedName~BrowserDomActionResultPolicyTests|FullyQualifiedName~BrowserDomAssertionPolicyTests|FullyQualifiedName~BrowserDomAssertionResultPolicyTests|FullyQualifiedName~BrowserUiMutationPolicyTests|FullyQualifiedName~BrowserTaskOwnerLeaseTests|FullyQualifiedName~CodingTaskRunLeaseTests|FullyQualifiedName~CodeWorktreeApplyServiceTests|FullyQualifiedName~MultiRepositoryApplyServiceTests|FullyQualifiedName~ShadowWorkspaceServiceTests|FullyQualifiedName~ShadowApplyTransactionTests|FullyQualifiedName~ShadowApplyRecoveryInspectorTests|FullyQualifiedName~ShadowApplyRecoveryServiceTests|FullyQualifiedName~ShadowRecoveryDialogModelTests|FullyQualifiedName~ShadowApplyPathPolicyTests'
-    }
-    # browserDomJs is a required gate, not an opt-in one. Without Node its two suites never execute, so the
-    # gate must read FAIL (the exit logic below then fails the run) rather than stay NOT_RUN and exit 0.
-    Invoke-Gate -Name browserDomJs -LogName 'browser-dom-js.log' -Action {
-        if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-            throw 'Node.js is not on PATH, so tools/test-browser-dom-assertion.mjs and tools/test-browser-agent-fixture.mjs cannot run.'
-        }
-        node --test tools/test-browser-dom-assertion.mjs tools/test-browser-agent-fixture.mjs
-    }
-    if ($RunReleaseGate) {
-        Invoke-Gate -Name releaseGate -LogName 'agent-v2-release-gate.log' -Action {
-            & (Join-Path $repo 'tools\release-gate.ps1') -Restore
-        }
-    }
-    if ($RunFlaUI) {
-        Invoke-Gate -Name flaui -LogName 'agent-v2-flaui.log' -Action {
-            if ([string]::IsNullOrWhiteSpace($AppPath)) {
-                & (Join-Path $repo 'tools\test-ui.ps1') -Suite Regression
-            } else {
-                & (Join-Path $repo 'tools\test-ui.ps1') -Suite Regression -AppPath $AppPath
-            }
-        }
-    }
-    if ($RunBrowserE2E) {
-        Invoke-Gate -Name browserCdpFunctional -LogName 'browser-cdp-functional.log' -Action {
-            if ([string]::IsNullOrWhiteSpace($BrowserExecutable)) {
-                throw 'RunBrowserE2E requires -BrowserExecutable with an installed Edge/Chrome executable.'
-            }
-            node tools/test-browser-cdp-e2e.mjs $BrowserExecutable
-        }
-    }
-    if ($RunNativeUiE2E) {
-        Invoke-Gate -Name nativeUiFunctional -LogName 'native-ui-functional.log' -Action {
-            & (Join-Path $repo 'tools\test-agent-native-ui-e2e.ps1') -ConfirmFunctionalTest `
-                -WinAppCli $WinAppCli -OutputRoot (Join-Path $OutputRoot 'native-ui')
-        }
-    }
-    if (-not [string]::IsNullOrWhiteSpace($WinAppTarget)) {
-        Invoke-Gate -Name winappUia -LogName 'agent-v2-winapp-ui.log' -Action {
-            $parameters = @{
-                AppName = $WinAppTarget
-                OutputRoot = (Join-Path $OutputRoot 'winapp-evidence')
-            }
-            if ($CaptureWinAppScreenshot) { $parameters.CaptureScreenshot = $true }
-            & (Join-Path $repo 'tools\test-winapp-ui.ps1') @parameters
-        }
-    }
-}
-finally {
-    $results.executedUtc = [DateTime]::UtcNow.ToString('o')
-    $path = Join-Path $OutputRoot 'validation-status.json'
-    $results | ConvertTo-Json -Depth 5 | Out-File -FilePath $path -Encoding UTF8
-    Write-Output ('Agent Platform V2 validation report: ' + $path)
-    foreach ($key in @('unit', 'browserDomJs', 'releaseGate', 'flaui', 'nativeUiFunctional', 'browserCdpFunctional', 'winappUia', 'physicalGpuAndLongContext', 'selfImprovementDogfood')) {
-        Write-Output ($key + ': ' + $results[$key])
-    }
-}
-
-if ($results.unit -ne 'PASS' -or
-    $results.browserDomJs -eq 'FAIL' -or
-    ($RunReleaseGate -and $results.releaseGate -ne 'PASS') -or
-    ($RunFlaUI -and $results.flaui -ne 'PASS') -or
-    ($RunNativeUiE2E -and $results.nativeUiFunctional -ne 'PASS') -or
-    ($RunBrowserE2E -and $results.browserCdpFunctional -ne 'PASS') -or
-    (-not [string]::IsNullOrWhiteSpace($WinAppTarget) -and $results.winappUia -ne 'PASS')) {
-    exit 1
-}
-exit 0
-) {
+        if ($LASTEXITCODE -eq 0 -and $foundCommit -match '^[a-f0-9]{40}$') {
             $currentCommit = $foundCommit
         }
     }
@@ -167,6 +69,7 @@ $results = [ordered]@{
     releaseGate = 'NOT_RUN'
     flaui = 'NOT_RUN'
     nativeUiFunctional = 'NOT_RUN'
+    nativeUiRecovery = 'NOT_RUN'
     browserCdpFunctional = 'NOT_RUN'
     winappUia = 'NOT_RUN'
     physicalGpuAndLongContext = 'NOT_RUN'
@@ -231,6 +134,13 @@ try {
                 -WinAppCli $WinAppCli -OutputRoot (Join-Path $OutputRoot 'native-ui')
         }
     }
+    if ($RunNativeUiRecovery) {
+        Invoke-Gate -Name nativeUiRecovery -LogName 'native-ui-recovery.log' -Action {
+            & (Join-Path $repo 'tools\test-agent-native-ui-e2e.ps1') -ConfirmFunctionalTest `
+                -RunRecoveryScenario -WinAppCli $WinAppCli `
+                -OutputRoot (Join-Path $OutputRoot 'native-ui-recovery')
+        }
+    }
     if (-not [string]::IsNullOrWhiteSpace($WinAppTarget)) {
         Invoke-Gate -Name winappUia -LogName 'agent-v2-winapp-ui.log' -Action {
             $parameters = @{
@@ -247,7 +157,7 @@ finally {
     $path = Join-Path $OutputRoot 'validation-status.json'
     $results | ConvertTo-Json -Depth 5 | Out-File -FilePath $path -Encoding UTF8
     Write-Output ('Agent Platform V2 validation report: ' + $path)
-    foreach ($key in @('unit', 'browserDomJs', 'releaseGate', 'flaui', 'nativeUiFunctional', 'browserCdpFunctional', 'winappUia', 'physicalGpuAndLongContext', 'selfImprovementDogfood')) {
+    foreach ($key in @('unit', 'browserDomJs', 'releaseGate', 'flaui', 'nativeUiFunctional', 'nativeUiRecovery', 'browserCdpFunctional', 'winappUia', 'physicalGpuAndLongContext', 'selfImprovementDogfood')) {
         Write-Output ($key + ': ' + $results[$key])
     }
 }
@@ -257,6 +167,7 @@ if ($results.unit -ne 'PASS' -or
     ($RunReleaseGate -and $results.releaseGate -ne 'PASS') -or
     ($RunFlaUI -and $results.flaui -ne 'PASS') -or
     ($RunNativeUiE2E -and $results.nativeUiFunctional -ne 'PASS') -or
+    ($RunNativeUiRecovery -and $results.nativeUiRecovery -ne 'PASS') -or
     ($RunBrowserE2E -and $results.browserCdpFunctional -ne 'PASS') -or
     (-not [string]::IsNullOrWhiteSpace($WinAppTarget) -and $results.winappUia -ne 'PASS')) {
     exit 1
