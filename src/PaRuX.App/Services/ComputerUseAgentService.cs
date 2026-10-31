@@ -715,15 +715,20 @@ namespace PaRuX.Services
                         return "The selected window changed or could not be identified. No focus command was sent.";
                     string? focusStop = stopReason();
                     if (focusStop != null) return focusStop;
-                    bool focused = DesktopAutomationService.FocusWindow(windows[targetIndex].Handle);
+                    bool focused = DesktopAutomationService.FocusWindowIfSameIdentity(candidates[targetIndex]);
                     if (!focused) return ComputerUseActionParser.FocusRefusal(true, false);
 
-                    // SetForegroundWindow can report success without the target
-                    // actually owning the foreground after a concurrent switch.
+                    // A successful SetForegroundWindow call is not a verified
+                    // foreground transition. Recheck exact HWND/PID/EXE after it.
                     ForegroundWindowSnapshot after = DesktopAutomationService.CaptureForegroundWindow();
+                    ComputerUseWindowFocusPolicy.Candidate? afterIdentity =
+                        DesktopAutomationService.CaptureWindowFocusIdentity(
+                            new IntPtr(after.WindowHandle));
                     return ComputerUseActionParser.FocusRefusal(true,
                         after.ProcessId == candidates[targetIndex].ProcessId
-                        && after.WindowHandle == candidates[targetIndex].WindowHandle);
+                        && after.WindowHandle == candidates[targetIndex].WindowHandle
+                        && ComputerUseWindowFocusPolicy.IsUnchanged(
+                            candidates[targetIndex], afterIdentity));
                 }
                 case "wait":
                 {
