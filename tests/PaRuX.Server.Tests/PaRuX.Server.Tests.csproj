@@ -162,6 +162,7 @@
     <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseCompletionGate.cs" Link="ComputerUse\ComputerUseCompletionGate.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseGuiTestEvidenceGate.cs" Link="ComputerUse\ComputerUseGuiTestEvidenceGate.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseGuiFinalProof.cs" Link="ComputerUse\ComputerUseGuiFinalProof.cs" />
+    <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseGuiProofLedger.cs" Link="ComputerUse\ComputerUseGuiProofLedger.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseGuiRepairBudget.cs" Link="ComputerUse\ComputerUseGuiRepairBudget.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseGuiRunTrace.cs" Link="ComputerUse\ComputerUseGuiRunTrace.cs" />
     <Compile Include="..\..\src\PaRuX.App\Services\ComputerUseGuiReceiptPresenter.cs" Link="ComputerUse\ComputerUseGuiReceiptPresenter.cs" />
