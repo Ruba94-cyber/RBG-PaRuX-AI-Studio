@@ -60,6 +60,16 @@ namespace PaRuX.Services
                     || (!guiTest && finalControls != 0)))
                     return null;
 
+                int finalWindows = 0;
+                bool hasFinalWindows = receipt.TryGetProperty("finalDistinctWindowsVerified", out _);
+                if (hasFinalWindows && (!TryInt(receipt, "finalDistinctWindowsVerified",
+                        0, 8, out finalWindows)
+                    || finalWindows > passed
+                    || (ready && guiTest && finalWindows == 0)
+                    || (!guiTest && finalWindows != 0)
+                    || (hasFinalControls && finalWindows > finalControls)))
+                    return null;
+
                 string status = outcome switch
                 {
                     "ready_for_independent_verifier" =>
@@ -89,6 +99,8 @@ namespace PaRuX.Services
                 return status + " · UIA " + passed + " passed, " + failed + " failed"
                     + (hasFinalControls && guiTest
                         ? " · distinct controls " + finalControls : string.Empty)
+                    + (hasFinalWindows && guiTest
+                        ? " · distinct windows " + finalWindows : string.Empty)
                     + " · final checks " + checks + " (" + failures + " failed)"
                     + " · delivered actions " + delivered + "/" + attempts;
             }
