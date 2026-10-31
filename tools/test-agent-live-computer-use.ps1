@@ -214,12 +214,14 @@ try {
     # A model can read the desired value, but only genuine UIA proof and the
     # native observed value can establish it was actually reached.
     $expected = 'ACCEPTED-' + $nonce
-    $goal = 'Test the visible PaRuX Disposable UI Acceptance ' + $nonce +
-        ' window ONLY. Press its Run acceptance action button, then use ui_assert ' +
-        'on the observed result selector ' + $selector + ' with property value and ' +
-        'exact expected value ' + $expected +
+    $goal = 'Test ONLY the already running disposable Windows application titled PaRuX Disposable UI Acceptance ' + $nonce +
+        '. If this window is not in the foreground, use focus_window with the exact title ' +
+        'PaRuX Disposable UI Acceptance ' + $nonce +
+        ' (this app must already be user-approved). Press its Run acceptance action button, ' +
+        'then use ui_assert on the observed result selector ' + $selector +
+        ' with property value and exact expected value ' + $expected +
         '. Report done only after the exact UI assertion passes. ' +
-        'Do not use browser, shell, other applications or sensitive user content.'
+        'Do not open apps, use browser or shell, or interact with unrelated windows and private content.'
     $global:LASTEXITCODE = 0
     $createLines = @(& $cli agent run $goal --role computer-use --max-repair 0 --detach 2>&1)
     if ($LASTEXITCODE -ne 0) { throw 'PaRuX CLI failed to create a real Computer Use task.' }
