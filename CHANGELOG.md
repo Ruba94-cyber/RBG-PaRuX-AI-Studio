@@ -1,5 +1,12 @@
 # Changelog
 
+### 2026-10-31 — Redacted Computer Use GUI run receipts (source only)
+
+- Added a bounded per-run executor trace for attempted versus delivered actions, exact UIA assertion passes/failures, final readback attempts/failures and verified recovery. The resulting `guiRunReceipt` is versioned and contains only fixed status/reason fields, counts and booleans; no selectors, UI values, paths, window titles or model text.
+- Worker persists the redacted receipt for verifying, failed and cancelled desktop tasks. A GUI test's original user goal now controls the worker's admission requirement; independently verified final control state and consistent executor counts are mandatory before handing off to the separate goal verifier. **Ready for independent verifier is not a task PASS.**
+- Added hermetic xUnit regressions and local runner selection plus physical Windows acceptance cases. **No .NET build, xUnit, FlaUI or real Windows execution performed in this GitHub-only session.**
+
+
 ### 2026-10-31 — Independent GUI completion readback (source only)
 
 - A model's `done` no longer reuses an earlier `ui_assert` as proof of a GUI test result. PaRuX checks the same control/property/expected value again in a fresh UIA observation tied to the same PID/HWND, with no private text in the serialized result.
