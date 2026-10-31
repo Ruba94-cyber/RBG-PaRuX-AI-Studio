@@ -449,7 +449,16 @@ double ParseDouble(string value, string option)
 
 async Task RunAgentCommandAsync(string[] rest, CancellationToken ct)
 {
+    bool helpRequested = rest.Length > 0 && (rest[0] is "--help" or "-h")
+        || rest.Length > 1 && rest[0].Equals("run", StringComparison.OrdinalIgnoreCase) && (rest[1] is "--help" or "-h");
+    if (helpRequested)
+    {
+        PrintAgentHelp();
+        return;
+    }
+
     string sub = rest.Length > 0 ? rest[0].ToLowerInvariant() : string.Empty;
+    if (sub == "help") { PrintAgentHelp(); return; }
     if (sub is "list" or "ls") { await AgentListAsync(ct); return; }
     if (sub is "show" or "status") { await AgentShowAsync(rest.Skip(1).ToArray(), ct); return; }
     if (sub is "logs" or "log") { await AgentLogsAsync(rest.Skip(1).ToArray(), ct); return; }
@@ -1037,6 +1046,30 @@ Ctrl+C on agent/log/project watch commands detaches from observation; it does no
 durable work. Ctrl+C on download/benchmark/training explicitly asks Core to cancel that job.
 Virtual Context is a Core capability, so CLI/desktop/mobile continuations share the same >128k/1M+
 logical-history behavior.
+""");
+}
+
+void PrintAgentHelp()
+{
+    Console.WriteLine("""
+parux agent - create and manage durable PaRuX agent tasks
+
+Usage:
+  parux agent run <goal> [--role <name>] [--workspace <primaryRepo>]
+                  [--repo <alias>=<repo>]... [--permissions offline|package-fetch|trusted-restore]
+                  [--max-repair N] [--detach]
+  parux agent <goal>                         Backward-compatible alias for agent run
+  parux agent list | ls
+  parux agent show | status <taskId> [--json]
+  parux agent logs | log <taskId> [--follow]
+  parux agent stop | cancel <taskId>
+  parux agent resume <taskId>
+  parux agent open <taskId> [--editor code|cursor]
+  parux agent questions | question <taskId>
+  parux agent answer <taskId> <questionId> <text>
+
+Options:
+  -h, --help                                  Show this help without contacting PaRuX Core
 """);
 }
 
