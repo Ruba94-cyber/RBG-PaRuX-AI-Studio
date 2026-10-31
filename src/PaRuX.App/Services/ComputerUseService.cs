@@ -92,6 +92,9 @@ namespace PaRuX.Services
 
             foreach (ComputerAppShortcut configured in SettingsStore.Current.Data.ComputerApps ?? new List<ComputerAppShortcut>())
             {
+                if (!ComputerUseAppSelectionPolicy.IsValidName(configured.Name)
+                    || !ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(configured.ExecutablePath))
+                    continue;
                 IEnumerable<string> aliases = new[] { configured.Name, Path.GetFileNameWithoutExtension(configured.ExecutablePath) }
                     .Concat((configured.Aliases ?? string.Empty).Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries));
                 if (aliases.Where(a => !string.IsNullOrWhiteSpace(a)).Any(alias => ContainsPhrase(request, alias.Trim())))
@@ -226,7 +229,10 @@ namespace PaRuX.Services
             {
                 ComputerAppShortcut? allowed = (SettingsStore.Current.Data.ComputerApps ?? new List<ComputerAppShortcut>())
                     .FirstOrDefault(a => string.Equals(a.ExecutablePath, plan.Executable, StringComparison.OrdinalIgnoreCase));
-                if (allowed == null || !File.Exists(allowed.ExecutablePath))
+                if (allowed == null
+                    || !ComputerUseAppSelectionPolicy.IsValidName(allowed.Name)
+                    || !ComputerUseAppLaunchPolicy.IsAllowedConfiguredExecutable(allowed.ExecutablePath)
+                    || !File.Exists(allowed.ExecutablePath))
                     return new ComputerActionResult { Message = "That app is no longer in the Computer Use allowlist." };
                 plan.Arguments = allowed.Arguments;
             }
