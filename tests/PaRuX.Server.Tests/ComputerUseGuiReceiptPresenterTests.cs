@@ -27,6 +27,7 @@ public sealed class ComputerUseGuiReceiptPresenterTests
                 uiAssertionsFailed = 1,
                 finalReadbackChecks = 2,
                 finalReadbackFailures = 1,
+                finalDistinctControlsVerified = guiTest ? 2 : 0,
                 readyForIndependentVerifier = ready,
                 selector = "synthetic SECRET selector"
             }
@@ -41,6 +42,7 @@ public sealed class ComputerUseGuiReceiptPresenterTests
         Assert.NotNull(line);
         Assert.Contains("independent goal verification required", line);
         Assert.Contains("UIA 2 passed, 1 failed", line);
+        Assert.Contains("distinct controls 2", line);
         Assert.Contains("delivered actions 3/5", line);
         Assert.DoesNotContain("SECRET", line, StringComparison.Ordinal);
         Assert.DoesNotContain("selector", line, StringComparison.OrdinalIgnoreCase);
@@ -93,6 +95,7 @@ public sealed class ComputerUseGuiReceiptPresenterTests
         Assert.NotNull(line);
         Assert.Contains("Computer Use reported completion", line);
         Assert.DoesNotContain("GUI evidence captured", line);
+        Assert.DoesNotContain("distinct controls", line);
     }
 
     [Theory]
@@ -155,4 +158,14 @@ public sealed class ComputerUseGuiReceiptPresenterTests
         Assert.Null(ComputerUseGuiReceiptPresenter.BuildLine(
             "computer-use", original.Replace("\"finalReadbackFailures\":1", "\"finalReadbackFailures\":3")));
     }
+    [Theory]
+    [InlineData("\"finalDistinctControlsVerified\":2", "\"finalDistinctControlsVerified\":0")]
+    [InlineData("\"finalDistinctControlsVerified\":2", "\"finalDistinctControlsVerified\":9")]
+    [InlineData("\"finalDistinctControlsVerified\":2", "\"finalDistinctControlsVerified\":3")]
+    public void Invalid_distinct_control_counts_are_not_displayed(string oldValue, string newValue)
+    {
+        Assert.Null(ComputerUseGuiReceiptPresenter.BuildLine(
+            "computer-use", Receipt().Replace(oldValue, newValue)));
+    }
+
 }
