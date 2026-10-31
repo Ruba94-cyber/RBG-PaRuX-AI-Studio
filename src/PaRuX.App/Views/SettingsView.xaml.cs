@@ -2622,8 +2622,18 @@ namespace PaRuX.Views
                     || ComputerUseService.GetAllowedAppNames().Any(n =>
                         string.Equals(n, displayName, StringComparison.OrdinalIgnoreCase))
                     || (SettingsStore.Current.Data.ComputerApps?.Any(a =>
-                        string.Equals(a.ExecutablePath, file.Path, StringComparison.OrdinalIgnoreCase)) ?? false))
+                        string.Equals(a.ExecutablePath, file.Path, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(a.Name, displayName, StringComparison.OrdinalIgnoreCase)) ?? false))
+                {
+                    await new ContentDialog
+                    {
+                        Title = "Cannot approve this app",
+                        Content = "Select a local GUI executable with a unique name. Shell interpreters, scripts and already approved executables are not permitted.",
+                        CloseButtonText = "OK",
+                        XamlRoot = XamlRoot
+                    }.ShowAsync();
                     return;
+                }
                 SettingsStore.Current.Data.ComputerApps ??= new List<ComputerAppShortcut>();
                 SettingsStore.Current.Data.ComputerApps.Add(new ComputerAppShortcut
                 {
