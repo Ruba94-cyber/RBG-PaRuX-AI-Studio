@@ -21,40 +21,107 @@ public sealed class ComputerUseTaskAppLeaseTests
     }
 
     [Fact]
-    public void Successful_approved_app_binding_requires_fresh_matching_window()
+    public void Open_app_path_only_is_provisional_until_explicit_verified_focus()
     {
         var lease = new ComputerUseTaskAppLease();
         Assert.True(lease.BindApprovedExecutable(Exe("Editor.exe")));
         Assert.True(lease.IsActive);
+        Assert.False(lease.HasVerifiedProcess);
+        Assert.Contains("focus_window", lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
+        Assert.True(lease.HasVerifiedProcess);
         Assert.Null(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Other.exe")));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe", 71, 100)));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe", 70, 101)));
-        Assert.NotNull(lease.RefusalForAction(Screenshot(), null));
     }
 
     [Fact]
-    public void Untrusted_or_invalid_binding_cannot_revoke_a_preexisting_safe_scope()
+    public void Same_binary_in_another_process_is_not_the_authorized_window_instance()
+    {
+        var lease = new ComputerUseTaskAppLease();
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
+        Assert.Null(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200)));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe", 71, 100)));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(71, 100), Current("Editor.exe", 71, 100)));
+
+        // A deliberately requested and OS-verified focus transition, while
+        // the executable remains approved, may authorize the new instance.
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe", 71, 200), true));
+        Assert.Null(lease.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200)));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
+    }
+
+    [Fact]
+    public void Same_process_dialogs_and_secondary_top_level_windows_remain_in_scope()
+    {
+        var lease = new ComputerUseTaskAppLease();
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
+        Assert.Null(lease.RefusalForAction(Screenshot(70, 201), Current("Editor.exe", 70, 201)));
+        Assert.Null(lease.RefusalForAction(Screenshot(70, 202), Current("Editor.exe", 70, 202)));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(70, 202), Current("Editor.exe", 70, 201)));
+    }
+
+    [Fact]
+    public void Secondary_process_with_another_executable_requires_its_own_approval()
+    {
+        var lease = new ComputerUseTaskAppLease();
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
+        Assert.False(lease.BindVerifiedFocus(Current("Helper.exe", 71, 200), false));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(71, 200), Current("Helper.exe", 71, 200)));
+        Assert.Null(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
+
+        Assert.True(lease.BindVerifiedFocus(Current("Helper.exe", 71, 200), true));
+        Assert.Null(lease.RefusalForAction(Screenshot(71, 200), Current("Helper.exe", 71, 200)));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
+    }
+
+    [Fact]
+    public void Same_verified_process_does_not_require_regrant_for_second_dialog()
+    {
+        var lease = new ComputerUseTaskAppLease();
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe", 70, 202), false));
+        Assert.Null(lease.RefusalForAction(Screenshot(70, 203), Current("Editor.exe", 70, 203)));
+    }
+
+    [Fact]
+    public void Untrusted_or_invalid_binding_never_destroys_preexisting_verified_scope()
     {
         var lease = new ComputerUseTaskAppLease();
         Assert.False(lease.BindApprovedExecutable("relative.exe"));
         Assert.False(lease.IsActive);
-        Assert.True(lease.BindApprovedExecutable(Exe("Editor.exe")));
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
+        Assert.True(lease.HasVerifiedProcess);
         Assert.False(lease.BindApprovedExecutable(Exe("cmd.exe")));
+        Assert.False(lease.BindVerifiedFocus(Current("cmd.exe"), true));
+        Assert.False(lease.BindVerifiedFocus(Current("Helper.exe", 71, 201), false));
+        Assert.False(lease.BindVerifiedFocus(Current("Editor.exe", 71, 201), false));
         Assert.Null(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
         Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("cmd.exe")));
+        Assert.False(lease.BindVerifiedFocus(null, true));
     }
 
     [Fact]
-    public void Switching_to_a_second_approved_app_updates_only_this_run_scope()
+    public void Approved_new_open_app_clears_old_process_authority_until_refocused()
     {
         var lease = new ComputerUseTaskAppLease();
-        Assert.True(lease.BindApprovedExecutable(Exe("Editor.exe")));
+        Assert.True(lease.BindVerifiedFocus(Current("Editor.exe"), true));
         Assert.True(lease.BindApprovedExecutable(Exe("Excel.exe")));
-        Assert.Null(lease.RefusalForAction(Screenshot(), Current("Excel.exe")));
+        Assert.False(lease.HasVerifiedProcess);
         Assert.NotNull(lease.RefusalForAction(Screenshot(), Current("Editor.exe")));
+        Assert.NotNull(lease.RefusalForAction(Screenshot(90, 300), Current("Excel.exe", 90, 300)));
+        Assert.True(lease.BindVerifiedFocus(Current("Excel.exe", 90, 300), true));
+        Assert.Null(lease.RefusalForAction(Screenshot(90, 300), Current("Excel.exe", 90, 300)));
+    }
 
-        var unrelatedRun = new ComputerUseTaskAppLease();
-        Assert.False(unrelatedRun.IsActive);
+    [Fact]
+    public void Process_scope_is_task_local_and_does_not_grant_other_agent_runs()
+    {
+        var first = new ComputerUseTaskAppLease();
+        var second = new ComputerUseTaskAppLease();
+        Assert.True(first.BindVerifiedFocus(Current("Editor.exe", 70, 100), true));
+        Assert.False(second.IsActive);
+        Assert.True(second.BindVerifiedFocus(Current("Editor.exe", 71, 200), true));
+        Assert.NotNull(first.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200)));
+        Assert.Null(second.RefusalForAction(Screenshot(71, 200), Current("Editor.exe", 71, 200)));
     }
 }
