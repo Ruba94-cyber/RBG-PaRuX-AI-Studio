@@ -57,6 +57,16 @@ namespace PaRuX.Services
                 VerifiedAfterLatestMutation = false;
         }
 
+        /// <summary>
+        /// An independently re-read UI control changed or became unavailable
+        /// even though the agent did not deliver another mutation. The old
+        /// successful assertion remains in total counts but cannot satisfy done.
+        /// </summary>
+        internal void InvalidateExternalChange()
+        {
+            VerifiedAfterLatestMutation = false;
+        }
+
         internal void RecordVerifiedAssertion()
         {
             VerifiedAssertions++;
