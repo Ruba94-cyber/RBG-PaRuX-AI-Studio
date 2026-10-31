@@ -16,6 +16,8 @@ powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunNa
 powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunNativeModalE2E
 .EXAMPLE
 powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunLiveComputerUseE2E -CliPath C:\tools\parux.exe
+.EXAMPLE
+powershell -ExecutionPolicy Bypass -File tools\test-agent-platform-v2.ps1 -RunLiveMultiWindowE2E -CliPath C:\tools\parux.exe
 #>
 [CmdletBinding()]
 param(
@@ -26,6 +28,7 @@ param(
     [switch]$RunNativeDialogE2E,
     [switch]$RunNativeModalE2E,
     [switch]$RunLiveComputerUseE2E,
+    [switch]$RunLiveMultiWindowE2E,
     [string]$CliPath,
     [switch]$RunBrowserE2E,
     [string]$BrowserExecutable,
@@ -84,6 +87,7 @@ $results = [ordered]@{
     nativeUiDialog = 'NOT_RUN'
     nativeUiModal = 'NOT_RUN'
     liveComputerUseAgent = 'NOT_RUN'
+    liveMultiWindowAgent = 'NOT_RUN'
     browserCdpFunctional = 'NOT_RUN'
     winappUia = 'NOT_RUN'
     physicalGpuAndLongContext = 'NOT_RUN'
@@ -172,6 +176,20 @@ try {
                 -OutputRoot (Join-Path $OutputRoot 'native-ui-modal')
         }
     }
+    if ($RunLiveMultiWindowE2E) {
+        Invoke-Gate -Name liveMultiWindowAgent -LogName 'live-multi-window-agent.log' -Action {
+            if ($results.scriptSyntax -ne 'PASS') {
+                throw 'Real multi-window agent E2E requires the PowerShell parser gate to pass.'
+            }
+            if ([string]::IsNullOrWhiteSpace($CliPath)) {
+                throw '-RunLiveMultiWindowE2E requires -CliPath pointing to parux.exe.'
+            }
+            & (Join-Path $repo 'tools\test-agent-live-computer-use.ps1') `
+                -ConfirmLiveAgentTest -RunCrossWindowScenario `
+                -CliPath $CliPath -WinAppCli $WinAppCli `
+                -OutputRoot (Join-Path $OutputRoot 'live-multi-window-agent')
+        }
+    }
     if ($RunLiveComputerUseE2E) {
         Invoke-Gate -Name liveComputerUseAgent -LogName 'live-computer-use-agent.log' -Action {
             if ($results.scriptSyntax -ne 'PASS') {
@@ -201,7 +219,7 @@ finally {
     $path = Join-Path $OutputRoot 'validation-status.json'
     $results | ConvertTo-Json -Depth 5 | Out-File -FilePath $path -Encoding UTF8
     Write-Output ('Agent Platform V2 validation report: ' + $path)
-    foreach ($key in @('scriptSyntax', 'unit', 'browserDomJs', 'releaseGate', 'flaui', 'nativeUiFunctional', 'nativeUiRecovery', 'nativeUiDialog', 'nativeUiModal', 'liveComputerUseAgent', 'browserCdpFunctional', 'winappUia', 'physicalGpuAndLongContext', 'selfImprovementDogfood')) {
+    foreach ($key in @('scriptSyntax', 'unit', 'browserDomJs', 'releaseGate', 'flaui', 'nativeUiFunctional', 'nativeUiRecovery', 'nativeUiDialog', 'nativeUiModal', 'liveComputerUseAgent', 'liveMultiWindowAgent', 'browserCdpFunctional', 'winappUia', 'physicalGpuAndLongContext', 'selfImprovementDogfood')) {
         Write-Output ($key + ': ' + $results[$key])
     }
 }
@@ -216,6 +234,7 @@ if ($results.scriptSyntax -ne 'PASS' -or
     ($RunNativeDialogE2E -and $results.nativeUiDialog -ne 'PASS') -or
     ($RunNativeModalE2E -and $results.nativeUiModal -ne 'PASS') -or
     ($RunLiveComputerUseE2E -and $results.liveComputerUseAgent -ne 'PASS') -or
+    ($RunLiveMultiWindowE2E -and $results.liveMultiWindowAgent -ne 'PASS') -or
     ($RunBrowserE2E -and $results.browserCdpFunctional -ne 'PASS') -or
     (-not [string]::IsNullOrWhiteSpace($WinAppTarget) -and $results.winappUia -ne 'PASS')) {
     exit 1
